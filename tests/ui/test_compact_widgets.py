@@ -11,19 +11,23 @@ failed at the screen.
 
 from __future__ import annotations
 
+import pytest
 from PySide6.QtCore import QPoint, Qt
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import (
+    QApplication,
     QComboBox,
+    QFormLayout,
     QLabel,
     QLineEdit,
     QScrollArea,
     QSpinBox,
+    QStyleFactory,
     QVBoxLayout,
     QWidget,
 )
 
-from matteloop.ui.compact_widgets import compact_field
+from matteloop.ui.compact_widgets import compact_field, form_layout
 
 _ONE_NOTCH_DOWN = QPoint(0, -120)
 
@@ -73,6 +77,50 @@ def _combobox() -> QComboBox:
     combo.addItems(["a", "b", "c", "d", "e"])
     combo.setCurrentIndex(2)
     return combo
+
+
+@pytest.mark.parametrize("field_factory", (_spinbox, _combobox))
+def test_compact_fields_keep_width_under_the_macos_form_policy(
+    qtbot, field_factory
+) -> None:
+    application = QApplication.instance()
+    assert application is not None
+    original_style_name = application.style().objectName()
+    macos_style = QStyleFactory.create("macos")
+    try:
+        if macos_style is not None:
+            application.setStyle(macos_style)
+        else:
+            # Headless Linux may not ship Qt's macOS style plugin. Its form
+            # default is reproduced here so the test still documents the
+            # policy that collapses an Ignored field.
+            fallback = QFormLayout()
+            fallback.setFieldGrowthPolicy(
+                QFormLayout.FieldGrowthPolicy.FieldsStayAtSizeHint
+            )
+            assert (
+                fallback.fieldGrowthPolicy()
+                == QFormLayout.FieldGrowthPolicy.FieldsStayAtSizeHint
+            )
+
+        parent = QWidget()
+        qtbot.addWidget(parent)
+        layout = form_layout(parent)
+        field = compact_field(field_factory())
+        layout.addRow(QLabel("Field"), field)
+        parent.resize(320, 100)
+        parent.show()
+        application.processEvents()
+
+        assert (
+            layout.fieldGrowthPolicy()
+            == QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow
+        )
+        assert field.width() > 0
+    finally:
+        restored_style = QStyleFactory.create(original_style_name)
+        if restored_style is not None:
+            application.setStyle(restored_style)
 
 
 def test_wheel_over_unfocused_spinbox_scrolls_the_form_and_leaves_it_alone(

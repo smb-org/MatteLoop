@@ -13,7 +13,6 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDoubleSpinBox,
-    QFormLayout,
     QHBoxLayout,
     QLabel,
     QPushButton,
@@ -36,7 +35,7 @@ from matteloop.core.specs import (
     TransformSpec,
 )
 from matteloop.core.state import ArtifactResult
-from matteloop.ui.compact_widgets import compact_field
+from matteloop.ui.compact_widgets import compact_field, form_layout
 from matteloop.ui.parameter_presentation import (
     ParameterPresentation,
     fraction_from_widget_value,
@@ -361,7 +360,7 @@ class TransformGroup(QWidget):
 
     def _trim_section(self) -> QWidget:
         section = QWidget()
-        layout = QFormLayout(section)
+        layout = form_layout(section)
         layout.addRow(self._section_heading("Trim", "transform_trim_heading"))
         layout.addRow(
             _transform_label("First frame"),
@@ -383,7 +382,7 @@ class TransformGroup(QWidget):
 
     def _crop_section(self) -> QWidget:
         section = QWidget()
-        layout = QFormLayout(section)
+        layout = form_layout(section)
         layout.addRow(self._section_heading("Crop", "transform_crop_heading"))
         layout.addRow(self.crop_edit_checkbox)
         layout.addRow(_transform_label("Aspect"), self.aspect_combo)
@@ -395,7 +394,7 @@ class TransformGroup(QWidget):
 
     def _resize_section(self) -> QWidget:
         section = QWidget()
-        layout = QFormLayout(section)
+        layout = form_layout(section)
         layout.addRow(self._section_heading("Resize", "transform_resize_heading"))
         layout.addRow(_transform_label("Width"), self.width_spinbox)
         layout.addRow(_transform_label("Height"), self.height_spinbox)
