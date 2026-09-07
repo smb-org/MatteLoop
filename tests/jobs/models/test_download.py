@@ -67,7 +67,7 @@ class FakeTransport:
         self.urls: list[str] = []
         self._lock = threading.Lock()
 
-    def open(self, url: str) -> FakeResponse:
+    def open(self, url: str, _cancelled: Callable[[], bool]) -> FakeResponse:
         with self._lock:
             self.urls.append(url)
         if self.failure is not None:
