@@ -120,21 +120,21 @@ def test_open_artifact_computes_facts_matching_the_shared_framing_stage(
     controller.shutdown()
 
 
-def test_restore_for_dispatches_identity_then_the_stored_transform(
+def test_restore_for_returns_identity_then_the_stored_transform_without_dispatching(
     tmp_path, qtbot
 ) -> None:
     workspace = _seed_cut(tmp_path, "seed-restore").cut_workspace
     store = ReducerStore(_ready_state(tmp_path / "source.mp4"))
     controller = TransformStageController(store)
 
-    controller.restore_for(workspace)
+    assert controller.restore_for(workspace) == TransformSpec()
     assert store.state.parameters.transform == TransformSpec()
 
     spec = TransformSpec(first_frame=1)
     store_transform(workspace, spec, [])
 
-    controller.restore_for(workspace)
-    assert store.state.parameters.transform == spec
+    assert controller.restore_for(workspace) == spec
+    assert store.state.parameters.transform == TransformSpec()
     controller.shutdown()
 
 
