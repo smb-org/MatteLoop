@@ -49,8 +49,8 @@ The three rules that get broken most often:
 - **A `fix:` commit needs a `Trigger:` line** naming a repro or a
   previously-failing test. No observed trigger, no fix.
 - **Third consecutive `fix:` on the same file — stop and ask the user.**
-- **Commit bodies are substantive.** Short summary line, blank line, then what
-  actually changed. Never a one-liner, never test results in the body.
+- **Commit bodies are substantive.** Never a one-liner, never test results in
+  the body. See *Commit messages* below for the shape.
 - **Degrade, never refuse.** A precondition the user cannot fix from the UI must
   fall back, not abort the job.
 
@@ -150,6 +150,63 @@ lies about what a control does, a comment that contradicts the code.
   finding, why it stays, and ask the maintainer before merging. Silence about a
   finding is not the same as a clean report, and "the checks were green" is not
   an answer to "what did the analysis say?".
+
+## Commit messages (REQUIRED)
+
+English throughout. One commit carries one complete change — the fix or feature
+together with its tests, its documentation and its configuration. Do not split a
+change across a commit per file, and do not commit an intermediate step that
+does not stand on its own.
+
+**Subject:** `<icon> <type>(<module>): summary`, imperative, at most 50
+characters, then a blank line.
+
+```
+🐛 fix(inspector): stop Clear claiming a source it lacks
+```
+
+The module is the part of the application the change lives in — `inspector`,
+`timeline`, `render`, `packaging`, `guardrails`. Leave it out when a change
+genuinely spans the application.
+
+| Icon | Type | Icon | Type |
+|---|---|---|---|
+| 🚀 | perf | 📝 | docs |
+| ✨ | feat | 🧪 | test |
+| 🛠 | improve | 🔒 | security |
+| 🐛 | fix | ⚙️ | config |
+| 📊 | db | 🎨 | style |
+| 🔄 | refactor | ⬆️ | deps |
+|  |  | 🔧 | chore |
+
+**Body:** bullet points grouped by kind, each group led by its icon. Concrete
+statements, not general ones: name the function, the value, the observed
+behaviour. List only what a reader needs — compact and precise, never an essay.
+Reference the issue.
+
+```
+🐛 fix(render): refuse a request whose source changed
+
+- 🐛 Defects:
+  - `_start` read the current `source_id` while the reuse probe held a
+    request built from the previous one, so video A rendered under B's
+    identity and its artifact was accepted as B's.
+  - Selecting a cut for rebuild dispatched its transform before the user
+    agreed, so cancelling left the open cut showing another cut's edits.
+- 🧪 One test per defect, each failing without its fix.
+
+Trigger: repro — start a render on a large clip, replace the source while
+the reuse probe is still hashing.
+
+Refs #60
+```
+
+**A `fix:` still needs its `Trigger:` line** (`docs/engineering-guardrails.md`),
+placed after the bullets and before the issue reference.
+
+**No attribution trailers.** No `Co-Authored-By`, no generator line, and — as
+the global rule already states — never a session URL, in a commit message, a
+pull request body, an issue or a comment.
 
 ## Keeping the README honest (REQUIRED)
 
