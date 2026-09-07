@@ -163,6 +163,15 @@ not finished until the README shows the application as it now is.
   without a test is.
 - **A new user-visible string is not done until it is wrapped for Qt
   translation and present in the German catalogue.**
+- **Never pass a variable to `tr()` or `translate()`.** `lupdate` extracts
+  string literals, so `translate("Ctx", label)` extracts nothing: the catalogue
+  keeps whatever entry happened to be there, the German interface silently
+  falls back to English, and the tests stay green because they assert the
+  English path. The literal has to sit at the call site — put it in
+  `QT_TRANSLATE_NOOP()` where the constant is defined and translate at the
+  render site, or pass a token and let the renderer choose between literals.
+  Caught twice in review already: once across the inspector, the provider names
+  and the transform presets, once in a disabled button's reason.
 - **A minor release checks the README and the screenshots before the version
   bump.** A patch carries corrections and needs no pass. A minor carries
   something new — and the screenshots are the part that rots silently, because

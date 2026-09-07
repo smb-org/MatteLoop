@@ -330,6 +330,13 @@ def test_workspace_management_requires_a_ready_video(window) -> None:
     value.render_state(_ready())
     assert value.manage_workspaces_button.isEnabled()
 
+    # A running job disables the whole inspector, which is fine — but nothing
+    # may then claim that no video is open, because one is.
+    running = reduce(_ready(), RenderRequested("job", "request"))
+    value.render_state(running)
+    assert value.manage_workspaces_button.toolTip() == ""
+    assert value.manage_workspaces_button.accessibleDescription() == ""
+
 
 def test_model_status_describes_cached_uncached_and_preparing_states(window) -> None:
     value, _ = window

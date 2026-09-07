@@ -76,6 +76,7 @@ def _render_actions(window: MainWindow, model: PresentationModel) -> None:
         model.workspace_attention,
         model.workspace_open,
         model.workspace_management_enabled,
+        model.workspace_management_needs_source,
     )
     window.open_output_button.setEnabled(model.open_output_enabled)
     window.open_folder_button.setEnabled(model.open_folder_enabled)
