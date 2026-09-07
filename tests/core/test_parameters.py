@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import Decimal
 from fractions import Fraction
 from pathlib import Path
@@ -19,12 +19,13 @@ from matteloop.core.parameters import (
     OutputFpsChanged,
     OutputMaxSizeChanged,
     PaddingChanged,
+    ParametersReset,
     ParameterState,
     StretchChanged,
     TransformChanged,
     parameters_from_values,
 )
-from matteloop.core.specs import EdgeMode, TransformSpec
+from matteloop.core.specs import CropSpec, EdgeMode, TransformSpec
 from matteloop.core.state import (
     AppState,
     PreviewInvalidationReason,
@@ -161,6 +162,75 @@ def test_output_fps_changes_sampling_and_stales_the_current_preview() -> None:
     assert changed.timeline.fps == 90
     assert changed.preview is PreviewState.STALE
     assert changed.stale_category is PreviewInvalidationReason.SAMPLING
+
+
+def test_reset_restores_inspector_parameters_and_preserves_other_state() -> None:
+    current = _current()
+    assert current.timeline is not None
+    parameters = ParameterState(
+        model_id="u2net",
+        edge_mode=EdgeMode.DECONTAMINATE_COLORS,
+        execution_provider="CUDAExecutionProvider",
+        fps=90,
+        trim=True,
+        alpha_threshold=Decimal("0.4"),
+        padding=1,
+        stretch_x=Decimal("1.2"),
+        output_directory=Path("exports"),
+        output_filename="chosen.webp",
+        max_mib=Decimal("12.5"),
+        transform=TransformSpec(first_frame=1, crop=CropSpec(4, 5, 80, 70)),
+    )
+    timeline = replace(
+        current.timeline,
+        start=Fraction(1, 2),
+        end=Fraction(7, 2),
+        playhead=Fraction(1),
+        fps=90,
+    )
+    state = replace(
+        current,
+        parameters=parameters,
+        timeline=timeline,
+        crop=CropSpec(8, 9, 100, 90),
+        crop_enabled=False,
+    )
+
+    reset = reduce(state, ParametersReset())
+    defaults = ParameterState()
+
+    for name in (
+        "model_id",
+        "edge_mode",
+        "fps",
+        "trim",
+        "alpha_threshold",
+        "padding",
+        "stretch_x",
+        "max_mib",
+    ):
+        assert getattr(reset.parameters, name) == getattr(defaults, name)
+    assert reset.parameters.execution_provider == "CUDAExecutionProvider"
+    assert reset.parameters.output_directory == Path("exports")
+    assert reset.parameters.output_filename == "chosen.webp"
+    assert reset.parameters.transform == parameters.transform
+    assert reset.source_id == state.source_id
+    assert reset.source_value is state.source_value
+    assert reset.crop == state.crop
+    assert reset.crop_enabled is state.crop_enabled
+    assert reset.timeline is not None
+    assert reset.timeline.start == state.timeline.start
+    assert reset.timeline.end == state.timeline.end
+    assert reset.timeline.playhead == state.timeline.playhead
+    assert reset.timeline.fps == defaults.fps
+    assert reset.preview is PreviewState.STALE
+    assert reset.stale_category is PreviewInvalidationReason.CROP_CLEANUP
+
+
+def test_reset_parameters_is_ignored_while_a_job_runs() -> None:
+    running = reduce(_ready(), RenderRequested("job", "request"))
+
+    assert reduce(running, ParametersReset()) is running
 
 
 def test_output_parameter_changes_keep_a_current_preview_current() -> None:
