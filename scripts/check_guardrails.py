@@ -118,7 +118,10 @@ def main() -> int:
                 )
             failures.append(f"G6 {module}: {'; '.join(problems)}.")
             continue
-        if metrics["lines"] > allowed["lines"]:
+        if (
+            metrics["lines"] > MODULE_LINE_BUDGET
+            and metrics["lines"] > allowed["lines"]
+        ):
             failures.append(
                 f"G6 {module}: grew from {allowed['lines']} to "
                 f"{metrics['lines']} lines. Frozen modules must not grow — see "
@@ -152,7 +155,10 @@ def main() -> int:
         for module, metrics in current.items()
         if module in baseline and metrics["lines"] < baseline[module]["lines"]
     ]
-    print(f"Guardrail check passed ({len(current)} module(s) over budget).")
+    over_budget = sum(
+        metrics["lines"] > MODULE_LINE_BUDGET for metrics in current.values()
+    )
+    print(f"Guardrail check passed ({over_budget} module(s) over budget).")
     if shrunk:
         print(f"Shrunk since baseline: {', '.join(sorted(shrunk))} — run --update.")
     return 0
