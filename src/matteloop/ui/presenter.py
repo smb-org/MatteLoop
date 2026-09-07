@@ -93,8 +93,7 @@ def present(state: AppState) -> PresentationModel:
         state.preview is Preview.RUNNING and state.preview_result is not None
     )
     source_error_detail = str(state.source_error) if state.source_error else None
-    source_error_message = None
-    source_error_icon: str | None = None
+    source_error_message = source_error_icon = None
     if state.source is Source.ERROR:
         source_error_message = source_error_copy(state.source_error)
         source_error_icon = "error"
@@ -162,6 +161,7 @@ def present(state: AppState) -> PresentationModel:
         success_accessible_description=artifact_path or "Render complete",
         workspace_attention=state.edited_cuts or state.edited_cuts_error is not None,
         workspace_open=state.edited_cuts or state.edited_cuts_error is not None,
+        workspace_management_enabled=allowed.can_edit,
         **s(state.source_value if ready else None, state.source is Source.LOADING),
         source_frame=state.source_frame,
         crop=present_crop(state),

@@ -361,6 +361,11 @@
         <source>Model status: %s</source>
         <translation>Model status: %s</translation>
     </message>
+    <message>
+        <location filename="../src/matteloop/ui/inspector.py" line="839"/>
+        <source>Open a video to manage its workspaces.</source>
+        <translation>Open a video to manage its workspaces.</translation>
+    </message>
 </context>
 <context>
     <name>InspectorDisclosure</name>
