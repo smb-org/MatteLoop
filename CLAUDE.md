@@ -110,10 +110,13 @@ diagnostics, and the macOS bundle's `CFBundleShortVersionString` and
 Two files carry the number, and the second is the one that gets forgotten:
 
 1. `src/matteloop/__init__.py` — `__version__`.
-2. `packaging/pysidedeploy.spec` — **three** occurrences: `version` under
-   `[app]`, and `--file-version` and `--product-version` in `extra_args`. Nuitka
-   writes the Windows executable's version resource from the latter two; there
-   is no way to derive them from the package at build time, so they are copies.
+2. `packaging/pysidedeploy.spec` — **four** version occurrences: `version` under
+   `[app]`, `--file-version`, `--product-version`, and `--macos-app-version` in
+   `extra_args`. The same section also carries `--macos-signed-app-name`, which
+   must stay equal to `io.github.smb-org.matteloop`. Nuitka writes the Windows
+   executable's version resource from the first two arguments and the macOS
+   bundle's version from the latter; there is no way to derive them from the
+   package at build time, so they are copies.
 
 `tests/release/test_version_identity.py` fails when those disagree. It is a
 floor, not a substitute for this list: it cannot see the tag, the release notes,

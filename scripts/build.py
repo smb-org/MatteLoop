@@ -469,26 +469,39 @@ def remove_previous_artifact(os_name: str, dist_path: Path = DIST_PATH) -> None:
 def patch_macos_bundle_metadata(
     bundle: Path, *, version: str = __version__
 ) -> None:
-    """Set the release identity fields Nuitka does not configure reliably.
+    """Set Nuitka's missing release field and verify the bundle signature.
 
     The artifact decides, not the host: a `.app` carrying an Info.plist is a
     macOS bundle wherever it was produced, and gating on sys.platform only made
     the check invisible to CI, which runs on Linux.
     """
     info_plist = bundle / "Contents" / "Info.plist"
-    if bundle.suffix != ".app" or not info_plist.is_file():
+    if bundle.suffix != ".app":
         return
-    with info_plist.open("rb") as source:
-        metadata = plistlib.load(source)
-    metadata.update(
-        {
-            "CFBundleShortVersionString": version,
-            "CFBundleVersion": version,
-            "CFBundleIdentifier": BUNDLE_IDENTIFIER,
-        }
+    if info_plist.is_file():
+        with info_plist.open("rb") as source:
+            metadata = plistlib.load(source)
+        if metadata.get("CFBundleVersion") != version:
+            metadata["CFBundleVersion"] = version
+            with info_plist.open("wb") as destination:
+                plistlib.dump(
+                    metadata, destination, fmt=plistlib.FMT_XML, sort_keys=False
+                )
+            subprocess.run(
+                ["codesign", "--force", "--sign", "-", str(bundle)], check=True
+            )
+    verification = subprocess.run(
+        ["codesign", "-dv", str(bundle)],
+        check=True,
+        capture_output=True,
+        text=True,
     )
-    with info_plist.open("wb") as destination:
-        plistlib.dump(metadata, destination, fmt=plistlib.FMT_XML, sort_keys=False)
+    details = f"{verification.stdout}\n{verification.stderr}"
+    if "Info.plist entries=" not in details:
+        raise RuntimeError(
+            "codesign did not bind the macOS bundle Info.plist: "
+            f"{details.strip()}"
+        )
 
 
 @contextlib.contextmanager
@@ -578,7 +591,7 @@ def _run_native_build(media_wheel: Path | None, rebuild_media_stack: bool) -> in
                     )
         _recover_long_command_deploy_mismatch(artifact, deployment_staging)
         patch_macos_bundle_metadata(artifact)
-    except (OSError, RuntimeError, ValueError) as error:
+    except (OSError, RuntimeError, ValueError, subprocess.CalledProcessError) as error:
         print(
             f"Native build preparation or launch failed: {error}",
             file=sys.stderr,

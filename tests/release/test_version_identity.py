@@ -3,10 +3,12 @@ from __future__ import annotations
 import configparser
 import plistlib
 import shlex
+import subprocess
 from collections.abc import Callable
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
 from PySide6.QtCore import QSettings
 
 from matteloop import __version__, application_title
@@ -80,23 +82,73 @@ def test_native_packaging_version_matches_the_package_version() -> None:
     assert configured_version == __version__
     assert f"--file-version={configured_version}" in args
     assert f"--product-version={configured_version}" in args
+    assert f"--macos-app-version={configured_version}" in args
+    assert f"--macos-signed-app-name={BUNDLE_IDENTIFIER}" in args
 
 
-def test_macos_bundle_metadata_identifies_the_current_build(tmp_path: Path) -> None:
+def test_macos_bundle_metadata_identifies_and_verifies_the_current_build(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    bundle = tmp_path / "MatteLoop.app"
     info_plist = tmp_path / "MatteLoop.app" / "Contents" / "Info.plist"
     info_plist.parent.mkdir(parents=True)
     info_plist.write_bytes(
         plistlib.dumps(
             {
                 "CFBundleExecutable": "MatteLoop",
-                "CFBundleShortVersionString": "1.0",
+                "CFBundleShortVersionString": __version__,
+                "CFBundleIdentifier": BUNDLE_IDENTIFIER,
             }
         )
     )
+    codesign_calls: list[list[str]] = []
 
-    patch_macos_bundle_metadata(info_plist.parents[1])
+    def fake_codesign(
+        command: list[str], **_kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        codesign_calls.append(command)
+        return subprocess.CompletedProcess(command, 0, stderr="Info.plist entries=9")
+
+    monkeypatch.setattr("scripts.build.subprocess.run", fake_codesign)
+
+    patch_macos_bundle_metadata(bundle)
 
     metadata = plistlib.loads(info_plist.read_bytes())
     assert metadata["CFBundleShortVersionString"] == __version__
     assert metadata["CFBundleVersion"] == __version__
     assert metadata["CFBundleIdentifier"] == BUNDLE_IDENTIFIER
+    assert codesign_calls == [
+        ["codesign", "--force", "--sign", "-", str(bundle)],
+        ["codesign", "-dv", str(bundle)],
+    ]
+
+
+def test_macos_bundle_metadata_verification_failure_aborts_the_build(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    bundle = tmp_path / "MatteLoop.app"
+    info_plist = bundle / "Contents" / "Info.plist"
+    info_plist.parent.mkdir(parents=True)
+    info_plist.write_bytes(
+        plistlib.dumps(
+            {
+                "CFBundleExecutable": "MatteLoop",
+                "CFBundleShortVersionString": __version__,
+                "CFBundleIdentifier": BUNDLE_IDENTIFIER,
+            }
+        )
+    )
+
+    def fake_codesign(
+        command: list[str], **_kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        if command[1] == "-dv":
+            return subprocess.CompletedProcess(
+                command, 0, stderr="Info.plist=not bound"
+            )
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr("scripts.build.subprocess.run", fake_codesign)
+
+    with pytest.raises(RuntimeError, match="did not bind"):
+        patch_macos_bundle_metadata(bundle)

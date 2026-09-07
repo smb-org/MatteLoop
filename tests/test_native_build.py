@@ -811,7 +811,7 @@ def test_finished_bundle_media_failure_skips_smoke_and_reports_every_entry(
     commands = _stub_native_main(monkeypatch, tmp_path, artifact, prepared)
 
     assert native_build.main([]) == 1
-    assert len(commands) == 1
+    assert len(commands) == 3
     stderr = capsys.readouterr().err
     assert "libx264.dylib" in stderr
     assert "nonfree-codec.dylib" in stderr
@@ -849,7 +849,7 @@ def test_successful_native_build_uses_extracted_av_and_publishes_compliance(
     published = tmp_path / "dist" / compliance.name
     checksum = published.with_name(f"{published.name}.sha256")
     assert received_av == [extracted_av]
-    assert len(commands) == 2
+    assert len(commands) == 4
     metadata = plistlib.loads(
         (artifact / "Contents" / "Info.plist").read_bytes()
     )
@@ -1053,7 +1053,8 @@ def _stub_native_main(
         info_plist.write_bytes(
             plistlib.dumps(
                 {
-                    "CFBundleShortVersionString": "1.0",
+                    "CFBundleShortVersionString": native_build.__version__,
+                    "CFBundleIdentifier": native_build.BUNDLE_IDENTIFIER,
                     "CFBundleExecutable": "matteloop",
                 }
             )
@@ -1088,7 +1089,13 @@ def _stub_native_main(
 
     def run(command: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
         commands.append(command)
-        return subprocess.CompletedProcess(command, returncodes[len(commands) - 1])
+        if command == [str(Path(sys.executable)), "packaging/smoke_child.py", "dist"]:
+            return subprocess.CompletedProcess(command, returncodes[1])
+        if command[:2] == ["codesign", "-dv"]:
+            return subprocess.CompletedProcess(
+                command, returncodes[0], stderr="Info.plist entries=9"
+            )
+        return subprocess.CompletedProcess(command, returncodes[0])
 
     monkeypatch.setattr(native_build, "prepare_temporary_spec", prepare_spec)
     monkeypatch.setattr(native_build.subprocess, "run", run)
