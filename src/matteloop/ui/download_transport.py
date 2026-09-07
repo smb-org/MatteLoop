@@ -12,9 +12,14 @@ from PySide6.QtNetwork import (
     QNetworkRequest,
 )
 
-from matteloop.jobs.models.download import DownloadHttpError, DownloadProxyError
+from matteloop.jobs.models.download import (
+    CancellationCheck,
+    DownloadHttpError,
+    DownloadProxyError,
+)
 
 _NETWORK_TIMEOUT_MS = 60_000
+_CANCELLATION_POLL_MS = 250
 _PROXY_ERROR_NAMES = frozenset(
     {
         "ProxyConnectionRefusedError",
@@ -30,13 +35,16 @@ _PROXY_ERROR_NAMES = frozenset(
 class QtNetworkDownloadTransport:
     """Open model responses with Qt's platform trust store and proxy settings."""
 
-    def open(self, url: str) -> _QtNetworkDownloadResponse:
-        return _QtNetworkDownloadResponse(url)
+    def open(
+        self, url: str, cancelled: CancellationCheck
+    ) -> _QtNetworkDownloadResponse:
+        return _QtNetworkDownloadResponse(url, cancelled)
 
 
 class _QtNetworkDownloadResponse:
-    def __init__(self, url: str) -> None:
+    def __init__(self, url: str, cancelled: CancellationCheck) -> None:
         QNetworkProxyFactory.setUseSystemConfiguration(True)
+        self._cancelled = cancelled
         self._manager = QNetworkAccessManager()
         request = QNetworkRequest(QUrl(url))
         # Weight URLs redirect (GitHub releases -> objects.githubusercontent.com).
@@ -52,8 +60,12 @@ class _QtNetworkDownloadResponse:
         self._reply.sslErrors.connect(self._mark_tls_error)
         try:
             self._wait_for_event(include_metadata=True)
+            if self._cancelled():
+                return
             while self._is_redirect() and not self._reply.isFinished():
                 self._wait_for_event(include_metadata=True)
+                if self._cancelled():
+                    return
             self._raise_http_or_transport_error()
             self.headers = _response_headers(self._reply)
         except BaseException:
@@ -73,6 +85,8 @@ class _QtNetworkDownloadResponse:
             elif self._reply.isFinished():
                 return b""
             self._wait_for_event(include_metadata=False)
+            if self._cancelled():
+                return b""
 
     def close(self) -> None:
         if self._closed:
@@ -94,12 +108,14 @@ class _QtNetworkDownloadResponse:
         loop = QEventLoop()
         timer = QTimer()
         timer.setSingleShot(True)
-        signaled = False
-
+        cancellation_timer = QTimer()
+        cancellation_timer.setInterval(_CANCELLATION_POLL_MS)
         def wake(*_args: object) -> None:
-            nonlocal signaled
-            signaled = True
             loop.quit()
+
+        def poll_cancellation() -> None:
+            if self._cancelled():
+                loop.quit()
 
         self._reply.readyRead.connect(wake)
         self._reply.finished.connect(wake)
@@ -107,19 +123,26 @@ class _QtNetworkDownloadResponse:
         self._reply.sslErrors.connect(wake)
         if include_metadata:
             self._reply.metaDataChanged.connect(wake)
+        cancellation_timer.timeout.connect(poll_cancellation)
         timer.timeout.connect(loop.quit)
         try:
             timer.start(_NETWORK_TIMEOUT_MS)
+            cancellation_timer.start()
             loop.exec()
+            timed_out = not timer.isActive()
         finally:
             timer.stop()
+            cancellation_timer.stop()
             self._reply.readyRead.disconnect(wake)
             self._reply.finished.disconnect(wake)
             self._reply.errorOccurred.disconnect(wake)
             self._reply.sslErrors.disconnect(wake)
             if include_metadata:
                 self._reply.metaDataChanged.disconnect(wake)
-        if not signaled:
+            cancellation_timer.timeout.disconnect(poll_cancellation)
+        if self._cancelled():
+            return
+        if timed_out:
             raise TimeoutError("Qt Network response timed out")
 
     def _raise_http_or_transport_error(self) -> None:

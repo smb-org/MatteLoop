@@ -100,8 +100,8 @@ class _LocalUrlTransport:
         self._transport = _transport()
         self._url = url
 
-    def open(self, _url: str) -> DownloadResponse:
-        return self._transport.open(self._url)
+    def open(self, _url: str, cancelled: Callable[[], bool]) -> DownloadResponse:
+        return self._transport.open(self._url, cancelled)
 
 
 def test_qt_transport_reads_chunked_http_body_in_bounded_chunks(
@@ -109,7 +109,9 @@ def test_qt_transport_reads_chunked_http_body_in_bounded_chunks(
 ) -> None:
     del qtbot
     body = b"chunked model response"
-    response = _transport().open(http_server(_HttpResponse(body, chunk_size=3)))
+    response = _transport().open(
+        http_server(_HttpResponse(body, chunk_size=3)), lambda: False
+    )
     try:
         chunks: list[bytes] = []
         while chunk := response.read(4):
@@ -127,7 +129,8 @@ def test_qt_transport_exposes_content_length_header(
     del qtbot
     body = b"known-length model response"
     response = _transport().open(
-        http_server(_HttpResponse(body, length_header="content-length"))
+        http_server(_HttpResponse(body, length_header="content-length")),
+        lambda: False,
     )
     try:
         assert response.headers["Content-Length"] == str(len(body))
@@ -140,7 +143,9 @@ def test_qt_transport_reports_non_success_http_status(
 ) -> None:
     del qtbot
     with pytest.raises(DownloadHttpError) as exc:
-        _transport().open(http_server(_HttpResponse(b"unavailable", status=503)))
+        _transport().open(
+            http_server(_HttpResponse(b"unavailable", status=503)), lambda: False
+        )
 
     assert exc.value.status == 503
 
@@ -179,6 +184,47 @@ def test_model_downloader_cancels_qt_transport_between_chunks(
     assert not list(tmp_path.rglob("*.onnx"))
 
 
+def test_model_downloader_cancels_qt_transport_while_waiting_for_chunk(
+    tmp_path: Path,
+    http_server: Callable[[_HttpResponse], str],
+    qtbot,
+) -> None:
+    del qtbot
+    data = b"cancel while the server stalls"
+    url = http_server(_HttpResponse(data, chunk_size=2, delay=1.5))
+    catalog, spec = _catalog_for(data)
+    cancellation_requested = threading.Event()
+    cancellation_timer: threading.Timer | None = None
+    download_started = time.monotonic()
+
+    def progress_callback(completed: int, total: int) -> None:
+        nonlocal cancellation_timer
+        if completed and cancellation_timer is None:
+            cancellation_timer = threading.Timer(
+                0.1, cancellation_requested.set
+            )
+            cancellation_timer.start()
+
+    try:
+        with pytest.raises(AppError) as exc:
+            ModelDownloader(
+                _LocalUrlTransport(url), catalog=catalog, chunk_size=4
+            ).download(
+                spec,
+                tmp_path,
+                progress_callback,
+                cancellation_requested.is_set,
+            )
+    finally:
+        if cancellation_timer is not None:
+            cancellation_timer.cancel()
+
+    assert exc.value.code is ErrorCode.JOB_CANCELLED
+    assert time.monotonic() - download_started < 1.0
+    assert not list(tmp_path.rglob("*.part"))
+    assert not list(tmp_path.rglob("*.onnx"))
+
+
 def test_qt_transport_follows_a_redirect_to_the_final_body(
     http_server: Callable[[_HttpResponse], str],
 ) -> None:
@@ -189,7 +235,7 @@ def test_qt_transport_follows_a_redirect_to_the_final_body(
         _HttpResponse(body=b"", status=302, location=final_url, include_length=False)
     )
 
-    response = _transport().open(redirect_url)
+    response = _transport().open(redirect_url, lambda: False)
     try:
         assert response.headers["Content-Length"] == str(len(data))
         chunks = []

@@ -34,6 +34,9 @@ class Downloader(Protocol):
 
 
 class SessionClient(Protocol):
+    @property
+    def is_running(self) -> bool: ...
+
     def start(self) -> None: ...
 
     def replace_model(self, model_spec: object) -> None: ...
@@ -135,6 +138,7 @@ class ModelSessionManager:
                 self._active_spec == spec
                 and self._active_requested_provider == provider
                 and self._active_result is not None
+                and self._client is not None and self._client.is_running
             ):
                 return self._active_result
             artifact_path = self._downloader.download(
@@ -337,17 +341,13 @@ class ModelSessionManager:
         self._clear_all_unlocked()
 
     def _clear_active_unlocked(self) -> None:
-        self._active_spec = None
-        self._active_provider = None
-        self._active_requested_provider = None
-        self._active_result = None
+        self._active_spec = self._active_provider = None
+        self._active_requested_provider = self._active_result = None
 
     def _clear_all_unlocked(self) -> None:
         self._client = None
-        self._active_spec = None
-        self._active_provider = None
-        self._active_requested_provider = None
-        self._active_result = None
+        self._active_spec = self._active_provider = None
+        self._active_requested_provider = self._active_result = None
         self._cleanup_spec = None
         self._cleanup_ids = frozenset()
 

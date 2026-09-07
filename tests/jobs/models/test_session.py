@@ -70,12 +70,14 @@ class FakeClient:
         self.fail_start: BaseException | None = None
         self.fail_replace: BaseException | None = None
         self.close_failures = 0
+        self.is_running = False
 
     def start(self) -> None:
         self.events.append(f"start:{self.payload['model_id']}")
         self.starts += 1
         if self.fail_start is not None:
             raise self.fail_start
+        self.is_running = True
 
     def replace_model(self, payload: object) -> None:
         assert type(payload) is dict
@@ -84,10 +86,12 @@ class FakeClient:
         if self.fail_replace is not None:
             raise self.fail_replace
         self.payload = payload
+        self.is_running = True
 
     def close(self) -> None:
         self.events.append("close")
         self.closes += 1
+        self.is_running = False
         if self.close_failures:
             self.close_failures -= 1
             raise AppError(
@@ -245,6 +249,26 @@ def test_same_active_model_is_idempotent_without_download_or_restart(
     assert downloader.calls == ["u2net"]
     assert clients[0].starts == 1
     assert clients[0].replacements == []
+
+
+def test_dead_active_client_is_replaced_on_prepare_instead_of_cached(
+    tmp_path: Path,
+) -> None:
+    manager, downloader, clients, events = _manager(tmp_path)
+    first = manager.prepare("u2net", {})
+    clients[0].is_running = False
+
+    second = manager.prepare("u2net", {})
+
+    assert second is not first
+    assert downloader.calls == ["u2net", "u2net"]
+    assert events == [
+        "download:u2net",
+        "start:u2net",
+        "download:u2net",
+        "replace:u2net",
+    ]
+    assert clients[0].is_running is True
 
 
 def test_provider_change_replaces_the_active_model_session_once(
