@@ -8,17 +8,30 @@ from threading import Event, Thread, get_ident
 import pytest
 from PIL import Image
 from PySide6.QtCore import QSettings
-from PySide6.QtWidgets import QApplication, QFileDialog
+from PySide6.QtGui import QCloseEvent
+from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox
 
 from matteloop.core.errors import AppError, ErrorCode
-from matteloop.core.state import SourceState
+from matteloop.core.parameters import TransformChanged
+from matteloop.core.specs import TransformSpec
+from matteloop.core.state import (
+    AppState,
+    JobKind,
+    SourceLoaded,
+    SourceLoadRequested,
+    SourceState,
+    reduce,
+)
+from matteloop.jobs.render import FilesystemWorkspacePort
 from matteloop.jobs.source import decode_frame, probe_source
+from matteloop.jobs.transform_store import store_transform
 from matteloop.ui.controller import SourceController, SourceLoadResult
 from matteloop.ui.main_window import MainWindow
 from matteloop.ui.ports import ChooseVideoRequested, VideoDropped
 from matteloop.ui.source_presentation import format_source_file_size
 from matteloop.ui.store import ReducerStore
 from tests.fixtures.media_factory import make_video
+from tests.jobs.render_support import job, render_service, request
 
 
 @dataclass
@@ -35,6 +48,40 @@ class FakeSourceAdapter:
         if self.errors and path in self.errors:
             raise self.errors[path]
         return self.results[path]
+
+
+@dataclass(frozen=True)
+class _LoadedMetadata:
+    path: Path
+    width: int = 128
+    height: int = 128
+    duration: Fraction = Fraction(2)
+    average_rate: Fraction = Fraction(30)
+
+
+def _ready_store(path: Path) -> ReducerStore:
+    loading = reduce(AppState(), SourceLoadRequested("old-source", "old-load"))
+    return ReducerStore(
+        reduce(
+            loading,
+            SourceLoaded("old-source", "old-load", _LoadedMetadata(path)),
+        )
+    )
+
+
+def _controller_with_unsaved_cut(
+    tmp_path: Path, old_path: Path, adapter: FakeSourceAdapter
+) -> tuple[SourceController, ReducerStore]:
+    artifact = render_service(workspace=FilesystemWorkspacePort()).render(
+        request(tmp_path), job(tmp_path, "unsaved-source", JobKind.RENDER)
+    )
+    store = _ready_store(old_path)
+    controller = SourceController(store, source_adapter=adapter)
+    stored = TransformSpec(first_frame=2)
+    store_transform(artifact.cut_workspace, stored, [])
+    controller.transform_stage.open_artifact(artifact)
+    store.dispatch(TransformChanged(TransformSpec(first_frame=1)))
+    return controller, store
 
 
 def _settings(name: str) -> QSettings:
@@ -229,3 +276,103 @@ def test_open_video_uses_one_caption_for_empty_and_loaded_source(
         "caption": "Open video",
         "filter": "Video files (*.mp4 *.mov *.webm *.mkv)",
     }
+
+
+@pytest.mark.parametrize("command", ["choose", "drop"])
+def test_replacing_source_cancel_keeps_unsaved_transform_and_source(
+    tmp_path, monkeypatch, qtbot, command: str
+) -> None:
+    old_path = tmp_path / "old.mp4"
+    new_path = tmp_path / "new.mp4"
+    load_error = AppError(
+        ErrorCode.SOURCE_CORRUPT,
+        "source.probe",
+        "source.probe.corrupt",
+        "new source cannot be decoded",
+        "choose-another-file",
+    )
+    adapter = FakeSourceAdapter({}, {new_path: load_error})
+    controller, store = _controller_with_unsaved_cut(tmp_path, old_path, adapter)
+    confirmation: list[tuple[str, str, object]] = []
+
+    def cancel(_parent, title, body, buttons, default):
+        confirmation.append((title, body, default))
+        assert buttons == QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        return int(QMessageBox.StandardButton.No)
+
+    monkeypatch.setattr(QMessageBox, "question", cancel)
+    if command == "choose":
+        monkeypatch.setattr(
+            QFileDialog,
+            "getOpenFileName",
+            lambda *_args, **_kwargs: (str(new_path), "Video files"),
+        )
+        controller.dispatch(ChooseVideoRequested(replace=True))
+    else:
+        controller.dispatch(VideoDropped(new_path))
+
+    qtbot.wait(50)
+    assert len(confirmation) == 1
+    assert "unsaved transform changes" in confirmation[0][1]
+    assert confirmation[0][2] == QMessageBox.StandardButton.No
+    assert store.state.source is SourceState.READY
+    assert getattr(store.state.source_value, "path", None) == old_path
+    assert store.state.parameters.transform == TransformSpec(first_frame=1)
+    assert adapter.thread_ids == []
+    controller.shutdown()
+
+
+def test_closing_cancel_keeps_unsaved_transform_and_leaves_window_open(
+    tmp_path, monkeypatch, qtbot
+) -> None:
+    old_path = tmp_path / "old.mp4"
+    controller, store = _controller_with_unsaved_cut(
+        tmp_path, old_path, FakeSourceAdapter({})
+    )
+    window = MainWindow(store, controller, _settings("close-unsaved"))
+    qtbot.addWidget(window)
+    window.show()
+    confirmation: list[tuple[str, str, object]] = []
+
+    def cancel(_parent, title, body, buttons, default):
+        confirmation.append((title, body, default))
+        assert buttons == QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        return int(QMessageBox.StandardButton.No)
+
+    monkeypatch.setattr(QMessageBox, "question", cancel)
+    event = QCloseEvent()
+    window.closeEvent(event)
+
+    assert len(confirmation) == 1
+    assert not event.isAccepted()
+    assert window.isVisible()
+    assert store.state.parameters.transform == TransformSpec(first_frame=1)
+    controller.shutdown()
+
+
+def test_discarded_transform_stays_discarded_when_the_new_source_fails(
+    tmp_path, monkeypatch, qtbot
+) -> None:
+    old_path = tmp_path / "old.mp4"
+    new_path = tmp_path / "broken.mp4"
+    error = AppError(
+        ErrorCode.SOURCE_CORRUPT,
+        "source.probe",
+        "source.probe.corrupt",
+        "broken source",
+        "choose-another-file",
+    )
+    adapter = FakeSourceAdapter({}, {new_path: error})
+    controller, store = _controller_with_unsaved_cut(tmp_path, old_path, adapter)
+    monkeypatch.setattr(
+        QMessageBox,
+        "question",
+        lambda *_args, **_kwargs: int(QMessageBox.StandardButton.Yes),
+    )
+
+    controller.dispatch(VideoDropped(new_path))
+
+    qtbot.waitUntil(lambda: store.state.source is SourceState.ERROR, timeout=5000)
+    assert store.state.parameters.transform == TransformSpec()
+    assert controller.transform_stage.session is None
+    controller.shutdown()

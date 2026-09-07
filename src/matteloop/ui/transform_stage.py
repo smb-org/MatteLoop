@@ -22,7 +22,8 @@ from itertools import count
 from typing import TYPE_CHECKING, Protocol, cast
 
 from PIL import Image
-from PySide6.QtCore import QObject, QThread, QTimer, Signal, Slot
+from PySide6.QtCore import QCoreApplication, QObject, QThread, QTimer, Signal, Slot
+from PySide6.QtWidgets import QMessageBox, QWidget
 
 from matteloop.core.crop import clamp_crop
 from matteloop.core.geometry import FramingPlan, PixelBounds, union_alpha_bounds
@@ -210,6 +211,28 @@ class TransformStageController(QObject):
             if clamped != transform.crop:
                 transform = replace(transform, crop=clamped)
         self._store.dispatch(TransformChanged(transform))
+
+    def confirm_discard_if_needed(self, parent: QWidget | None = None) -> bool:
+        """Ask before abandoning a transform that differs from its sidecar."""
+        session = self._session
+        if session is None:
+            return True
+        if self._store.state.parameters.transform == load_transform(session.workspace):
+            return True
+        answer = QMessageBox.question(
+            parent,
+            QCoreApplication.translate(
+                "TransformStage", "Discard unsaved transform changes?"
+            ),
+            QCoreApplication.translate(
+                "TransformStage",
+                "The current cut has unsaved transform changes. "
+                "Discard them and continue?",
+            ),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        return answer == QMessageBox.StandardButton.Yes
 
     def close_session(self) -> None:
         self._session = None

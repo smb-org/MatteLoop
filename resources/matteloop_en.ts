@@ -1826,17 +1826,17 @@ Freed %s.</translation>
 <context>
     <name>SourceController</name>
     <message>
-        <location filename="../src/matteloop/ui/controller.py" line="369"/>
+        <location filename="../src/matteloop/ui/controller.py" line="376"/>
         <source>Open video</source>
         <translation>Open video</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/controller.py" line="371"/>
+        <location filename="../src/matteloop/ui/controller.py" line="378"/>
         <source>Video files (*.mp4 *.mov *.webm *.mkv)</source>
         <translation>Video files (*.mp4 *.mov *.webm *.mkv)</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/controller.py" line="525"/>
+        <location filename="../src/matteloop/ui/controller.py" line="532"/>
         <source>Choose output directory</source>
         <translation>Choose output directory</translation>
     </message>
@@ -2280,29 +2280,55 @@ Freed %s.</translation>
     </message>
 </context>
 <context>
+    <name>TransformStage</name>
+    <message>
+        <location filename="../src/matteloop/ui/transform_stage.py" line="224"/>
+        <source>Discard unsaved transform changes?</source>
+        <translation>Discard unsaved transform changes?</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/transform_stage.py" line="227"/>
+        <source>The current cut has unsaved transform changes. Discard them and continue?</source>
+        <translation>The current cut has unsaved transform changes. Discard them and continue?</translation>
+    </message>
+</context>
+<context>
     <name>WorkspacePicker</name>
     <message>
-        <location filename="../src/matteloop/ui/workspace_controller.py" line="54"/>
+        <location filename="../src/matteloop/ui/workspace_controller.py" line="57"/>
         <source>Cut set is in use</source>
         <translation>Cut set is in use</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/workspace_controller.py" line="55"/>
+        <location filename="../src/matteloop/ui/workspace_controller.py" line="58"/>
         <source>This cut set is being used by a running job.</source>
         <translation>This cut set is being used by a running job.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/workspace_controller.py" line="70"/>
+        <location filename="../src/matteloop/ui/workspace_controller.py" line="73"/>
         <source>Could not delete cut set</source>
         <translation>Could not delete cut set</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/workspace_controller.py" line="90"/>
+        <location filename="../src/matteloop/ui/workspace_controller.py" line="95"/>
+        <source>Delete %1 (%2 frames, %3)?
+Stored frames and the saved transform will be removed. Recreating them requires background removal again.</source>
+        <translation>Delete %1 (%2 frames, %3)?
+Stored frames and the saved transform will be removed. Recreating them requires background removal again.</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/workspace_controller.py" line="109"/>
+        <source>Delete cut set?</source>
+        <translation>Delete cut set?</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/workspace_controller.py" line="119"/>
         <source>Delete pinned cut set?</source>
         <translation>Delete pinned cut set?</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/workspace_controller.py" line="91"/>
+        <location filename="../src/matteloop/ui/workspace_controller.py" line="104"/>
+        <location filename="../src/matteloop/ui/workspace_controller.py" line="120"/>
         <source>This set is pinned. Delete it anyway?</source>
         <translation>This set is pinned. Delete it anyway?</translation>
     </message>

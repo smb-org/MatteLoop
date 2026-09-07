@@ -1826,17 +1826,17 @@ Freed %s.</source>
 <context>
     <name>SourceController</name>
     <message>
-        <location filename="../src/matteloop/ui/controller.py" line="369"/>
+        <location filename="../src/matteloop/ui/controller.py" line="376"/>
         <source>Open video</source>
         <translation>Video öffnen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/controller.py" line="371"/>
+        <location filename="../src/matteloop/ui/controller.py" line="378"/>
         <source>Video files (*.mp4 *.mov *.webm *.mkv)</source>
         <translation>Videodateien (*.mp4 *.mov *.webm *.mkv)</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/controller.py" line="525"/>
+        <location filename="../src/matteloop/ui/controller.py" line="532"/>
         <source>Choose output directory</source>
         <translation>Ausgabeordner auswählen</translation>
     </message>
@@ -2280,29 +2280,55 @@ Freed %s.</source>
     </message>
 </context>
 <context>
+    <name>TransformStage</name>
+    <message>
+        <location filename="../src/matteloop/ui/transform_stage.py" line="224"/>
+        <source>Discard unsaved transform changes?</source>
+        <translation>Ungespeicherte Transformationsänderungen verwerfen?</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/transform_stage.py" line="227"/>
+        <source>The current cut has unsaved transform changes. Discard them and continue?</source>
+        <translation>Das aktuelle Schnittset enthält ungespeicherte Transformationsänderungen. Sollen sie verworfen und fortgefahren werden?</translation>
+    </message>
+</context>
+<context>
     <name>WorkspacePicker</name>
     <message>
-        <location filename="../src/matteloop/ui/workspace_controller.py" line="54"/>
+        <location filename="../src/matteloop/ui/workspace_controller.py" line="57"/>
         <source>Cut set is in use</source>
         <translation>Schnittset wird verwendet</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/workspace_controller.py" line="55"/>
+        <location filename="../src/matteloop/ui/workspace_controller.py" line="58"/>
         <source>This cut set is being used by a running job.</source>
         <translation>Dieses Schnittset wird von einem laufenden Auftrag verwendet.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/workspace_controller.py" line="70"/>
+        <location filename="../src/matteloop/ui/workspace_controller.py" line="73"/>
         <source>Could not delete cut set</source>
         <translation>Schnittset konnte nicht gelöscht werden</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/workspace_controller.py" line="90"/>
+        <location filename="../src/matteloop/ui/workspace_controller.py" line="95"/>
+        <source>Delete %1 (%2 frames, %3)?
+Stored frames and the saved transform will be removed. Recreating them requires background removal again.</source>
+        <translation>Schnittset %1 (%2 Frames, %3) löschen?
+Gespeicherte Frames und die gespeicherte Transformation werden entfernt. Eine Neuerstellung erfordert eine erneute Hintergrundentfernung.</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/workspace_controller.py" line="109"/>
+        <source>Delete cut set?</source>
+        <translation>Schnittset löschen?</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/workspace_controller.py" line="119"/>
         <source>Delete pinned cut set?</source>
         <translation>Angeheftetes Schnittset löschen?</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/workspace_controller.py" line="91"/>
+        <location filename="../src/matteloop/ui/workspace_controller.py" line="104"/>
+        <location filename="../src/matteloop/ui/workspace_controller.py" line="120"/>
         <source>This set is pinned. Delete it anyway?</source>
         <translation>Dieses Set ist angeheftet. Trotzdem löschen?</translation>
     </message>
