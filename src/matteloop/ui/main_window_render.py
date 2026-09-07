@@ -34,6 +34,9 @@ def render_window(window: MainWindow, model: PresentationModel) -> None:
 
 
 def _render_source_and_result(window: MainWindow, model: PresentationModel) -> None:
+    window.source_drop_surface.set_drop_enabled(
+        model.choose_enabled or model.replace_enabled
+    )
     window.source_drop_surface.setVisible(model.source_surface_visible)
     window.source_strip.setVisible(model.source_strip_visible)
     window.preview_stage.setVisible(model.show_stage)

@@ -102,6 +102,8 @@ class MainWindow(QMainWindow):
         self.preview_stage = PreviewStage()
         self.original_canvas = self.preview_stage.original_canvas
         self.result_canvas = self.preview_stage.result_canvas
+        self.source_drop_target.install_drop_target(self.source_strip)
+        self.source_drop_target.install_drop_target(self.preview_stage)
         self.timeline_widget = TimelineWidget()
         self.timeline_placeholder = self.timeline_widget
         self.source_error_heading = StatusLabel(
