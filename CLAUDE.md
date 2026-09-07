@@ -100,6 +100,37 @@ The coupling test in `tests/jobs/models/test_catalog.py` fails when the
 installed runtime and the manifest pin disagree. It is a floor, not a
 substitute for this list: it cannot see steps 3, 4 or 7.
 
+## Raising the version (REQUIRED — all of it)
+
+`matteloop.__version__` is the source of truth, and everything a user reads
+derives from it: the window title, `--version`, the first line of the startup
+diagnostics, and the macOS bundle's `CFBundleShortVersionString` and
+`CFBundleVersion`, patched at build time from that value.
+
+Two files carry the number, and the second is the one that gets forgotten:
+
+1. `src/matteloop/__init__.py` — `__version__`.
+2. `packaging/pysidedeploy.spec` — **three** occurrences: `version` under
+   `[app]`, and `--file-version` and `--product-version` in `extra_args`. Nuitka
+   writes the Windows executable's version resource from the latter two; there
+   is no way to derive them from the package at build time, so they are copies.
+
+`tests/release/test_version_identity.py` fails when those disagree. It is a
+floor, not a substitute for this list: it cannot see the tag, the release notes,
+or the README.
+
+Then, still by hand:
+
+3. The tag, `vX.Y.Z`, matching exactly. The release workflow is
+   `workflow_dispatch`, so nothing enforces that the tag and the built version
+   agree — a mismatch here is what shipped `1.0` in two releases.
+4. Release notes: what is new. The README never carries version history.
+5. **A minor release checks the README and the screenshots** before the bump
+   (see *Keeping the README honest*). A patch needs no pass.
+
+Never patch a version into a built artifact by hand. If a number is wrong in a
+bundle, it is wrong in one of the two files above, and the fix belongs there.
+
 ## Working on issues (REQUIRED)
 
 Work that answers a GitHub issue goes onto its own branch and into a pull
