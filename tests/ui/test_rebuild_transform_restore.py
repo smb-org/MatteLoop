@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from fractions import Fraction
 from pathlib import Path
 
+import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QImage
 
@@ -32,11 +33,16 @@ from matteloop.core.state import (
     reduce,
 )
 from matteloop.jobs.transform_store import store_transform, transform_sidecar_path
-from matteloop.jobs.workspace import CutWorkspace, WorkspaceLifecycle
+from matteloop.jobs.workspace import (
+    CutWorkspace,
+    WorkspaceLifecycle,
+    WorkspaceSummary,
+)
 from matteloop.ui.controller import SourceController
 from matteloop.ui.ports import RenderVideoRequested
 from matteloop.ui.preview_controller import PreviewRuntime
 from matteloop.ui.store import ReducerStore
+from tests.ui.rebuild_support import rebuild_manifest
 
 
 @dataclass(frozen=True)
@@ -46,6 +52,8 @@ class _Metadata:
     height: int = 128
     duration: Fraction = Fraction(2)
     average_rate: Fraction = Fraction(30)
+
+
 
 
 class _MatchedCutRuntime(PreviewRuntime):
@@ -217,4 +225,35 @@ def test_rebuilding_a_cut_without_a_stored_transform_stays_identity(
 
     qtbot.waitUntil(lambda: len(runtime.rebuild_requests) == 1, timeout=5000)
     assert runtime.rebuild_requests[0].transform == TransformSpec()
+    controller.shutdown()
+
+
+@pytest.mark.parametrize("selects_open_cut", [False, True])
+def test_canceling_a_rebuild_keeps_the_open_cut_transform(
+    tmp_path, qtbot, selects_open_cut: bool
+) -> None:
+    """Cancelling must cost nothing, whichever cut the picker offered."""
+    opened = _promoted_cut(tmp_path, "a")
+    matched = opened if selects_open_cut else _promoted_cut(tmp_path, "b")
+    store_transform(matched, TransformSpec(first_frame=2), [])
+    output = tmp_path / "source.webp"
+    output.write_bytes(b"existing")
+    runtime = _MatchedCutRuntime(matched)
+    store, controller = _controller(tmp_path, runtime)
+    controller.render_controller.open_cut_key = lambda: opened.cache_key
+    live = TransformSpec(crop=CropSpec(4, 4, 32, 32))
+    store.dispatch(TransformChanged(live))
+
+    controller.render_controller._use_workspace(  # noqa: SLF001
+        WorkspaceSummary(matched, rebuild_manifest(tmp_path / "source.mp4"), 0)
+    )
+    dialog = controller.render_controller.collision_dialog
+    assert dialog is not None
+    assert store.state.parameters.transform == live
+    qtbot.mouseClick(dialog.buttons()[2], Qt.MouseButton.LeftButton)
+    qtbot.waitUntil(
+        lambda: controller.render_controller.collision_dialog is None, timeout=1000
+    )
+    assert store.state.parameters.transform == live
+    assert not runtime.rebuild_requests
     controller.shutdown()

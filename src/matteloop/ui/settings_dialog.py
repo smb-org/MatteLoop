@@ -55,7 +55,7 @@ class SettingsDialog(QDialog):
         self.setAccessibleName(
             QCoreApplication.translate("SettingsDialog", "Preferences")
         )
-        self.setMinimumWidth(560)
+        self.setMinimumWidth(640)
         self._store = store
         self._services = services
         self._settings = settings or QSettings()
@@ -114,6 +114,9 @@ class SettingsDialog(QDialog):
             QCoreApplication.translate("SettingsDialog", "Language restart note")
         )
         self.language_note_label.setProperty("secondary", True)
+        # German runs a third longer than English here; without wrapping the
+        # note is cut off at the dialog edge.
+        self.language_note_label.setWordWrap(True)
 
         language_row = QWidget()
         language_layout = QVBoxLayout(language_row)
@@ -134,7 +137,14 @@ class SettingsDialog(QDialog):
         provider_label_widget.setBuddy(self.provider_picker)
         form.addRow(provider_label_widget, self.provider_picker)
 
+        self.heading_label = QLabel(
+            QCoreApplication.translate("SettingsDialog", "Preferences")
+        )
+        self.heading_label.setObjectName("settings_heading")
+        self.heading_label.setProperty("heading", True)
+
         layout = QVBoxLayout(self)
+        layout.addWidget(self.heading_label)
         layout.addWidget(self.description_label)
         layout.addLayout(form)
         layout.addWidget(self.button_box)

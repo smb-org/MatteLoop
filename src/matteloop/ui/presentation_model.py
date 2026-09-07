@@ -91,6 +91,8 @@ class PresentationModel:
     success_accessible_description: str
     workspace_attention: bool
     workspace_open: bool
+    workspace_management_enabled: bool
+    workspace_management_needs_source: bool
     source_filename: str
     source_dimensions: str
     source_duration: str

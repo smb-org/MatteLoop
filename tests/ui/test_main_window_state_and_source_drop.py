@@ -328,6 +328,30 @@ def test_ready_source_does_not_show_inspector_readiness_placeholder(window) -> N
     )
 
 
+def test_workspace_management_requires_a_ready_video(window) -> None:
+    value, _ = window
+
+    value.render_state(AppState())
+    assert not value.manage_workspaces_button.isEnabled()
+    assert value.manage_workspaces_button.toolTip() == (
+        "Open a video to manage its workspaces."
+    )
+    assert value.manage_workspaces_button.accessibleDescription() == (
+        "Open a video to manage its workspaces."
+    )
+    assert value.manage_models_button.isEnabled()
+
+    value.render_state(_ready())
+    assert value.manage_workspaces_button.isEnabled()
+
+    # A running job disables the whole inspector, which is fine — but nothing
+    # may then claim that no video is open, because one is.
+    running = reduce(_ready(), RenderRequested("job", "request"))
+    value.render_state(running)
+    assert value.manage_workspaces_button.toolTip() == ""
+    assert value.manage_workspaces_button.accessibleDescription() == ""
+
+
 def test_model_status_describes_cached_uncached_and_preparing_states(window) -> None:
     value, _ = window
     unavailable = reduce(_ready(), ModelAvailabilityChanged(False))

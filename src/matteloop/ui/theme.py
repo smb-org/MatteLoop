@@ -76,7 +76,12 @@ def _control_stylesheet() -> str:
         QComboBox, QAbstractSpinBox, QLineEdit {{ background: {CONTROL_COLOR};
             border: 1px solid {DIVIDER_COLOR}; border-radius: 4px;
             min-height: 32px; padding: 0 8px;
-            selection-background-color: {ACCENT_COLOR}; }}
+            selection-background-color: {ACCENT_COLOR};
+            selection-color: {PRIMARY_ACTION_TEXT_COLOR}; }}
+        QComboBox QAbstractItemView {{ background: {CONTROL_COLOR};
+            border: 1px solid {DIVIDER_COLOR};
+            selection-background-color: {ACCENT_COLOR};
+            selection-color: {PRIMARY_ACTION_TEXT_COLOR}; }}
         QComboBox::drop-down {{ border: 0; width: 28px; }}
         QAbstractSpinBox::up-button, QAbstractSpinBox::down-button {{
             width: 24px; border: 0; background: transparent;

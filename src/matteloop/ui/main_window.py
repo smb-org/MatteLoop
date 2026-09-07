@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from matteloop import application_title
 from matteloop.core.execution_providers import ProviderOption
 from matteloop.core.state import AppState, FocusTarget
 from matteloop.ui.action_shelf import ActionShelf
@@ -57,6 +58,7 @@ class MainWindow(QMainWindow):
         provider_options: tuple[ProviderOption, ...] | None = None,
     ) -> None:
         super().__init__(parent)
+        self.setWindowTitle(application_title())
         self.setObjectName("main_window")
         self.setAccessibleName(main_window_copy("MatteLoop"))
         self.setMinimumSize(1100, 720)
@@ -88,8 +90,7 @@ class MainWindow(QMainWindow):
         left_layout.setContentsMargins(16, 16, 16, 0)
         left_layout.setSpacing(12)
         self.source_drop_target = SourceDropSurface()
-        # Compatibility alias retained for the Task 13 public test seam.
-        self.source_drop_surface = self.source_drop_target
+        self.source_drop_surface = self.source_drop_target  # Public test seam alias.
         self.choose_video_button = self.source_drop_target.button
         self.source_strip = SourceStrip()
         self.source_filename = self.source_strip.filename

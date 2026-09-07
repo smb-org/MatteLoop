@@ -8,7 +8,7 @@ so this controller keeps it alive until the event loop closes.
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from pathlib import Path
 from threading import Thread
 from uuid import uuid4
@@ -18,7 +18,8 @@ from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QFileDialog, QMessageBox, QWidget
 
 from matteloop.core.errors import AppError
-from matteloop.core.specs import CollisionPolicy, RenderRequest
+from matteloop.core.parameters import TransformChanged
+from matteloop.core.specs import CollisionPolicy, RenderRequest, TransformSpec
 from matteloop.core.state import (
     CancelAcknowledged,
     CancelRequested,
@@ -53,42 +54,19 @@ from matteloop.ui.ports import (
     StateStore,
 )
 from matteloop.ui.preview_controller import PreviewJobDialog, PreviewRuntime
-from matteloop.ui.render_worker import RenderRuntime, RenderWorker
+from matteloop.ui.render_worker import RenderWorker
 from matteloop.ui.request_builder import _preview_inputs, _render_request
 from matteloop.ui.worker_thread import WorkerThread
 from matteloop.ui.workspace_controller import WorkspacePickerController
 from matteloop.ui.workspace_dialog import WorkspacePickerDialog
 from matteloop.ui.workspace_presentation import request_for_workspace
+from matteloop.ui.workspace_probe import WorkspaceProbeWorker
 
 
-class _WorkspaceProbeWorker(QObject):
-    result = Signal(object)
-    finished = Signal()
-
-    def __init__(self, request: RenderRequest, runtime: RenderRuntime) -> None:
-        super().__init__()
-        self._request = request
-        self._runtime = runtime
-        self._context = JobContext(
-            f"workspace-probe-{uuid4().hex}",
-            JobKind.RENDER,
-            request.output.directory,
-            lambda _event: None,
-            CancellationState(),
-        )
-
-    @Slot()
-    def run(self) -> None:
-        workspace: CutWorkspace | None = None
-        finder = getattr(self._runtime, "find_matching_workspace", None)
-        if callable(finder):
-            try:
-                candidate = finder(self._request, self._context)
-                workspace = candidate if isinstance(candidate, CutWorkspace) else None
-            except BaseException:
-                workspace = None
-        self.result.emit(workspace)
-        self.finished.emit()
+@dataclass(frozen=True, slots=True)
+class _PendingRender:
+    source_id: str
+    request: RenderRequest
 
 
 class RenderController(QObject):
@@ -120,19 +98,19 @@ class RenderController(QObject):
         self._dialog: PreviewJobDialog | None = None
         self._dialog_cancel_connected = False
         self._preflight_dialog: QMessageBox | None = None
-        self._preflight_request: RenderRequest | None = None
+        self._preflight_request: _PendingRender | None = None
         self._collision_dialog: QMessageBox | None = None
-        self._collision_request: RenderRequest | None = None
+        self._collision_request: _PendingRender | None = None
         self._collision_workspace: CutWorkspace | None = None
         self._reuse_dialog: QMessageBox | None = None
-        self._reuse_request: RenderRequest | None = None
+        self._reuse_request: _PendingRender | None = None
         self._reuse_workspace: CutWorkspace | None = None
         self._probe_thread: QThread | None = None
-        self._probe_worker: _WorkspaceProbeWorker | None = None
-        self._probe_request: RenderRequest | None = None
+        self._probe_worker: WorkspaceProbeWorker | None = None
+        self._probe_request: _PendingRender | None = None
         self._workspace_picker: WorkspacePickerController | None = None
         self._active_workspace: CutWorkspace | None = None
-        self.transform_restore: Callable[[CutWorkspace], None] | None = None
+        self.transform_restore: Callable[[CutWorkspace], TransformSpec] | None = None
         self.open_cut_key: Callable[[], str | None] | None = None
         self._closed = False
 
@@ -237,17 +215,18 @@ class RenderController(QObject):
             request = _render_request(inputs)
         except BaseException:
             return
+        pending = _PendingRender(source_id, request)
         if state.preview in {
             PreviewState.NONE,
             PreviewState.STALE,
             PreviewState.ERROR,
         }:
-            self._preflight_request = request
+            self._preflight_request = pending
             self._store.dispatch(RenderPreflightRequested())
             if self._store.state.preflight_warning:
                 self._show_preflight()
             return
-        self._probe_for_reuse(request)
+        self._probe_for_reuse(pending)
 
     def _choice_dialog(
         self,
@@ -312,8 +291,8 @@ class RenderController(QObject):
 
     def _finish_preflight(self, choice: str) -> None:
         dialog = self._preflight_dialog
-        request = self._preflight_request
-        if dialog is None or request is None:
+        pending = self._preflight_request
+        if dialog is None or pending is None:
             return
         self._preflight_dialog = None
         self._preflight_request = None
@@ -322,16 +301,16 @@ class RenderController(QObject):
         if choice == "preview":
             self._preview_callback()
         elif choice == "render":
-            self._probe_for_reuse(request)
+            self._probe_for_reuse(pending)
 
-    def _probe_for_reuse(self, request: RenderRequest) -> None:
+    def _probe_for_reuse(self, pending: _PendingRender) -> None:
         if self._probe_thread is not None:
             return
         finder = getattr(self._runtime, "find_matching_workspace", None)
         if not callable(finder):
-            self._resolve_collision(request)
+            self._resolve_collision(pending)
             return
-        worker = _WorkspaceProbeWorker(request, self._runtime)
+        worker = WorkspaceProbeWorker(pending.request, self._runtime)
         thread = WorkerThread(worker, self)
         worker.result.connect(self._reuse_probe_result)
         worker.finished.connect(thread.quit)
@@ -339,23 +318,23 @@ class RenderController(QObject):
         thread.finished.connect(lambda: self._probe_finished(thread))
         self._probe_worker = worker
         self._probe_thread = thread
-        self._probe_request = request
+        self._probe_request = pending
         thread.start()
 
     @Slot(object)
     def _reuse_probe_result(self, value: object) -> None:
         if self._closed:
             return
-        request = self._probe_request
+        pending = self._probe_request
         self._probe_request = None
-        if request is None:
+        if pending is None:
             return
         if isinstance(value, CutWorkspace):
-            self._reuse_request = request
+            self._reuse_request = pending
             self._reuse_workspace = value
             self._show_reuse()
         else:
-            self._resolve_collision(request)
+            self._resolve_collision(pending)
 
     def _probe_finished(self, thread: QThread) -> None:
         if self._probe_thread is thread:
@@ -364,17 +343,18 @@ class RenderController(QObject):
 
     def _resolve_collision(
         self,
-        request: RenderRequest,
+        pending: _PendingRender,
         workspace: CutWorkspace | None = None,
     ) -> None:
+        request = pending.request
         try:
             exists = request.output.path.exists()
         except OSError:
             exists = False
         if not exists:
-            self._start(request, workspace)
+            self._start(pending, workspace)
             return
-        self._collision_request = request
+        self._collision_request = pending
         self._collision_workspace = workspace
         self._show_collision()
 
@@ -409,44 +389,33 @@ class RenderController(QObject):
 
     def _finish_reuse(self, choice: str) -> None:
         dialog = self._reuse_dialog
-        request = self._reuse_request
+        pending = self._reuse_request
         workspace = self._reuse_workspace
-        if dialog is None or request is None:
+        if dialog is None or pending is None:
             return
         self._reuse_dialog = None
         self._reuse_request = None
         self._reuse_workspace = None
         dialog.close()
         if choice == "rebuild" and workspace is not None:
-            self._resolve_collision(
-                self._transform_for_rebuild(replace(request, rebuild=True), workspace),
-                workspace,
+            request = self._transform_for_rebuild(
+                replace(pending.request, rebuild=True), workspace
             )
+            self._resolve_collision(replace(pending, request=request), workspace)
         elif choice == "regenerate":
-            self._resolve_collision(replace(request, regenerate=True), None)
+            self._resolve_collision(
+                replace(pending, request=replace(pending.request, regenerate=True)),
+                None,
+            )
 
     def _transform_for_rebuild(
         self, request: RenderRequest, workspace: CutWorkspace
     ) -> RenderRequest:
-        """Restore the matched cut's stored transform before it is rebuilt.
-
-        This request predates the probe, so on a cold start it carries
-        identity: the rebuild dropped the stored trim/crop/resize, and
-        ``store_transform`` then deleted the sidecar holding them because an
-        identity result records nothing. Restoring mirrors ``_use_workspace``
-        -- dispatch, then read the transform back off the store.
-
-        The cut already open is the exception: what the inspector holds for
-        it is an unsaved edit, and restoring over that is the same loss in
-        the other direction. ``open_cut_key`` asks the Transform stage, which
-        owns that session and closes it when the source is reloaded, rather
-        than tracking a second copy here. Every other cut restores, so
-        keeping that edit can never rewrite a different cut's sidecar.
-        """
+        """Build a rebuild request with the right cut transform, without dispatching."""
         open_key = self.open_cut_key() if self.open_cut_key is not None else None
-        if self.transform_restore is not None and open_key != workspace.cache_key:
-            self.transform_restore(workspace)
-        return replace(request, transform=self._store.state.parameters.transform)
+        if open_key == workspace.cache_key or self.transform_restore is None:
+            return request
+        return replace(request, transform=self.transform_restore(workspace))
 
     def _current_request(self) -> RenderRequest | None:
         state = self._store.state
@@ -478,18 +447,18 @@ class RenderController(QObject):
     def _use_workspace(self, value: object) -> None:
         if not isinstance(value, WorkspaceSummary):
             return
-        if self.transform_restore is not None:
-            self.transform_restore(value.workspace)
         request = self._current_request()
-        if request is None:
+        source_id = self._store.state.source_id
+        if request is None or source_id is None:
             return
         try:
             selected = request_for_workspace(value.manifest, request)
+            selected = self._transform_for_rebuild(selected, value.workspace)
         except (AppError, ValueError, KeyError):
             return
         if self._workspace_picker is not None:
             self._workspace_picker.close()
-        self._resolve_collision(selected, value.workspace)
+        self._resolve_collision(_PendingRender(source_id, selected), value.workspace)
 
     def _show_collision(self) -> None:
         if self._collision_dialog is not None or self._collision_request is None:
@@ -497,7 +466,8 @@ class RenderController(QObject):
         dialog = self._choice_dialog(
             "render_collision_dialog",
             render_copy("Output already exists"),
-            render_copy("%s already exists.") % self._collision_request.output.path,
+            render_copy("%s already exists.")
+            % self._collision_request.request.output.path,
             render_copy("Choose how to handle the existing output."),
             (
                 (render_copy("Replace"), "replace"),
@@ -519,23 +489,29 @@ class RenderController(QObject):
 
     def _finish_collision(self, choice: str) -> None:
         dialog = self._collision_dialog
-        request = self._collision_request
+        pending = self._collision_request
         workspace = self._collision_workspace
-        if dialog is None or request is None:
+        if dialog is None or pending is None:
             return
         self._collision_dialog = None
         self._collision_request = None
         self._collision_workspace = None
         dialog.close()
         if choice == "replace":
-            output = replace(request.output, collision_policy=CollisionPolicy.REPLACE)
-            self._start(replace(request, output=output), workspace)
+            output = replace(
+                pending.request.output, collision_policy=CollisionPolicy.REPLACE
+            )
+            self._start(
+                replace(pending, request=replace(pending.request, output=output)),
+                workspace,
+            )
         elif choice == "choose":
-            self._choose_output_name(request, workspace)
+            self._choose_output_name(pending, workspace)
 
     def _choose_output_name(
-        self, request: RenderRequest, workspace: CutWorkspace | None = None
+        self, pending: _PendingRender, workspace: CutWorkspace | None = None
     ) -> None:
+        request = pending.request
         filename, _filter = QFileDialog.getSaveFileName(
             self._dialog_parent,
             render_copy("Choose output name"),
@@ -561,7 +537,7 @@ class RenderController(QObject):
             )
         except AppError:
             return
-        self._resolve_collision(selected, workspace)
+        self._resolve_collision(replace(pending, request=selected), workspace)
 
     def _spawn_worker(
         self,
@@ -594,18 +570,20 @@ class RenderController(QObject):
         return worker
 
     def _start(
-        self, request: RenderRequest, rebuild_workspace: CutWorkspace | None = None
+        self, pending: _PendingRender, rebuild_workspace: CutWorkspace | None = None
     ) -> None:
         state = self._store.state
-        source_id = state.source_id
-        if source_id is None:
+        if pending.source_id != state.source_id:
             return
+        source_id = pending.source_id
+        request = pending.request
         job_id = uuid4().hex
         request_id = uuid4().hex
         if rebuild_workspace is None:
             self._store.dispatch(RenderRequested(job_id, request_id))
         else:
             request = replace(request, rebuild=True, regenerate=False)
+            self._store.dispatch(TransformChanged(request.transform))
             self._store.dispatch(
                 RebuildRequested(
                     job_id, request_id, workspace_key=rebuild_workspace.cache_key

@@ -44,7 +44,7 @@ class DownloadResponse(Protocol):
 
 @runtime_checkable
 class DownloadTransport(Protocol):
-    def open(self, url: str) -> DownloadResponse: ...
+    def open(self, url: str, cancelled: CancellationCheck) -> DownloadResponse: ...
 
 
 class _LexicalPathApi(Protocol):
@@ -175,7 +175,18 @@ class ModelDownloader:
         _remove_stale_part(bound, part_name, spec.id)
         response: DownloadResponse | None = None
         try:
-            response = self._open_response(artifact.url, spec.id)
+            try:
+                response = self._transport.open(artifact.url, cancelled)
+            except BaseException as error:
+                _raise_transport_error(spec.id, error)
+            if not isinstance(response, DownloadResponse):
+                try:
+                    response.close()
+                except BaseException:
+                    pass
+                raise _network_error(
+                    spec.id, "transport returned an invalid response"
+                )
             _raise_if_cancelled(cancelled, spec.id)
             known_total = _content_length(response.headers, spec.id)
             if known_total is not None and known_total != artifact.size_bytes:
@@ -288,19 +299,6 @@ class ModelDownloader:
                     response.close()
                 except BaseException:
                     pass
-
-    def _open_response(self, url: str, model_id: str) -> DownloadResponse:
-        try:
-            response = self._transport.open(url)
-        except BaseException as error:
-            _raise_transport_error(model_id, error)
-        if not isinstance(response, DownloadResponse):
-            try:
-                response.close()
-            except BaseException:
-                pass
-            raise _network_error(model_id, "transport returned an invalid response")
-        return response
 
     def _read_response(self, response: DownloadResponse, model_id: str) -> bytes:
         try:
