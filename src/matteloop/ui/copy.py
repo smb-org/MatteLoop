@@ -306,8 +306,8 @@ def presented_copy(value: str) -> str:
         "Edited cuts changed": QCoreApplication.translate(
             "Presenter", "Edited cuts changed"
         ),
-        "Prepare & Preview": QCoreApplication.translate(
-            "Presenter", "Prepare & Preview"
+        "Download & Preview": QCoreApplication.translate(
+            "Presenter", "Download & Preview"
         ),
         "Preview Frame": QCoreApplication.translate("Presenter", "Preview Frame"),
         "Open another video": QCoreApplication.translate(
@@ -324,6 +324,7 @@ def presented_copy(value: str) -> str:
             "Presenter", "Rebuild from edited cuts"
         ),
         "Render complete": QCoreApplication.translate("Presenter", "Render complete"),
+        "Previous result": QCoreApplication.translate("Presenter", "Previous result"),
     }
     if value in exact:
         return exact[value]
@@ -416,14 +417,22 @@ def _render_copy_dialog(value: str) -> str:
                 "A validated cut set matches the current source and settings.",
             )
         ),
-        "Rebuild reuses the cuts and only reruns framing and encoding.": (
+        (
+            "Rebuild reuses the cuts and only reruns framing and encoding. "
+            "Regenerate removes backgrounds again for every selected frame."
+        ): (
             QCoreApplication.translate(
                 "RenderController",
-                "Rebuild reuses the cuts and only reruns framing and encoding.",
+                "Rebuild reuses the cuts and only reruns framing and encoding. "
+                "Regenerate removes backgrounds again for every selected frame.",
             )
         ),
-        "Rebuild": QCoreApplication.translate("RenderController", "Rebuild"),
-        "Regenerate": QCoreApplication.translate("RenderController", "Regenerate"),
+        "Reuse cuts and rebuild": QCoreApplication.translate(
+            "RenderController", "Reuse cuts and rebuild"
+        ),
+        "Regenerate backgrounds": QCoreApplication.translate(
+            "RenderController", "Regenerate backgrounds"
+        ),
     }
     translated = exact.get(value, value)
     return (

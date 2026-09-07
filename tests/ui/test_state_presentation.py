@@ -190,4 +190,4 @@ def test_error_copy_and_editor_lock(window) -> None:
 def test_unavailable_model_truthfully_changes_preview_action_copy(window) -> None:
     value, _, _ = window
     value.render_state(reduce(_ready(), ModelAvailabilityChanged(False)))
-    assert value.preview_button.text() == "Prepare & Preview"
+    assert value.preview_button.text() == "Download & Preview"

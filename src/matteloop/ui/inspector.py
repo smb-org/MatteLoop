@@ -173,6 +173,7 @@ class Inspector(QFrame):
         self._connect_parameter_controls()
 
     def _build_segmentation_parameter_controls(self) -> None:
+        self._model_download_details: dict[str, tuple[str, str, bool]] = {}
         self.model_picker = compact_field(ElidingComboBox())
         self.model_picker.setObjectName("model_picker")
         self.model_picker.setAccessibleName(
@@ -206,6 +207,7 @@ class Inspector(QFrame):
                 (AlignedColumn(display_name), AlignedColumn(size, True)),
                 detail,
             )
+            self._model_download_details[model_id] = (display_name, size, availability)
             self.model_picker.addItem(status_icon(row), row.display_text, model_id)
             install_aligned_row(
                 self.model_picker, row, index=self.model_picker.count() - 1
@@ -213,6 +215,11 @@ class Inspector(QFrame):
         self.model_picker.setCurrentIndex(
             self.model_picker.findData(catalog.default_id)
         )
+        self._build_model_status_controls(catalog.default_id)
+        self._build_edge_control()
+        self.model_picker.currentIndexChanged.connect(self._update_model_accessibility)
+
+    def _build_model_status_controls(self, default_id: str) -> None:
         self.model_status = QLabel()
         self.model_status.setObjectName("model_status")
         self.model_status.setAccessibleName(
@@ -224,9 +231,17 @@ class Inspector(QFrame):
         self.model_status.setAlignment(
             Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
         )
-        self.set_model_status("ready")
-        self._build_edge_control()
-        self.model_picker.currentIndexChanged.connect(self._update_model_accessibility)
+        self.model_download_notice = QLabel()
+        self.model_download_notice.setObjectName("model_download_notice")
+        self.model_download_notice.setAccessibleName(
+            QCoreApplication.translate("Inspector", "Model download")
+        )
+        self.model_download_notice.setWordWrap(True)
+        self.model_download_notice.setProperty("secondary", True)
+        self._model_status_value = "not_cached"
+        self.set_model_status(
+            "ready" if self._model_options.get(default_id, False) else "not_cached"
+        )
 
     def _build_edge_control(self) -> None:
         self.edge_picker = compact_field(ElidingComboBox())
@@ -331,9 +346,17 @@ class Inspector(QFrame):
             "maximum_size", 0.0, 1_000_000_000.0, 3
         )
         self.max_size_spinbox.setAccessibleName(
-            QCoreApplication.translate("Inspector", "Maximum file size in MiB")
+            QCoreApplication.translate("Inspector", "Maximum file size")
+        )
+        self.max_size_spinbox.setSpecialValueText(
+            QCoreApplication.translate("Inspector", "Unlimited")
         )
         self.max_size_spinbox.setSuffix(QCoreApplication.translate("Inspector", " MiB"))
+        maximum_size_description = QCoreApplication.translate(
+            "Inspector", "Unlimited means no maximum file size."
+        )
+        self.max_size_spinbox.setToolTip(maximum_size_description)
+        self.max_size_spinbox.setAccessibleDescription(maximum_size_description)
 
     def _connect_parameter_controls(self) -> None:
         self.model_picker.currentIndexChanged.connect(self._model_changed)
@@ -390,6 +413,23 @@ class Inspector(QFrame):
             detail = ""
         self.model_picker.setToolTip(detail)
         self.model_picker.setAccessibleDescription(detail)
+        self._update_model_download_notice()
+
+    def _update_model_download_notice(self) -> None:
+        model_id = self.model_picker.currentData()
+        details = self._model_download_details.get(model_id)
+        if details is None or details[2] or self._model_status_value == "ready":
+            self.model_download_notice.clear()
+            self.model_download_notice.setAccessibleDescription("")
+            self.model_download_notice.hide()
+            return
+        display_name, size, _available = details
+        text = QCoreApplication.translate(
+            "Inspector", "%s — %s download required"
+        ) % (display_name, size)
+        self.model_download_notice.setText(text)
+        self.model_download_notice.setAccessibleDescription(text)
+        self.model_download_notice.show()
 
     def _edge_changed(self, _index: int) -> None:
         try:
@@ -703,6 +743,7 @@ class Inspector(QFrame):
         model_layout.addWidget(self.model_picker, 1)
         model_layout.addWidget(self.model_status)
         layout.addRow(self._form_label("Model"), model_row)
+        layout.addRow(self._form_label(""), self.model_download_notice)
         layout.addRow(self._form_label("Edge treatment"), self.edge_picker)
         return controls
 
@@ -756,6 +797,7 @@ class Inspector(QFrame):
 
     def set_model_status(self, status: str) -> None:
         """Render the presenter-derived model availability beside the picker."""
+        self._model_status_value = status
         marker, label = model_status(status)
         self.model_status.setText(f"{marker} {label}")
         self.model_status.setProperty("status", status)
@@ -764,6 +806,7 @@ class Inspector(QFrame):
         )
         self.model_status.style().unpolish(self.model_status)
         self.model_status.style().polish(self.model_status)
+        self._update_model_download_notice()
 
     def parameter_tab_widgets(self) -> tuple[QWidget, ...]:
         """Return standard parameter controls in consequence order."""

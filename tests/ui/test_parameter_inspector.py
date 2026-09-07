@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from decimal import Decimal
 from fractions import Fraction
 from pathlib import Path
 
@@ -199,6 +200,44 @@ def test_inspector_shows_manifest_download_size_and_cache_status_for_each_model(
             index, Qt.ItemDataRole.AccessibleTextRole
         )
         assert expected_status in detail
+
+
+def test_unlimited_output_size_is_spoken_as_unlimited_and_keeps_positive_values(
+    qtbot,
+) -> None:
+    inspector = Inspector(_settings())
+    qtbot.addWidget(inspector)
+    commands: list[object] = []
+    inspector.command_requested.connect(commands.append)
+
+    assert inspector.max_size_spinbox.text() == "Unlimited"
+    assert inspector.max_size_spinbox.accessibleName() == "Maximum file size"
+    assert "Unlimited" in inspector.max_size_spinbox.accessibleDescription()
+
+    inspector.max_size_spinbox.setValue(1.25)
+
+    assert inspector.max_size_spinbox.text().endswith(" MiB")
+    assert inspector.max_size_spinbox.text() != "Unlimited"
+    assert commands[-1].value == Decimal("1.25")
+
+
+def test_uncached_selected_model_shows_full_download_name_and_size(qtbot) -> None:
+    inspector = Inspector(_settings(), model_options=(("u2netp", True),))
+    qtbot.addWidget(inspector)
+    inspector.show()
+    inspector.set_model_status("not_cached")
+
+    assert inspector.model_download_notice.text() == (
+        "BiRefNet Portrait — 927.6 MiB download required"
+    )
+    assert inspector.model_download_notice.isVisible()
+    assert inspector.model_download_notice.accessibleDescription() == (
+        "BiRefNet Portrait — 927.6 MiB download required"
+    )
+
+    inspector.model_picker.setCurrentIndex(inspector.model_picker.findData("u2netp"))
+
+    assert not inspector.model_download_notice.isVisible()
 
 
 def test_inspector_emits_parameter_commands_from_standard_controls(qtbot) -> None:

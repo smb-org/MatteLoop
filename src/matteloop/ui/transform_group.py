@@ -270,6 +270,14 @@ class TransformGroup(QWidget):
             QCoreApplication.translate("TransformGroup", "Resize percentage")
         )
         self.percent_spinbox.setRange(0, 1000)
+        percent_description = QCoreApplication.translate(
+            "TransformGroup", "— means no percentage resize."
+        )
+        self.percent_spinbox.setSpecialValueText(
+            QCoreApplication.translate("TransformGroup", "—")
+        )
+        self.percent_spinbox.setToolTip(percent_description)
+        self.percent_spinbox.setAccessibleDescription(percent_description)
         self.percent_spinbox.setSuffix(
             QCoreApplication.translate("TransformGroup", " %")
         )

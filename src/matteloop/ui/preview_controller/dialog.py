@@ -103,6 +103,7 @@ class PreviewJobDialog(QDialog):
         self.output_label.setAccessibleName(
             QCoreApplication.translate("PreviewJobDialog", "Output file")
         )
+        self._build_failure_summary()
         self._build_completion_summary()
         self._build_completion_actions()
         self.provider_notice_label = QLabel()
@@ -153,6 +154,7 @@ class PreviewJobDialog(QDialog):
         job_details.addStretch(1)
         job_details.addWidget(self.output_label)
         layout.addLayout(job_details)
+        layout.addWidget(self.failure_summary)
         layout.addWidget(self.completion_summary)
         layout.addWidget(self.provider_notice_label)
         layout.addWidget(self.stage_progress_label)
@@ -227,6 +229,34 @@ class PreviewJobDialog(QDialog):
         ):
             summary_layout.addRow(label, value)
 
+    def _build_failure_summary(self) -> None:
+        self.failure_summary = QWidget()
+        self.failure_summary.setObjectName("job_failure_summary")
+        self.failure_summary.setAccessibleName(
+            QCoreApplication.translate("PreviewJobDialog", "Render failure details")
+        )
+        summary_layout = form_layout(self.failure_summary)
+        self.failure_reason = QLabel()
+        self.failure_reason.setObjectName("job_failure_reason")
+        self.failure_reason.setAccessibleName(
+            QCoreApplication.translate("PreviewJobDialog", "Failure reason")
+        )
+        self.failure_reason.setWordWrap(True)
+        self.failure_next_step = QLabel()
+        self.failure_next_step.setObjectName("job_failure_next_step")
+        self.failure_next_step.setAccessibleName(
+            QCoreApplication.translate("PreviewJobDialog", "Next step")
+        )
+        self.failure_next_step.setWordWrap(True)
+        summary_layout.addRow(
+            QCoreApplication.translate("PreviewJobDialog", "Reason"),
+            self.failure_reason,
+        )
+        summary_layout.addRow(
+            QCoreApplication.translate("PreviewJobDialog", "Next step"),
+            self.failure_next_step,
+        )
+
     def _build_completion_actions(self) -> None:
         self.completion_actions = QWidget()
         self.completion_actions.setObjectName("job_completion_actions")
@@ -259,6 +289,7 @@ class PreviewJobDialog(QDialog):
 
     def reset(self, title: str | None = None) -> None:
         self._completion_visible = False
+        self._failure_visible = False
         self._terminal_close_requested = False
         self.setAccessibleName(
             QCoreApplication.translate("PreviewJobDialog", "Preview job")
@@ -291,6 +322,9 @@ class PreviewJobDialog(QDialog):
         self.output_label.hide()
         self.output_label.setToolTip("")
         self.output_label.setAccessibleDescription("")
+        self.failure_summary.hide()
+        self.failure_reason.clear()
+        self.failure_next_step.clear()
         self.completion_summary.hide()
         self.completion_actions.hide()
         for value in (
@@ -333,6 +367,10 @@ class PreviewJobDialog(QDialog):
     @property
     def completion_visible(self) -> bool:
         return self._completion_visible
+
+    @property
+    def failure_visible(self) -> bool:
+        return self._failure_visible
 
     def _summary_value(self, accessible_name: str) -> QLabel:
         value = QLabel()
@@ -451,6 +489,7 @@ class PreviewJobDialog(QDialog):
 
     def show_completion(self, result: ArtifactResult) -> None:
         """Show the finished render summary and keep the modal open for review."""
+        self._failure_visible = False
         output_path = Path(str(result.output_path))
         if result.model_id:
             self.set_job_details(result.model_id)
@@ -459,6 +498,35 @@ class PreviewJobDialog(QDialog):
         self._completion_visible = True
         self._populate_completion(result, output_path)
         self._show_completion_widgets()
+
+    def show_failure(self, error: object) -> None:
+        """Show a truthful failure reason and recovery action."""
+        detail = getattr(error, "technical_detail", None)
+        if not isinstance(detail, str) or not detail:
+            detail = str(error) or QCoreApplication.translate(
+                "PreviewJobDialog", "The render failed without a reason."
+            )
+        self._completion_visible = False
+        self._failure_visible = True
+        self.setAccessibleName(
+            QCoreApplication.translate("PreviewJobDialog", "Render failed")
+        )
+        self.setWindowTitle(
+            QCoreApplication.translate("PreviewJobDialog", "Render failed")
+        )
+        self.stage_label.setText(
+            QCoreApplication.translate("PreviewJobDialog", "Failed")
+        )
+        self.detail_label.setText(
+            QCoreApplication.translate(
+                "PreviewJobDialog", "The render did not complete"
+            )
+        )
+        self.failure_reason.setText(detail)
+        self.failure_next_step.setText(
+            QCoreApplication.translate("PreviewJobDialog", "Try the render again.")
+        )
+        self._show_failure_widgets()
 
     def _populate_completion(self, result: ArtifactResult, output_path: Path) -> None:
         self.setAccessibleName(
@@ -518,29 +586,63 @@ class PreviewJobDialog(QDialog):
         self.rate_label.hide()
         self.estimate_label.hide()
         self.cancel_button.hide()
+        self.failure_summary.hide()
         self.completion_summary.show()
         self.completion_actions.show()
+        self.open_output_button.show()
+        self.open_folder_button.show()
+        self.close_button.show()
+        self.activateWindow()
+        self.raise_()
+        self.close_button.setFocus(Qt.FocusReason.OtherFocusReason)
+
+    def _show_failure_widgets(self) -> None:
+        self.stage_progress_label.hide()
+        self.progress_bar.hide()
+        self.overall_progress_label.hide()
+        self.overall_progress_bar.hide()
+        self.elapsed_label.hide()
+        self.rate_label.hide()
+        self.estimate_label.hide()
+        self.cancel_button.hide()
+        self.completion_summary.hide()
+        self.failure_summary.show()
+        self.completion_actions.show()
+        self.open_output_button.hide()
+        self.open_folder_button.hide()
+        self.close_button.show()
+        self._elapsed_timer.stop()
         self.activateWindow()
         self.raise_()
         self.close_button.setFocus(Qt.FocusReason.OtherFocusReason)
 
     def close_for_terminal(self) -> None:
         self._completion_visible = False
+        self._failure_visible = False
         self._elapsed_timer.stop()
         self._terminal_close_requested = True
         self.done(0)
         self._terminal_close_requested = False
 
     def closeEvent(self, event) -> None:  # type: ignore[no-untyped-def]
-        if not self._terminal_close_requested and not self._completion_visible:
+        if (
+            not self._terminal_close_requested
+            and not self._completion_visible
+            and not self._failure_visible
+        ):
             event.ignore()
             return
         self._completion_visible = False
+        self._failure_visible = False
         self._terminal_close_requested = False
         super().closeEvent(event)
 
     def reject(self) -> None:
-        if self._terminal_close_requested or self._completion_visible:
+        if (
+            self._terminal_close_requested
+            or self._completion_visible
+            or self._failure_visible
+        ):
             super().reject()
 
     def _refresh_metrics(self) -> None:
@@ -557,7 +659,7 @@ class PreviewJobDialog(QDialog):
     def eventFilter(self, watched: QObject, event: QEvent) -> bool:
         if event.type() == QEvent.Type.KeyPress and isinstance(event, QKeyEvent):
             if event.key() == Qt.Key.Key_Escape:
-                if self._completion_visible:
+                if self._completion_visible or self._failure_visible:
                     self._close_completion()
                 else:
                     self._request_cancel()
@@ -582,9 +684,10 @@ class PreviewJobDialog(QDialog):
 
     @Slot()
     def _close_completion(self) -> None:
-        if not self._completion_visible:
+        if not self._completion_visible and not self._failure_visible:
             return
         self._completion_visible = False
+        self._failure_visible = False
         self._terminal_close_requested = True
         self.done(0)
         self._terminal_close_requested = False
