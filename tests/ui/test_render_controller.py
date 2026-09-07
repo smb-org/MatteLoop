@@ -14,6 +14,7 @@ from matteloop.core.parameters import TransformChanged
 from matteloop.core.specs import CropSpec, TransformSpec
 from matteloop.core.state import (
     AppState,
+    ArtifactResult,
     ArtifactState,
     JobKind,
     JobStageChanged,
@@ -23,6 +24,8 @@ from matteloop.core.state import (
     PreviewSucceeded,
     RenderPreflightDismissed,
     RenderPreflightRequested,
+    RenderRequested,
+    RenderSucceeded,
     SourceLoaded,
     SourceLoadRequested,
     reduce,
@@ -39,6 +42,7 @@ from matteloop.ui.ports import (
     OpenOutputRequested,
     RenderVideoRequested,
 )
+from matteloop.ui.presenter import present
 from matteloop.ui.preview_controller import PreviewRuntime
 from matteloop.ui.render_pipeline import _StageReporter, render_prepared
 from matteloop.ui.store import ReducerStore
@@ -290,6 +294,19 @@ def _current_state(path: Path):
     )
 
 
+def _previous_render_state(path: Path):
+    running = reduce(
+        _current_state(path), RenderRequested("previous-render", "previous-request")
+    )
+    return reduce(
+        running,
+        RenderSucceeded(
+            "previous-render",
+            ArtifactResult("source", "previous-request", path.with_suffix(".webp")),
+        ),
+    )
+
+
 def test_render_command_writes_default_request_off_gui_thread(tmp_path, qtbot) -> None:
     source = tmp_path / "holiday clip.mp4"
     source.write_bytes(b"fixture")
@@ -422,19 +439,31 @@ def test_failed_render_closes_without_showing_completion_summary(
     source = tmp_path / "source.mp4"
     source.write_bytes(b"fixture")
     runtime = FailingRenderRuntime()
-    store = RecordingStore(_current_state(source))
+    store = RecordingStore(_previous_render_state(source))
     controller = SourceController(store, preview_runtime=runtime)
 
     controller.dispatch(RenderVideoRequested())
     dialog = controller.render_controller.dialog
     assert dialog is not None
     qtbot.waitUntil(
-        lambda: store.state.job.phase.value == "idle" and not dialog.isVisible(),
+        lambda: (
+            store.state.job.phase.value == "idle"
+            and dialog.failure_visible
+            and dialog.isVisible()
+        ),
         timeout=5000,
     )
 
     assert not dialog.completion_visible
-    assert store.state.artifact_result is None
+    assert not dialog.completion_summary.isVisible()
+    assert dialog.failure_reason.text() == "render failed: encoder failed"
+    assert dialog.failure_next_step.text() == "Try the render again."
+    assert not dialog.open_output_button.isVisible()
+    assert dialog.close_button.isVisible()
+    assert store.state.artifact_result is not None
+    assert store.state.artifact_error is not None
+    assert present(store.state).success_label == "Previous result"
+    assert "Render complete" not in present(store.state).success_accessible_description
     controller.shutdown()
 
 
@@ -601,11 +630,15 @@ def test_matching_cut_set_offers_three_choices_with_rebuild_default(
     dialog = controller.render_controller.reuse_dialog
     assert dialog is not None
     assert [button.text() for button in dialog.buttons()] == [
-        "Rebuild",
-        "Regenerate",
+        "Reuse cuts and rebuild",
+        "Regenerate backgrounds",
         "Cancel",
     ]
-    assert dialog.defaultButton().text() == "Rebuild"
+    assert dialog.defaultButton().text() == "Reuse cuts and rebuild"
+    assert (
+        "Regenerate removes backgrounds again for every selected frame."
+        in dialog.informativeText()
+    )
     qtbot.mouseClick(dialog.buttons()[2], Qt.MouseButton.LeftButton)
     qtbot.waitUntil(
         lambda: controller.render_controller.reuse_dialog is None,

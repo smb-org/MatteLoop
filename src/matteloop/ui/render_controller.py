@@ -386,11 +386,12 @@ class RenderController(QObject):
             render_copy("Matching cut set found"),
             render_copy("A validated cut set matches the current source and settings."),
             render_copy(
-                "Rebuild reuses the cuts and only reruns framing and encoding."
+                "Rebuild reuses the cuts and only reruns framing and encoding. "
+                "Regenerate removes backgrounds again for every selected frame."
             ),
             (
-                (render_copy("Rebuild"), "rebuild"),
-                (render_copy("Regenerate"), "regenerate"),
+                (render_copy("Reuse cuts and rebuild"), "rebuild"),
+                (render_copy("Regenerate backgrounds"), "regenerate"),
                 (render_copy("Cancel"), "cancel"),
             ),
             0,
@@ -745,6 +746,8 @@ class RenderController(QObject):
                         self._dialog.show_completion(result)
                     else:
                         self._dialog.close_for_terminal()
+                elif isinstance(notification, RenderFailed):
+                    self._dialog.show_failure(notification.error)
                 else:
                     self._dialog.close_for_terminal()
             if self._active_job_id == job_id:

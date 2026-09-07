@@ -140,7 +140,13 @@ def test_percentage_fills_both_dimensions_and_clears_on_manual_edit(qtbot) -> No
     group.set_cut(_facts(framed_size=(640, 360)))
     emitted.clear()
 
+    assert group.percent_spinbox.text() == "—"
+    assert "no percentage" in group.percent_spinbox.accessibleDescription()
+
     group.percent_spinbox.setValue(50)
+
+    assert group.percent_spinbox.text().endswith(" %")
+    assert group.percent_spinbox.text() != "—"
 
     assert group.width_spinbox.value() == 320
     assert group.height_spinbox.value() == 180
@@ -151,6 +157,7 @@ def test_percentage_fills_both_dimensions_and_clears_on_manual_edit(qtbot) -> No
     group.width_spinbox.setValue(300)
 
     assert group.percent_spinbox.value() == 0
+    assert group.percent_spinbox.text() == "—"
 
 
 def test_percent_rounds_from_the_displayed_decimal_not_the_binary_float(

@@ -16,6 +16,9 @@ from matteloop.ui.parameter_presentation import present_parameters
 from matteloop.ui.presentation_model import (
     PresentationModel,
     preview_invalidation_copy,
+    recovery_copy,
+    source_surface_copy,
+    success_copy,
 )
 from matteloop.ui.source_error_copy import source_error_copy
 from matteloop.ui.source_presentation import present_source_metadata as s
@@ -101,6 +104,9 @@ def present(state: AppState) -> PresentationModel:
     result_status_icon = {"current": "preview", "stale": "stale"}.get(result_status)
     artifact = state.artifact_result
     artifact_path = str(artifact.output_path) if artifact else None
+    success_label, success_accessible_description = success_copy(
+        artifact_path, state.artifact_error
+    )
     if active or not ready:
         primary: str | None = None
     elif state.preview is Preview.CURRENT and allowed.can_render:
@@ -125,7 +131,7 @@ def present(state: AppState) -> PresentationModel:
         preview_enabled=allowed.can_preview,
         model_available=state.model_available,
         preview_label=(
-            "Prepare & Preview" if not state.model_available else "Preview Frame"
+            "Download & Preview" if not state.model_available else "Preview Frame"
         ),
         render_enabled=allowed.can_render,
         rebuild_enabled=allowed.can_rebuild,
@@ -140,11 +146,7 @@ def present(state: AppState) -> PresentationModel:
         source_surface_visible=state.source in {Source.EMPTY, Source.ERROR},
         source_strip_visible=state.source in {Source.LOADING, Source.READY},
         source_error_visible=state.source is Source.ERROR,
-        source_surface_heading=(
-            "Open another video"
-            if state.source is Source.ERROR
-            else "Drop a video here"
-        ),
+        source_surface_heading=source_surface_copy(state.source is Source.ERROR),
         result_status=result_status,
         result_checkerboard=result_checkerboard,
         result_accessible_name="Background-removed result",
@@ -152,14 +154,10 @@ def present(state: AppState) -> PresentationModel:
         result_status_marker=result_status_marker,
         result_status_icon=result_status_icon,
         recovery_visible=state.edited_cuts_error is not None,
-        recovery_label=(
-            "Retry Rebuild"
-            if state.edited_cuts_error is not None
-            else "Rebuild from edited cuts"
-        ),
+        recovery_label=recovery_copy(state.edited_cuts_error),
         artifact_path=artifact_path,
-        success_label="Render complete",
-        success_accessible_description=artifact_path or "Render complete",
+        success_label=success_label,
+        success_accessible_description=success_accessible_description,
         workspace_attention=state.edited_cuts or state.edited_cuts_error is not None,
         workspace_open=state.edited_cuts or state.edited_cuts_error is not None,
         **s(state.source_value if ready else None, state.source is Source.LOADING),
