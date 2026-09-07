@@ -21,7 +21,7 @@ from matteloop import application_title
 from matteloop.core.execution_providers import ProviderOption
 from matteloop.core.state import AppState, FocusTarget
 from matteloop.ui.action_shelf import ActionShelf
-from matteloop.ui.copy import main_window_copy
+from matteloop.ui.copy import main_window_copy, runtime_banner_copy
 from matteloop.ui.inspector import Inspector
 from matteloop.ui.main_window_render import render_source_error, render_window
 from matteloop.ui.ports import (
@@ -56,6 +56,7 @@ class MainWindow(QMainWindow):
         *,
         model_options: tuple[tuple[str, bool], ...] | None = None,
         provider_options: tuple[ProviderOption, ...] | None = None,
+        runtime_unavailable: bool = False,
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle(application_title())
@@ -68,6 +69,7 @@ class MainWindow(QMainWindow):
         self._settings = settings
         self._model_options = model_options
         self._provider_options = provider_options
+        self._runtime_unavailable = runtime_unavailable
         self._unsubscribe: Callable[[], None] | None = None
         self._last_focus: FocusTarget | None = None
         self._success_artifact_path = ""
@@ -102,6 +104,8 @@ class MainWindow(QMainWindow):
         self.preview_stage = PreviewStage()
         self.original_canvas = self.preview_stage.original_canvas
         self.result_canvas = self.preview_stage.result_canvas
+        self.source_drop_target.install_drop_target(self.source_strip)
+        self.source_drop_target.install_drop_target(self.preview_stage)
         self.timeline_widget = TimelineWidget()
         self.timeline_placeholder = self.timeline_widget
         self.source_error_heading = StatusLabel(
@@ -140,6 +144,21 @@ class MainWindow(QMainWindow):
         self.preview_button = self.action_shelf.preview_button
         self.render_button = self.action_shelf.render_button
         self.rebuild_button = self.inspector.rebuild_button
+        runtime_message = runtime_banner_copy()
+        self.runtime_container = QFrame()
+        self.runtime_container.setObjectName("runtime_banner_container")
+        runtime_layout = QVBoxLayout(self.runtime_container)
+        runtime_layout.setContentsMargins(16, 8, 16, 8)
+        self.runtime_banner = QLabel(
+            runtime_message if self._runtime_unavailable else ""
+        )
+        self.runtime_banner.setObjectName("runtime_banner")
+        self.runtime_banner.setAccessibleName(
+            runtime_message if self._runtime_unavailable else ""
+        )
+        self.runtime_banner.setWordWrap(True)
+        runtime_layout.addWidget(self.runtime_banner)
+        self.runtime_container.setVisible(self._runtime_unavailable)
         self.success_container = QFrame()
         self.success_container.setObjectName("success_banner_container")
         success_layout = QVBoxLayout(self.success_container)
@@ -182,6 +201,7 @@ class MainWindow(QMainWindow):
         self.manage_workspaces_button = self.inspector.manage_workspaces
         self.edited_cut_recovery = self.inspector.edited_cut_recovery
         inspector_layout.addWidget(self.inspector, 1)
+        inspector_layout.addWidget(self.runtime_container)
         inspector_layout.addWidget(self.success_container)
         inspector_layout.addWidget(self.action_shelf)
         root.addWidget(inspector_column)

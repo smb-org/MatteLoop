@@ -74,11 +74,14 @@ def provider_options_from_runtime(
     runtime: object | None = None, *, model_id: str = "birefnet-portrait"
 ) -> tuple[ProviderOption, ...]:
     """Read the installed runtime's provider list without creating a session."""
-    if runtime is None:
-        import onnxruntime as runtime  # type: ignore[import-untyped,no-redef]
-    available = getattr(runtime, "get_available_providers")()
-    device = getattr(runtime, "get_device", lambda: None)()
-    return provider_options(available, device=str(device), model_id=model_id)
+    try:
+        if runtime is None:
+            import onnxruntime as runtime  # type: ignore[import-untyped,no-redef]
+        available = getattr(runtime, "get_available_providers")()
+        device = getattr(runtime, "get_device", lambda: None)()
+        return provider_options(available, device=str(device), model_id=model_id)
+    except Exception:
+        return ()
 
 
 def select_provider(

@@ -447,6 +447,11 @@
         <source>Open folder</source>
         <translation>Ordner öffnen</translation>
     </message>
+    <message>
+        <location filename="../src/matteloop/ui/copy.py" line="594"/>
+        <source>Segmentation is unavailable because ONNX Runtime could not enumerate any providers. Repair the installation with: uv sync --reinstall-package onnxruntime-directml</source>
+        <translation>Segmentierung ist nicht verfügbar, weil ONNX Runtime keine Provider auflisten konnte. Reparieren Sie die Installation mit: uv sync --reinstall-package onnxruntime-directml</translation>
+    </message>
 </context>
 <context>
     <name>ModelCopy</name>
@@ -1937,27 +1942,27 @@ Freed %s.</source>
 <context>
     <name>SourceDropSurface</name>
     <message>
-        <location filename="../src/matteloop/ui/source_strip.py" line="99"/>
+        <location filename="../src/matteloop/ui/source_strip.py" line="104"/>
         <source>Video drop area</source>
         <translation>Video-Ablagebereich</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/source_strip.py" line="108"/>
+        <location filename="../src/matteloop/ui/source_strip.py" line="115"/>
         <source>Drop a video here</source>
         <translation>Legen Sie hier ein Video ab</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/source_strip.py" line="112"/>
+        <location filename="../src/matteloop/ui/source_strip.py" line="119"/>
         <source>Open a video</source>
         <translation>Video öffnen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/source_strip.py" line="115"/>
+        <location filename="../src/matteloop/ui/source_strip.py" line="122"/>
         <source>Open Video…</source>
         <translation>Video öffnen…</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/source_strip.py" line="119"/>
+        <location filename="../src/matteloop/ui/source_strip.py" line="126"/>
         <source>Open Video</source>
         <translation>Video öffnen</translation>
     </message>
@@ -2067,17 +2072,17 @@ Freed %s.</source>
 <context>
     <name>SourceStrip</name>
     <message>
-        <location filename="../src/matteloop/ui/source_strip.py" line="47"/>
+        <location filename="../src/matteloop/ui/source_strip.py" line="52"/>
         <source>Source video</source>
         <translation>Quellvideo</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/source_strip.py" line="55"/>
+        <location filename="../src/matteloop/ui/source_strip.py" line="60"/>
         <source>Open Video…</source>
         <translation>Video öffnen…</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/source_strip.py" line="59"/>
+        <location filename="../src/matteloop/ui/source_strip.py" line="64"/>
         <source>Open Video</source>
         <translation>Video öffnen</translation>
     </message>

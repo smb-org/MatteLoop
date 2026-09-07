@@ -5,8 +5,13 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Protocol
 
-from PySide6.QtCore import QCoreApplication, Qt, QUrl, Signal
-from PySide6.QtGui import QDragEnterEvent, QDropEvent
+from PySide6.QtCore import QCoreApplication, QEvent, QObject, Qt, QUrl, Signal
+from PySide6.QtGui import (
+    QDragEnterEvent,
+    QDragLeaveEvent,
+    QDragMoveEvent,
+    QDropEvent,
+)
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
 SUPPORTED_VIDEO_SUFFIXES = frozenset({".mp4", ".mov", ".webm", ".mkv"})
@@ -100,6 +105,8 @@ class SourceDropSurface(QWidget):
         )
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setAcceptDrops(True)
+        self._drop_enabled = True
+        self._drop_targets: list[QWidget] = []
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(8)
@@ -122,6 +129,76 @@ class SourceDropSurface(QWidget):
         layout.addWidget(self.heading)
         layout.addWidget(self.button, alignment=Qt.AlignmentFlag.AlignCenter)
 
+    def install_drop_target(self, widget: QWidget) -> None:
+        """Extend this surface's drop handling to another visible widget."""
+        if widget in self._drop_targets:
+            return
+        self._drop_targets.append(widget)
+        widget.setAcceptDrops(True)
+        widget.installEventFilter(self)
+
+    def set_drop_enabled(self, enabled: bool) -> None:
+        """Enable drops from presenter-owned source capabilities."""
+        self._drop_enabled = enabled
+        if not enabled:
+            self._clear_drop_feedback()
+
+    def _set_drop_feedback(self, widget: QWidget, active: bool) -> None:
+        widget.setProperty("dropActive", active)
+        widget.style().unpolish(widget)
+        widget.style().polish(widget)
+        widget.update()
+
+    def _clear_drop_feedback(self) -> None:
+        self._set_drop_feedback(self, False)
+        for widget in self._drop_targets:
+            self._set_drop_feedback(widget, False)
+
+    def _handle_drag_enter(
+        self, widget: QWidget, event: QDragEnterEvent
+    ) -> None:
+        accepted = self._drop_enabled and self._drop_path(event.mimeData()) is not None
+        self._set_drop_feedback(widget, accepted)
+        if accepted:
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def _handle_drag_move(self, widget: QWidget, event: QDragMoveEvent) -> None:
+        accepted = self._drop_enabled and self._drop_path(event.mimeData()) is not None
+        self._set_drop_feedback(widget, accepted)
+        if accepted:
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def _handle_drop(self, widget: QWidget, event: QDropEvent) -> None:
+        path = self._drop_path(event.mimeData())
+        accepted = self._drop_enabled and path is not None
+        self._set_drop_feedback(widget, False)
+        if not accepted:
+            event.ignore()
+            return
+        self.video_dropped.emit(path)
+        event.acceptProposedAction()
+
+    def eventFilter(self, watched: QObject, event: QEvent) -> bool:
+        if not isinstance(watched, QWidget) or watched not in self._drop_targets:
+            return super().eventFilter(watched, event)
+        if event.type() == QEvent.Type.DragEnter and isinstance(event, QDragEnterEvent):
+            self._handle_drag_enter(watched, event)
+            return True
+        if event.type() == QEvent.Type.DragMove and isinstance(event, QDragMoveEvent):
+            self._handle_drag_move(watched, event)
+            return True
+        if event.type() == QEvent.Type.DragLeave and isinstance(event, QDragLeaveEvent):
+            self._set_drop_feedback(watched, False)
+            return True
+        if event.type() == QEvent.Type.Drop and isinstance(event, QDropEvent):
+            self._handle_drop(watched, event)
+            return True
+        return super().eventFilter(watched, event)
+
     @staticmethod
     def _drop_path(mime_data: object) -> Path | None:
         if not hasattr(mime_data, "urls"):
@@ -143,15 +220,14 @@ class SourceDropSurface(QWidget):
         return path
 
     def dragEnterEvent(self, event: QDragEnterEvent) -> None:
-        if self._drop_path(event.mimeData()) is not None:
-            event.acceptProposedAction()
-        else:
-            event.ignore()
+        self._handle_drag_enter(self, event)
+
+    def dragMoveEvent(self, event: QDragMoveEvent) -> None:
+        self._handle_drag_move(self, event)
+
+    def dragLeaveEvent(self, event: QDragLeaveEvent) -> None:
+        self._set_drop_feedback(self, False)
+        event.accept()
 
     def dropEvent(self, event: QDropEvent) -> None:
-        path = self._drop_path(event.mimeData())
-        if path is None:
-            event.ignore()
-            return
-        self.video_dropped.emit(path)
-        event.acceptProposedAction()
+        self._handle_drop(self, event)
