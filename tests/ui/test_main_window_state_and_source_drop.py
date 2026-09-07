@@ -251,7 +251,21 @@ def test_preview_error_wins_over_unavailable_model_copy() -> None:
     # The failure that actually happened, not a generic phrase: a user who
     # cannot preview needs to know it was the model checksum.
     assert model.result_message == "Preview failed: checksum detail"
-    assert model.preview_label == "Prepare & Preview"
+    assert model.preview_label == "Download & Preview"
+
+
+def test_uncached_preview_action_shows_model_download_cost_at_minimum_width(
+    window,
+) -> None:
+    value, _ = window
+    value.resize(1100, 720)
+    value.show()
+    value.render_state(reduce(_ready(), ModelAvailabilityChanged(False)))
+
+    assert value.preview_button.text() == "Download & Preview"
+    assert value.inspector.model_download_notice.isVisible()
+    assert "BiRefNet Portrait" in value.inspector.model_download_notice.text()
+    assert "927.6 MiB" in value.inspector.model_download_notice.text()
 
 
 def test_fixed_shelf_only_contains_reachable_primary_actions_at_minimum(window) -> None:
@@ -515,7 +529,7 @@ def test_stale_category_is_visible_and_preview_accessible_name_is_dynamic(
     assert "Crop & cleanup" in value.result_canvas.accessibleDescription()
     unavailable = reduce(_ready(), ModelAvailabilityChanged(False))
     value.render_state(unavailable)
-    assert value.preview_button.accessibleName() == "Prepare & Preview"
+    assert value.preview_button.accessibleName() == "Download & Preview"
 
 
 def test_render_completion_focus_is_routed_to_the_job_dialog(window, qtbot) -> None:
@@ -548,7 +562,7 @@ def test_failed_repreview_keeps_old_result_when_model_becomes_unavailable() -> N
     assert model.result_checkerboard is True
     assert model.result_status_marker == "Preview failed — preview again"
     assert "Preview failed — preview again" in model.result_accessible_description
-    assert model.preview_label == "Prepare & Preview"
+    assert model.preview_label == "Download & Preview"
 
 
 def test_edited_cuts_without_preview_uses_neutral_copy() -> None:
@@ -1590,7 +1604,7 @@ def _literal_presentation_rows() -> list[LiteralPresentationRow]:
             output_visible=False,
             output_enabled=False,
             recovery_enabled=True,
-            preview_name="Prepare & Preview",
+            preview_name="Download & Preview",
         ),
         "preparing": contract(
             None,
@@ -1601,7 +1615,7 @@ def _literal_presentation_rows() -> list[LiteralPresentationRow]:
             output_visible=False,
             output_enabled=False,
             recovery_enabled=False,
-            preview_name="Prepare & Preview",
+            preview_name="Download & Preview",
         ),
         "previewing": contract(
             None,
@@ -1662,7 +1676,7 @@ def _literal_presentation_rows() -> list[LiteralPresentationRow]:
             output_visible=False,
             output_enabled=False,
             recovery_enabled=True,
-            preview_name="Prepare & Preview",
+            preview_name="Download & Preview",
         ),
         "first_error": contract(
             "preview_action",

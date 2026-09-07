@@ -54,42 +54,13 @@ from matteloop.ui.ports import (
     StateStore,
 )
 from matteloop.ui.preview_controller import PreviewJobDialog, PreviewRuntime
-from matteloop.ui.render_worker import RenderRuntime, RenderWorker
+from matteloop.ui.render_worker import RenderWorker
 from matteloop.ui.request_builder import _preview_inputs, _render_request
 from matteloop.ui.worker_thread import WorkerThread
 from matteloop.ui.workspace_controller import WorkspacePickerController
 from matteloop.ui.workspace_dialog import WorkspacePickerDialog
 from matteloop.ui.workspace_presentation import request_for_workspace
-
-
-class _WorkspaceProbeWorker(QObject):
-    result = Signal(object)
-    finished = Signal()
-
-    def __init__(self, request: RenderRequest, runtime: RenderRuntime) -> None:
-        super().__init__()
-        self._request = request
-        self._runtime = runtime
-        self._context = JobContext(
-            f"workspace-probe-{uuid4().hex}",
-            JobKind.RENDER,
-            request.output.directory,
-            lambda _event: None,
-            CancellationState(),
-        )
-
-    @Slot()
-    def run(self) -> None:
-        workspace: CutWorkspace | None = None
-        finder = getattr(self._runtime, "find_matching_workspace", None)
-        if callable(finder):
-            try:
-                candidate = finder(self._request, self._context)
-                workspace = candidate if isinstance(candidate, CutWorkspace) else None
-            except BaseException:
-                workspace = None
-        self.result.emit(workspace)
-        self.finished.emit()
+from matteloop.ui.workspace_probe import WorkspaceProbeWorker
 
 
 @dataclass(frozen=True, slots=True)
@@ -135,7 +106,7 @@ class RenderController(QObject):
         self._reuse_request: _PendingRender | None = None
         self._reuse_workspace: CutWorkspace | None = None
         self._probe_thread: QThread | None = None
-        self._probe_worker: _WorkspaceProbeWorker | None = None
+        self._probe_worker: WorkspaceProbeWorker | None = None
         self._probe_request: _PendingRender | None = None
         self._workspace_picker: WorkspacePickerController | None = None
         self._active_workspace: CutWorkspace | None = None
@@ -339,7 +310,7 @@ class RenderController(QObject):
         if not callable(finder):
             self._resolve_collision(pending)
             return
-        worker = _WorkspaceProbeWorker(pending.request, self._runtime)
+        worker = WorkspaceProbeWorker(pending.request, self._runtime)
         thread = WorkerThread(worker, self)
         worker.result.connect(self._reuse_probe_result)
         worker.finished.connect(thread.quit)
@@ -395,11 +366,12 @@ class RenderController(QObject):
             render_copy("Matching cut set found"),
             render_copy("A validated cut set matches the current source and settings."),
             render_copy(
-                "Rebuild reuses the cuts and only reruns framing and encoding."
+                "Rebuild reuses the cuts and only reruns framing and encoding. "
+                "Regenerate removes backgrounds again for every selected frame."
             ),
             (
-                (render_copy("Rebuild"), "rebuild"),
-                (render_copy("Regenerate"), "regenerate"),
+                (render_copy("Reuse cuts and rebuild"), "rebuild"),
+                (render_copy("Regenerate backgrounds"), "regenerate"),
                 (render_copy("Cancel"), "cancel"),
             ),
             0,
@@ -752,6 +724,8 @@ class RenderController(QObject):
                         self._dialog.show_completion(result)
                     else:
                         self._dialog.close_for_terminal()
+                elif isinstance(notification, RenderFailed):
+                    self._dialog.show_failure(notification.error)
                 else:
                     self._dialog.close_for_terminal()
             if self._active_job_id == job_id:

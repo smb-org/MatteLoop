@@ -31,6 +31,24 @@ def preview_invalidation_copy(
     return None if reason is None else _INVALIDATION_COPY[reason]
 
 
+def success_copy(
+    artifact_path: str | None, error: object | None
+) -> tuple[str, str]:
+    """Name a retained artifact without claiming the failed run succeeded."""
+    label = "Previous result" if error is not None else "Render complete"
+    return label, label if error is not None else artifact_path or label
+
+
+def source_surface_copy(is_error: bool) -> str:
+    """Name the empty or error source surface."""
+    return "Open another video" if is_error else "Drop a video here"
+
+
+def recovery_copy(error: object | None) -> str:
+    """Name the action for recovering from edited-cut failures."""
+    return "Retry Rebuild" if error is not None else "Rebuild from edited cuts"
+
+
 @dataclass(frozen=True)
 class PresentationModel:
     source_mode: str

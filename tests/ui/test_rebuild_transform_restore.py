@@ -142,7 +142,7 @@ def _rebuild_from_reuse_dialog(controller: SourceController, qtbot) -> None:
     )
     dialog = controller.render_controller.reuse_dialog
     assert dialog is not None
-    assert dialog.buttons()[0].text() == "Rebuild"
+    assert dialog.buttons()[0].text() == "Reuse cuts and rebuild"
     qtbot.mouseClick(dialog.buttons()[0], Qt.MouseButton.LeftButton)
 
 

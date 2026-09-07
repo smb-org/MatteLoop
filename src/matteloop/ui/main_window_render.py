@@ -82,6 +82,7 @@ def _render_actions(window: MainWindow, model: PresentationModel) -> None:
     window.open_folder_button.setEnabled(model.open_folder_enabled)
     window.success_container.setVisible(model.show_success)
     window.success_banner.setText(presented_copy(model.success_label))
+    window.success_banner.setAccessibleName(presented_copy(model.success_label))
     artifact_path = model.artifact_path or ""
     window._success_artifact_path = artifact_path
     window._update_success_artifact()
