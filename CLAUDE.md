@@ -104,8 +104,8 @@ substitute for this list: it cannot see steps 3, 4 or 7.
 
 `matteloop.__version__` is the source of truth, and everything a user reads
 derives from it: the window title, `--version`, the first line of the startup
-diagnostics, and the macOS bundle's `CFBundleShortVersionString` and
-`CFBundleVersion`, patched at build time from that value.
+diagnostics, and the macOS bundle's `CFBundleShortVersionString`, which Nuitka
+writes from the spec before it signs.
 
 Two files carry the number, and the second is the one that gets forgotten:
 
@@ -117,6 +117,12 @@ Two files carry the number, and the second is the one that gets forgotten:
    executable's version resource from the first two arguments and the macOS
    bundle's version from the latter; there is no way to derive them from the
    package at build time, so they are copies.
+
+`CFBundleVersion` is deliberately absent: Nuitka does not write it, and adding
+it after the build invalidates the ad-hoc signature — which macOS then reports
+as a damaged application. That bundle cannot be re-signed either; `codesign`
+refuses it over the plain `.pxd` and `.py` files inside `Contents/MacOS/av`.
+Never edit a built bundle's `Info.plist`.
 
 `tests/release/test_version_identity.py` fails when those disagree. It is a
 floor, not a substitute for this list: it cannot see the tag, the release notes,

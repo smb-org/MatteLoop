@@ -15,7 +15,7 @@ from matteloop import __version__, application_title
 from matteloop.app import _collect_provider_diagnostics, main
 from matteloop.core.state import AppState
 from matteloop.ui.main_window import MainWindow
-from scripts.build import BUNDLE_IDENTIFIER, patch_macos_bundle_metadata
+from scripts.build import BUNDLE_IDENTIFIER, verify_macos_bundle_signature
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 
@@ -92,15 +92,14 @@ def test_macos_bundle_metadata_identifies_and_verifies_the_current_build(
     bundle = tmp_path / "MatteLoop.app"
     info_plist = tmp_path / "MatteLoop.app" / "Contents" / "Info.plist"
     info_plist.parent.mkdir(parents=True)
-    info_plist.write_bytes(
-        plistlib.dumps(
-            {
-                "CFBundleExecutable": "MatteLoop",
-                "CFBundleShortVersionString": __version__,
-                "CFBundleIdentifier": BUNDLE_IDENTIFIER,
-            }
-        )
+    original = plistlib.dumps(
+        {
+            "CFBundleExecutable": "MatteLoop",
+            "CFBundleShortVersionString": __version__,
+            "CFBundleIdentifier": BUNDLE_IDENTIFIER,
+        }
     )
+    info_plist.write_bytes(original)
     codesign_calls: list[list[str]] = []
 
     def fake_codesign(
@@ -111,16 +110,11 @@ def test_macos_bundle_metadata_identifies_and_verifies_the_current_build(
 
     monkeypatch.setattr("scripts.build.subprocess.run", fake_codesign)
 
-    patch_macos_bundle_metadata(bundle)
+    verify_macos_bundle_signature(bundle)
 
-    metadata = plistlib.loads(info_plist.read_bytes())
-    assert metadata["CFBundleShortVersionString"] == __version__
-    assert metadata["CFBundleVersion"] == __version__
-    assert metadata["CFBundleIdentifier"] == BUNDLE_IDENTIFIER
-    assert codesign_calls == [
-        ["codesign", "--force", "--sign", "-", str(bundle)],
-        ["codesign", "-dv", str(bundle)],
-    ]
+    # Nothing is written: the plist Nuitka signed is the plist that ships.
+    assert plistlib.loads(info_plist.read_bytes()) == plistlib.loads(original)
+    assert codesign_calls == [["codesign", "-dv", str(bundle)]]
 
 
 def test_macos_bundle_metadata_verification_failure_aborts_the_build(
@@ -151,4 +145,4 @@ def test_macos_bundle_metadata_verification_failure_aborts_the_build(
     monkeypatch.setattr("scripts.build.subprocess.run", fake_codesign)
 
     with pytest.raises(RuntimeError, match="did not bind"):
-        patch_macos_bundle_metadata(bundle)
+        verify_macos_bundle_signature(bundle)
