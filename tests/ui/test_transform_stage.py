@@ -161,7 +161,11 @@ def test_restored_trim_is_applied_when_the_first_frame_cache_arrives(
     qtbot.addWidget(group)
     controller.attach(group, canvas)
 
-    controller.restore_for(artifact.cut_workspace)
+    # restore_for reports the stored transform and deliberately does not
+    # dispatch it (#60: selecting a cut must not change global state before
+    # the rebuild is accepted), so the caller does — as RenderController._start
+    # does in the application.
+    store.dispatch(TransformChanged(controller.restore_for(artifact.cut_workspace)))
     controller.open_artifact(artifact)
 
     qtbot.waitUntil(lambda: canvas.current_frame is not None, timeout=5000)
