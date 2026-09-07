@@ -826,12 +826,28 @@ class Inspector(QFrame):
             self.crop_height_spinbox,
         )
 
-    def set_workspace_state(self, attention: bool, open_: bool) -> None:
+    def set_workspace_state(
+        self,
+        attention: bool,
+        open_: bool,
+        enabled: bool,
+        needs_source: bool = False,
+    ) -> None:
         """Apply presenter-owned attention and disclosure state."""
         workspace_button, workspace_body = self.disclosures["workspace"]
         workspace_button.setProperty("attention", attention)
         if open_ and not workspace_button.isChecked():
             workspace_button.setChecked(True)
         workspace_body.setVisible(workspace_button.isChecked())
+        self.manage_workspaces.setEnabled(enabled)
+        detail = (
+            QCoreApplication.translate(
+                "Inspector", "Open a video to manage its workspaces."
+            )
+            if needs_source
+            else ""
+        )
+        self.manage_workspaces.setToolTip(detail)
+        self.manage_workspaces.setAccessibleDescription(detail)
         workspace_button.style().unpolish(workspace_button)
         workspace_button.style().polish(workspace_button)

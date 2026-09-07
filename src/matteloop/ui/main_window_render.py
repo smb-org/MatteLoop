@@ -73,7 +73,10 @@ def _render_actions(window: MainWindow, model: PresentationModel) -> None:
     window.edited_cut_recovery.setVisible(model.recovery_visible)
     window.edited_cut_recovery.setText(presented_copy(model.recovery_label))
     window.inspector.set_workspace_state(
-        model.workspace_attention, model.workspace_open
+        model.workspace_attention,
+        model.workspace_open,
+        model.workspace_management_enabled,
+        model.workspace_management_needs_source,
     )
     window.open_output_button.setEnabled(model.open_output_enabled)
     window.open_folder_button.setEnabled(model.open_folder_enabled)

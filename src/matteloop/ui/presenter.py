@@ -35,6 +35,7 @@ def _failure_message(error: object | None, retry: str) -> str:
 def present(state: AppState) -> PresentationModel:
     """Present reducer state without importing Qt, jobs, or runtime services."""
     allowed = capabilities(state)
+    workspace_notice = state.edited_cuts or state.edited_cuts_error is not None
     stale_category = preview_invalidation_copy(state.stale_category)
     active = state.job.phase is not JobState.IDLE
     ready = state.source is Source.READY
@@ -93,8 +94,7 @@ def present(state: AppState) -> PresentationModel:
         state.preview is Preview.RUNNING and state.preview_result is not None
     )
     source_error_detail = str(state.source_error) if state.source_error else None
-    source_error_message = None
-    source_error_icon: str | None = None
+    source_error_message = source_error_icon = None
     if state.source is Source.ERROR:
         source_error_message = source_error_copy(state.source_error)
         source_error_icon = "error"
@@ -160,8 +160,10 @@ def present(state: AppState) -> PresentationModel:
         artifact_path=artifact_path,
         success_label="Render complete",
         success_accessible_description=artifact_path or "Render complete",
-        workspace_attention=state.edited_cuts or state.edited_cuts_error is not None,
-        workspace_open=state.edited_cuts or state.edited_cuts_error is not None,
+        workspace_attention=workspace_notice,
+        workspace_open=workspace_notice,
+        workspace_management_enabled=allowed.can_edit,
+        workspace_management_needs_source=not ready,
         **s(state.source_value if ready else None, state.source is Source.LOADING),
         source_frame=state.source_frame,
         crop=present_crop(state),
