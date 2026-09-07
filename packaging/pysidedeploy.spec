@@ -34,6 +34,9 @@ extra_args =
 	--windows-console-mode=attach
 	--file-version=0.2.1
 	--product-version=0.2.1
+	--macos-app-version=0.2.1
+	--macos-app-name=MatteLoop
+	--macos-signed-app-name=io.github.smb-org.matteloop
 	--noinclude-qt-translations
 	--output-filename=matteloop
 	--include-qt-plugins=platforms,imageformats
