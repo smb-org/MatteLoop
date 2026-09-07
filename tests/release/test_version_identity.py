@@ -84,6 +84,7 @@ def test_native_packaging_version_matches_the_package_version() -> None:
     assert f"--product-version={configured_version}" in args
     assert f"--macos-app-version={configured_version}" in args
     assert f"--macos-signed-app-name={BUNDLE_IDENTIFIER}" in args
+    assert "--macos-app-name=MatteLoop" in args
 
 
 def test_macos_bundle_metadata_identifies_and_verifies_the_current_build(
