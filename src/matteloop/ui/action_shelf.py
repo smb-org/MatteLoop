@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from matteloop.core.execution_providers import ProviderOption
 from matteloop.ui.ports import StateStore, WindowServices
 from matteloop.ui.settings_dialog import SettingsDialog
 from matteloop.ui.theme import ACCENT_COLOR
@@ -46,6 +47,7 @@ class ActionShelf(QFrame):
         parent: QWidget | None = None,
         *,
         settings: QSettings | None = None,
+        provider_options: tuple[ProviderOption, ...] | None = None,
     ) -> None:
         super().__init__(parent)
         self.setObjectName("action_shelf")
@@ -94,7 +96,8 @@ class ActionShelf(QFrame):
         self.setTabOrder(self.preview_button, self.render_button)
         self.setTabOrder(self.render_button, self.preferences_button)
         self.preferences_dialog = SettingsDialog(
-            store, services, self, settings=settings
+            store, services, self, settings=settings,
+            provider_options=provider_options,
         )
         self.preferences_button.clicked.connect(self.open_preferences)
 

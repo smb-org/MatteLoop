@@ -547,9 +547,6 @@ def inspector_label(value: str) -> str:
     """Translate a fixed inspector form label."""
     return {
         "Model": QCoreApplication.translate("Inspector", "Model"),
-        "Compute acceleration": QCoreApplication.translate(
-            "Inspector", "Compute acceleration"
-        ),
         "Edge treatment": QCoreApplication.translate("Inspector", "Edge treatment"),
         "Output FPS": QCoreApplication.translate("Inspector", "Output FPS"),
         "Start": QCoreApplication.translate("Inspector", "Start"),

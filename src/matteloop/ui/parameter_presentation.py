@@ -34,6 +34,7 @@ class ParameterPresentation:
     source_duration: Fraction | None
     transform: TransformSpec = field(default_factory=TransformSpec)
     artifact: ArtifactResult | None = None
+    output_directory_override: Path | None = None
 
 
 def present_parameters(state: AppState) -> ParameterPresentation:
@@ -70,6 +71,7 @@ def present_parameters(state: AppState) -> ParameterPresentation:
         source_duration=timeline.duration if timeline is not None else None,
         transform=parameters.transform,
         artifact=state.artifact_result,
+        output_directory_override=parameters.output_directory,
     )
 
 
