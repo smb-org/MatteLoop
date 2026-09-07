@@ -118,13 +118,13 @@
     </message>
     <message>
         <location filename="../src/matteloop/ui/copy.py" line="559"/>
-        <location filename="../src/matteloop/ui/inspector.py" line="250"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="252"/>
         <source>Edge treatment</source>
         <translation>Edge treatment</translation>
     </message>
     <message>
         <location filename="../src/matteloop/ui/copy.py" line="560"/>
-        <location filename="../src/matteloop/ui/inspector.py" line="264"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="266"/>
         <source>Output FPS</source>
         <translation>Output FPS</translation>
     </message>
@@ -158,7 +158,7 @@
     </message>
     <message>
         <location filename="../src/matteloop/ui/copy.py" line="566"/>
-        <location filename="../src/matteloop/ui/inspector.py" line="305"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="307"/>
         <source>Horizontal stretch</source>
         <translation>Horizontal stretch</translation>
     </message>
@@ -178,206 +178,221 @@
         <translation>Maximum size</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="99"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="100"/>
         <source>Processing settings</source>
         <translation>Processing settings</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="124"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="125"/>
         <source>Retry Rebuild</source>
         <translation>Retry Rebuild</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="128"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="129"/>
         <source>Edited cut recovery</source>
         <translation>Edited cut recovery</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="131"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="132"/>
         <source>Edited cut frames could not be validated. Retry the rebuild scan.</source>
         <translation>Edited cut frames could not be validated. Retry the rebuild scan.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="138"/>
-        <location filename="../src/matteloop/ui/inspector.py" line="142"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="139"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="143"/>
         <source>Rebuild from edited cuts</source>
         <translation>Rebuild from edited cuts</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="146"/>
-        <location filename="../src/matteloop/ui/inspector.py" line="150"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="147"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="151"/>
         <source>Manage Models…</source>
         <translation>Manage Models…</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="153"/>
-        <location filename="../src/matteloop/ui/inspector.py" line="157"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="154"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="158"/>
         <source>Manage Workspaces…</source>
         <translation>Manage Workspaces…</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="180"/>
+        <location filename="../src/matteloop/ui/inspector_reset.py" line="16"/>
+        <source>Reset to defaults</source>
+        <translation>Reset to defaults</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/inspector_reset.py" line="20"/>
+        <source>Reset inspector parameters</source>
+        <translation>Reset inspector parameters</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/inspector_reset.py" line="22"/>
+        <source>Compute acceleration, output directory, and output filename are not affected.</source>
+        <translation>Compute acceleration, output directory, and output filename are not affected.</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/inspector.py" line="182"/>
         <source>Segmentation model</source>
         <translation>Segmentation model</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="194"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="196"/>
         <source>cached locally</source>
         <translation>cached locally</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="196"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="198"/>
         <source>not cached yet</source>
         <translation>not cached yet</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="226"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="228"/>
         <source>Model status</source>
         <translation>Model status</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="237"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="239"/>
         <source>Model download</source>
         <translation>Model download</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="253"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="255"/>
         <source>Standard</source>
         <translation>Standard</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="256"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="258"/>
         <source>Decontaminate colors</source>
         <translation>Decontaminate colors</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="267"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="269"/>
         <source> fps</source>
         <translation> fps</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="269"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="271"/>
         <source>High output FPS may increase render cost</source>
         <translation>High output FPS may increase render cost</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="276"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="278"/>
         <source>Output FPS cost warning</source>
         <translation>Output FPS cost warning</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="285"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="287"/>
         <source>Global trim</source>
         <translation>Global trim</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="289"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="291"/>
         <source>Global alpha trim</source>
         <translation>Global alpha trim</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="298"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="300"/>
         <source>Padding pixels</source>
         <translation>Padding pixels</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="312"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="314"/>
         <source>Output directory</source>
         <translation>Output directory</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="317"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="319"/>
         <source>Choose…</source>
         <translation>Choose…</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="321"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="323"/>
         <source>Choose output directory</source>
         <translation>Choose output directory</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="324"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="326"/>
         <source>Clear</source>
         <translation>Clear</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="328"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="330"/>
         <source>Clear output directory</source>
         <translation>Clear output directory</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="334"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="336"/>
         <source>Output filename</source>
         <translation>Output filename</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="339"/>
-        <location filename="../src/matteloop/ui/inspector.py" line="474"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="341"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="476"/>
         <source>Use one non-empty filename ending in .webp; path separators are not allowed.</source>
         <translation>Use one non-empty filename ending in .webp; path separators are not allowed.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="349"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="351"/>
         <source>Maximum file size</source>
         <translation>Maximum file size</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="352"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="354"/>
         <source>Unlimited</source>
         <translation>Unlimited</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="354"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="356"/>
         <source> MiB</source>
         <translation> MiB</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="355"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="357"/>
         <source>Unlimited means no maximum file size.</source>
         <translation>Unlimited means no maximum file size.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="427"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="429"/>
         <source>%s — %s download required</source>
         <translation>%s — %s download required</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="462"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="464"/>
         <source>Filename must be a single non-empty .webp filename.</source>
         <translation>Filename must be a single non-empty .webp filename.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="578"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="581"/>
         <source> s</source>
         <translation> s</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="594"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="597"/>
         <source>Crop</source>
         <translation>Crop</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="597"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="600"/>
         <source>Crop overlay</source>
         <translation>Crop overlay</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="601"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="604"/>
         <source>Reset Crop</source>
         <translation>Reset Crop</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="605"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="608"/>
         <source>Reset crop</source>
         <translation>Reset crop</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="662"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="665"/>
         <source>Crop %s</source>
         <translation>Crop %s</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="805"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="809"/>
         <source>Model status: %s</source>
         <translation>Model status: %s</translation>
     </message>

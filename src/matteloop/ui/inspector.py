@@ -65,6 +65,7 @@ from matteloop.ui.copy import (
 )
 from matteloop.ui.crop_presentation import CropPresentation
 from matteloop.ui.inspector_disclosure import configure_disclosure, read_bool
+from matteloop.ui.inspector_reset import build_reset_button
 from matteloop.ui.parameter_presentation import (
     ParameterPresentation,
     decimal_from_widget_value,
@@ -170,6 +171,7 @@ class Inspector(QFrame):
         self._build_sampling_parameter_controls()
         self._build_cleanup_parameter_controls()
         self._build_output_parameter_controls()
+        self.reset_parameters_button = build_reset_button(self.command_requested.emit)
         self._connect_parameter_controls()
 
     def _build_segmentation_parameter_controls(self) -> None:
@@ -506,6 +508,7 @@ class Inspector(QFrame):
             self.clear_output_directory_button,
             self.output_filename_edit,
             self.max_size_spinbox,
+            self.reset_parameters_button,
         ):
             widget.setEnabled(available)
         self.fps_warning.setVisible(available and presentation.fps > 60)
@@ -764,6 +767,7 @@ class Inspector(QFrame):
         layout.addRow(self._form_label("Alpha threshold"), self.alpha_threshold_spinbox)
         layout.addRow(self._form_label("Padding"), self.padding_spinbox)
         layout.addRow(self._form_label("Horizontal stretch"), self.stretch_spinbox)
+        layout.addRow(self._form_label(""), self.reset_parameters_button)
         return controls
 
     def _output_controls(self) -> QWidget:
@@ -825,37 +829,33 @@ class Inspector(QFrame):
             self.clear_output_directory_button,
             self.output_filename_edit,
             self.max_size_spinbox,
+            self.reset_parameters_button,
         )
 
     def tab_widgets(self) -> tuple[QWidget, ...]:
         """Return the full inspector tab route in consequence order."""
         return (
             self.disclosures["segmentation"][0],
-            self.model_picker,
-            self.edge_picker,
+            self.model_picker, self.edge_picker,
             self.manage_models,
             self.disclosures["time_sampling"][0],
-            self.fps_spinbox,
-            self.start_spinbox,
-            self.end_spinbox,
+            self.fps_spinbox, self.start_spinbox, self.end_spinbox,
             self.duration_spinbox,
             self.disclosures["crop_cleanup"][0],
             *self.crop_tab_widgets(),
-            self.trim_checkbox,
-            self.alpha_threshold_spinbox,
-            self.padding_spinbox,
+            self.trim_checkbox, self.alpha_threshold_spinbox, self.padding_spinbox,
             self.stretch_spinbox,
             self.disclosures["transform"][0],
             *self.transform_group.tab_widgets(),
             self.disclosures["output"][0],
-            self.output_directory_button,
-            self.clear_output_directory_button,
+            self.output_directory_button, self.clear_output_directory_button,
             self.output_filename_edit,
             self.max_size_spinbox,
             self.disclosures["workspace"][0],
             self.edited_cut_recovery,
             self.rebuild_button,
             self.manage_workspaces,
+            self.reset_parameters_button,
         )
 
     def crop_tab_widgets(self) -> tuple[QWidget, ...]:

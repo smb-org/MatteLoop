@@ -8,8 +8,9 @@ import pytest
 from PySide6.QtCore import QSettings, Qt
 from PySide6.QtWidgets import QAbstractSpinBox, QComboBox
 
-from matteloop.core.parameters import ParameterState
-from matteloop.core.state import AppState
+from matteloop.core.parameters import ParametersReset, ParameterState
+from matteloop.core.specs import CropSpec, EdgeMode, TransformSpec
+from matteloop.core.state import AppState, SourceState
 from matteloop.core.timeline import TimelineState
 from matteloop.ui.aligned_rows import (
     ACCESSIBLE_DESCRIPTION_ROLE,
@@ -17,8 +18,10 @@ from matteloop.ui.aligned_rows import (
     STATUS_ROLE,
     RowStatus,
 )
+from matteloop.ui.controller import SourceController
 from matteloop.ui.inspector import Inspector
 from matteloop.ui.parameter_presentation import present_parameters
+from matteloop.ui.store import ReducerStore
 
 
 def _settings() -> QSettings:
@@ -266,6 +269,94 @@ def test_inspector_emits_edge_mode_from_the_standard_combo(qtbot) -> None:
     inspector.edge_picker.setCurrentIndex(1)
 
     assert [type(command).__name__ for command in commands] == ["EdgeModeChanged"]
+
+
+def test_inspector_exposes_reset_action_and_explains_what_it_preserves(qtbot) -> None:
+    inspector = Inspector(_settings())
+    qtbot.addWidget(inspector)
+    commands: list[object] = []
+    inspector.command_requested.connect(commands.append)
+
+    assert inspector.reset_parameters_button.text() == "Reset to defaults"
+    assert inspector.reset_parameters_button.accessibleName() == (
+        "Reset inspector parameters"
+    )
+    assert inspector.reset_parameters_button.toolTip() == (
+        "Compute acceleration, output directory, and output filename are not affected."
+    )
+
+    inspector.reset_parameters_button.click()
+
+    assert commands == [ParametersReset()]
+
+
+def test_inspector_reset_updates_widgets_without_disturbing_other_editors(
+    qtbot,
+) -> None:
+    settings = _settings()
+    parameters = ParameterState(
+        model_id="u2net",
+        edge_mode=EdgeMode.DECONTAMINATE_COLORS,
+        execution_provider="CUDAExecutionProvider",
+        fps=90,
+        trim=True,
+        alpha_threshold=Decimal("0.4"),
+        padding=1,
+        stretch_x=Decimal("1.2"),
+        output_directory=Path("exports"),
+        output_filename="chosen.webp",
+        max_mib=Decimal("12.5"),
+        transform=TransformSpec(first_frame=1, crop=CropSpec(4, 5, 80, 70)),
+    )
+    timeline = TimelineState(
+        Fraction(4), Fraction(1, 2), Fraction(7, 2), Fraction(1), fps=90
+    )
+    state = AppState(
+        source=SourceState.READY,
+        source_id="source",
+        source_value=object(),
+        timeline=timeline,
+        parameters=parameters,
+        crop=CropSpec(8, 9, 100, 90),
+        crop_enabled=False,
+    )
+    store = ReducerStore(state)
+    controller = SourceController.__new__(SourceController)
+    controller._store = store
+    controller._settings = settings
+    controller._working_provider = parameters.execution_provider
+    controller._failed_provider = None
+    controller._closed = False
+    inspector = Inspector(settings)
+    qtbot.addWidget(inspector)
+
+    def render(updated: AppState) -> None:
+        inspector.apply_parameters(present_parameters(updated), editable=True)
+
+    store.subscribe(render)
+    inspector.command_requested.connect(controller.dispatch)
+    inspector.apply_parameters(present_parameters(state), editable=True)
+    inspector.reset_parameters_button.click()
+
+    defaults = ParameterState()
+    assert inspector.model_picker.currentData() == defaults.model_id
+    assert inspector.edge_picker.currentData() == defaults.edge_mode.value
+    assert inspector.fps_spinbox.value() == defaults.fps
+    assert inspector.trim_checkbox.isChecked() is defaults.trim
+    assert inspector.alpha_threshold_spinbox.value() == float(defaults.alpha_threshold)
+    assert inspector.padding_spinbox.value() == defaults.padding
+    assert inspector.stretch_spinbox.value() == float(defaults.stretch_x)
+    assert inspector.max_size_spinbox.value() == float(defaults.max_mib)
+    assert store.state.parameters.execution_provider == parameters.execution_provider
+    assert store.state.parameters.output_directory == parameters.output_directory
+    assert store.state.parameters.output_filename == parameters.output_filename
+    assert store.state.parameters.transform == parameters.transform
+    assert store.state.crop == state.crop
+    assert store.state.crop_enabled is state.crop_enabled
+    assert store.state.timeline is not None
+    assert store.state.timeline.start == timeline.start
+    assert store.state.timeline.end == timeline.end
+    assert store.state.timeline.playhead == timeline.playhead
 
 
 def test_inspector_exposes_and_emits_output_directory_clear(qtbot) -> None:

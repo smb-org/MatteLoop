@@ -145,6 +145,11 @@ class OutputMaxSizeChanged:
 
 
 @dataclass(frozen=True, slots=True)
+class ParametersReset:
+    pass
+
+
+@dataclass(frozen=True, slots=True)
 class TransformChanged:
     transform: TransformSpec
 
@@ -161,6 +166,7 @@ ParameterEvent = (
     | OutputDirectoryChanged
     | OutputFilenameChanged
     | OutputMaxSizeChanged
+    | ParametersReset
     | TransformChanged
 )
 
@@ -174,6 +180,8 @@ def reduce_parameters(state: AppState, event: ParameterEvent) -> AppState:
             return state
     elif not capabilities(state).can_edit:
         return state
+    if isinstance(event, ParametersReset):
+        return _reduce_parameters_reset(state)
     if isinstance(event, ModelChanged):
         return _reduce_model(state, event)
     if isinstance(event, EdgeModeChanged):
@@ -199,6 +207,39 @@ def reduce_parameters(state: AppState, event: ParameterEvent) -> AppState:
     if isinstance(event, TransformChanged):
         return _reduce_transform(state, event)
     return state
+
+
+def _reduce_parameters_reset(state: AppState) -> AppState:
+    from matteloop.core.tokens import PreviewInvalidationReason
+
+    defaults = ParameterState()
+    parameters = replace(
+        state.parameters,
+        model_id=defaults.model_id,
+        edge_mode=defaults.edge_mode,
+        fps=defaults.fps,
+        trim=defaults.trim,
+        alpha_threshold=defaults.alpha_threshold,
+        padding=defaults.padding,
+        stretch_x=defaults.stretch_x,
+        max_mib=defaults.max_mib,
+    )
+    timeline = state.timeline
+    if timeline is not None and timeline.fps != defaults.fps:
+        try:
+            timeline = timeline.set_fps(defaults.fps)
+        except ValueError:
+            return state
+    if parameters == state.parameters and timeline == state.timeline:
+        return state
+    model_available = state.model_available
+    if parameters.model_id != state.parameters.model_id:
+        model_available = False
+    return _invalidate(
+        replace(state, timeline=timeline, model_available=model_available),
+        parameters,
+        PreviewInvalidationReason.CROP_CLEANUP,
+    )
 
 
 def _reduce_model(state: AppState, event: ModelChanged) -> AppState:

@@ -10,7 +10,11 @@ from matteloop.core.execution_providers import (
     CUDA_EXECUTION_PROVIDER,
     ProviderOption,
 )
-from matteloop.core.parameters import OutputFilenameChanged, ParameterState
+from matteloop.core.parameters import (
+    OutputFilenameChanged,
+    ParametersReset,
+    ParameterState,
+)
 from matteloop.core.specs import CropSpec, EdgeMode, TransformSpec
 from matteloop.core.state import AppState, SourceState
 from matteloop.ui.controller import SourceController
@@ -103,3 +107,54 @@ def test_failed_provider_is_not_reintroduced_by_a_later_parameter_save() -> None
     controller._dispatch_parameter(OutputFilenameChanged("next.webp"))
 
     assert settings.value("parameters/execution_provider") == CPU_EXECUTION_PROVIDER
+
+
+def test_reset_persists_inspector_defaults_without_overwriting_excluded_choices(
+) -> None:
+    settings = _settings()
+    saved = ParameterState(
+        model_id="u2net",
+        edge_mode=EdgeMode.DECONTAMINATE_COLORS,
+        execution_provider=CUDA_EXECUTION_PROVIDER,
+        fps=90,
+        trim=True,
+        alpha_threshold=Decimal("0.4"),
+        padding=1,
+        stretch_x=Decimal("1.2"),
+        output_directory=Path("exports"),
+        output_filename="chosen.webp",
+        max_mib=Decimal("12.5"),
+    )
+    persist_parameters(settings, saved)
+    store = ReducerStore(
+        AppState(
+            source=SourceState.READY,
+            source_id="source",
+            source_value=object(),
+            parameters=saved,
+        )
+    )
+    controller = SourceController.__new__(SourceController)
+    controller._store = store
+    controller._settings = settings
+    controller._working_provider = CUDA_EXECUTION_PROVIDER
+    controller._failed_provider = None
+
+    controller._dispatch_parameter(ParametersReset())
+    actual = load_parameters(settings)
+    defaults = ParameterState()
+
+    for name in (
+        "model_id",
+        "edge_mode",
+        "fps",
+        "trim",
+        "alpha_threshold",
+        "padding",
+        "stretch_x",
+        "max_mib",
+    ):
+        assert getattr(actual, name) == getattr(defaults, name)
+    assert actual.execution_provider == saved.execution_provider
+    assert actual.output_directory == saved.output_directory
+    assert actual.output_filename == saved.output_filename
