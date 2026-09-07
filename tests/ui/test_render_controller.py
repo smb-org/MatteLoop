@@ -43,6 +43,7 @@ from matteloop.ui.render_pipeline import _StageReporter, render_prepared
 from matteloop.ui.store import ReducerStore
 from tests.fixtures.media_factory import make_video
 from tests.jobs.render_support import frozen_segmentation_result
+from tests.ui.rebuild_support import rebuild_manifest
 
 
 @dataclass(frozen=True)
@@ -245,35 +246,6 @@ class RebuildRuntime(FakeRenderRuntime):
         return type("Artifact", (), {"output_path": request.output.path})()
 
 
-@dataclass(frozen=True)
-class _RebuildManifest:
-    """Duck-typed stand-in exposing only what request_for_workspace reads."""
-
-    cache_key_inputs: dict[str, object]
-    source_path: str
-
-
-def _rebuild_manifest(source: Path) -> _RebuildManifest:
-    return _RebuildManifest(
-        cache_key_inputs={
-            "sampling": {
-                "start": {"numerator": 0, "denominator": 1},
-                "end": {"numerator": 2, "denominator": 1},
-                "fps": 15,
-            },
-            "crop": {"x": 0, "y": 0, "width": 128, "height": 128},
-            "model": {"id": "u2net"},
-            "edge_settings": {
-                "mode": "standard",
-                "alpha_matting": {
-                    "foreground_threshold": 240,
-                    "background_threshold": 10,
-                    "erode_size": 10,
-                },
-            },
-        },
-        source_path=str(source),
-    )
 
 
 class RecordingStore(ReducerStore):
@@ -688,7 +660,7 @@ def test_use_this_set_restores_the_stored_transform_before_rebuilding(
         None,
         "source-aaaaaaaa",
     )
-    manifest = _rebuild_manifest(source)
+    manifest = rebuild_manifest(source)
     runtime = RebuildRuntime()
     store = RecordingStore(_current_state(source))
     controller = SourceController(store, preview_runtime=runtime)

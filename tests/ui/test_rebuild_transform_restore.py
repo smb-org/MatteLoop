@@ -42,6 +42,7 @@ from matteloop.ui.controller import SourceController
 from matteloop.ui.ports import RenderVideoRequested
 from matteloop.ui.preview_controller import PreviewRuntime
 from matteloop.ui.store import ReducerStore
+from tests.ui.rebuild_support import rebuild_manifest
 
 
 @dataclass(frozen=True)
@@ -53,33 +54,6 @@ class _Metadata:
     average_rate: Fraction = Fraction(30)
 
 
-@dataclass(frozen=True)
-class _RebuildManifest:
-    cache_key_inputs: dict[str, object]
-    source_path: str
-
-
-def _rebuild_manifest(source: Path) -> _RebuildManifest:
-    return _RebuildManifest(
-        cache_key_inputs={
-            "sampling": {
-                "start": {"numerator": 0, "denominator": 1},
-                "end": {"numerator": 2, "denominator": 1},
-                "fps": 15,
-            },
-            "crop": {"x": 0, "y": 0, "width": 128, "height": 128},
-            "model": {"id": "u2net"},
-            "edge_settings": {
-                "mode": "standard",
-                "alpha_matting": {
-                    "foreground_threshold": 240,
-                    "background_threshold": 10,
-                    "erode_size": 10,
-                },
-            },
-        },
-        source_path=str(source),
-    )
 
 
 class _MatchedCutRuntime(PreviewRuntime):
@@ -271,7 +245,7 @@ def test_canceling_a_rebuild_keeps_the_open_cut_transform(
     store.dispatch(TransformChanged(live))
 
     controller.render_controller._use_workspace(  # noqa: SLF001
-        WorkspaceSummary(matched, _rebuild_manifest(tmp_path / "source.mp4"), 0)
+        WorkspaceSummary(matched, rebuild_manifest(tmp_path / "source.mp4"), 0)
     )
     dialog = controller.render_controller.collision_dialog
     assert dialog is not None
