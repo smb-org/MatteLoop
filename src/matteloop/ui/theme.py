@@ -48,6 +48,11 @@ def _surface_stylesheet() -> str:
                   font-family: '{UI_FONT}', {_UI_FALLBACKS}; font-size: 10pt; }}
         QFrame#preview_stage {{ background: {CANVAS_COLOR};
                                 border: 1px solid {DIVIDER_COLOR}; }}
+        QWidget#source_drop_target[dropActive='true'],
+        QWidget#source_strip[dropActive='true'],
+        QFrame#preview_stage[dropActive='true'] {{
+            border: 2px solid {ACCENT_COLOR};
+        }}
         QLabel#original_canvas, QLabel#result_canvas {{ background: {CANVAS_COLOR}; }}
         QWidget#inspector {{ background: {INSPECTOR_COLOR};
                              border-left: 1px solid {DIVIDER_COLOR}; }}

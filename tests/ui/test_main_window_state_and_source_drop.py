@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 from PySide6.QtCore import QByteArray, QMimeData, QSettings, Qt, QUrl
-from PySide6.QtGui import QDropEvent, QFontMetrics
+from PySide6.QtGui import QDragEnterEvent, QDragLeaveEvent, QDropEvent, QFontMetrics
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QLabel, QPushButton
 
@@ -424,6 +424,71 @@ def test_source_drop_accepts_one_local_video_and_dispatches_path(
     assert len(services.commands) == 1
     assert type(services.commands[0]).__name__ == "VideoDropped"
     assert services.commands[0].path == source
+
+
+@pytest.mark.parametrize("target_name", ["source_strip", "preview_stage"])
+def test_loaded_source_accepts_drop_over_source_and_preview_regions(
+    window, tmp_path, qtbot, target_name: str
+) -> None:
+    value, services = window
+    value.render_state(_ready())
+    source = tmp_path / "replacement.mp4"
+    source.write_bytes(b"not decoded here")
+    mime = QMimeData()
+    mime.setUrls([QUrl.fromLocalFile(str(source))])
+    target = getattr(value, target_name)
+    event = QDropEvent(
+        target.rect().center(),
+        Qt.DropAction.CopyAction,
+        mime,
+        Qt.MouseButton.LeftButton,
+        Qt.KeyboardModifier.NoModifier,
+    )
+
+    value.source_drop_target.eventFilter(target, event)
+
+    assert event.isAccepted()
+    assert services.commands[-1].path == source
+
+
+@pytest.mark.parametrize(
+    ("state", "suffix", "accepted"),
+    [
+        (_ready(), ".mp4", True),
+        (
+            reduce(_ready(), PreviewRequested("preview", "preview-request")),
+            ".mp4",
+            False,
+        ),
+        (_ready(), ".txt", False),
+    ],
+)
+def test_source_drop_feedback_accepts_only_enabled_supported_drags(
+    window, tmp_path, qtbot, state: AppState, suffix: str, accepted: bool
+) -> None:
+    value, _services = window
+    value.render_state(state)
+    source = tmp_path / f"dragged{suffix}"
+    source.write_bytes(b"not decoded here")
+    mime = QMimeData()
+    mime.setUrls([QUrl.fromLocalFile(str(source))])
+    event = QDragEnterEvent(
+        value.preview_stage.rect().center(),
+        Qt.DropAction.CopyAction,
+        mime,
+        Qt.MouseButton.LeftButton,
+        Qt.KeyboardModifier.NoModifier,
+    )
+
+    value.source_drop_target.eventFilter(value.preview_stage, event)
+
+    assert event.isAccepted() is accepted
+    assert value.preview_stage.property("dropActive") is accepted
+    if accepted:
+        value.source_drop_target.eventFilter(
+            value.preview_stage, QDragLeaveEvent()
+        )
+        assert value.preview_stage.property("dropActive") is False
 
 
 @pytest.mark.parametrize(
