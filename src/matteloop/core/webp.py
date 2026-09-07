@@ -128,19 +128,14 @@ def encode_lossless_webp(
     *,
     rgba_ownership_tracker: RgbaOwnershipTracker | None = None,
     progress: Callable[[int, int], None] | None = None,
+    is_cancelled: Callable[[], bool] | None = None,
 ) -> EncodeSummary:
     """Encode PNG-backed RGBA frames and atomically replace *destination*."""
-
-    if rgba_ownership_tracker is None:
-        frames = _validate_frame_inputs(frame_paths, delays_ms)
-    else:
-        frames = _validate_frame_inputs(
-            frame_paths,
-            delays_ms,
-            rgba_ownership_tracker,
-        )
+    frames = _validate_frame_inputs(
+        frame_paths, delays_ms, rgba_ownership_tracker, is_cancelled=is_cancelled
+    )
     emitted = (
-        _collapse_identical_frames(frames, rgba_ownership_tracker)
+        _collapse_identical_frames(frames, rgba_ownership_tracker, is_cancelled)
         if frames.animated
         else frames
     )
@@ -148,34 +143,32 @@ def encode_lossless_webp(
     temporary = _sibling_temporary(destination)
     primary: BaseException | None = None
     try:
+        _raise_if_fit_cancelled(is_cancelled)
         if not emitted.animated:
-            if rgba_ownership_tracker is None:
-                _encode_still(emitted.paths[0], emitted.identities[0], temporary)
-            else:
-                _encode_still(
-                    emitted.paths[0],
-                    emitted.identities[0],
-                    temporary,
-                    rgba_ownership_tracker,
-                )
+            _encode_still(
+                emitted.paths[0],
+                emitted.identities[0],
+                temporary,
+                rgba_ownership_tracker,
+            )
             if progress is not None:
                 progress(1, 1)
         else:
-            _encode_animation(emitted, temporary, rgba_ownership_tracker, progress)
+            _encode_animation(
+                emitted,
+                temporary,
+                rgba_ownership_tracker,
+                progress,
+                is_cancelled,
+            )
         _fsync_file(temporary)
-        if rgba_ownership_tracker is None:
-            info = validate_webp(
-                temporary,
-                expected_frames=len(emitted.paths),
-                expected_duration_ms=frames.encoded_duration_ms,
-            )
-        else:
-            info = validate_webp(
-                temporary,
-                expected_frames=len(emitted.paths),
-                expected_duration_ms=frames.encoded_duration_ms,
-                rgba_ownership_tracker=rgba_ownership_tracker,
-            )
+        info = validate_webp(
+            temporary,
+            expected_frames=len(emitted.paths),
+            expected_duration_ms=frames.encoded_duration_ms,
+            rgba_ownership_tracker=rgba_ownership_tracker,
+            is_cancelled=is_cancelled,
+        )
         if (info.width, info.height) != frames.size:
             raise _invalid_output("encoded dimensions do not match the input frames")
         expected_delays = emitted.delays_ms if emitted.animated else ()
@@ -189,6 +182,7 @@ def encode_lossless_webp(
             emitted.identities,
             rgba_ownership_tracker,
             allow_invisible_rgb_changes=emitted.animated,
+            is_cancelled=is_cancelled,
         )
         os.replace(temporary, destination)
     except AppError as error:
@@ -207,7 +201,6 @@ def encode_lossless_webp(
         raise
     finally:
         _cleanup_file(temporary, primary)
-
     return EncodeSummary(
         destination=destination,
         width=info.width,
@@ -224,14 +217,14 @@ def validate_webp(
     expected_duration_ms: int,
     *,
     rgba_ownership_tracker: RgbaOwnershipTracker | None = None,
+    is_cancelled: Callable[[], bool] | None = None,
 ) -> WebPInfo:
     """Validate a WebP path or caller-owned stable binary file.
 
-    An open binary is never closed and its logical position is restored.  RIFF
+    An open binary is never closed and its logical position is restored. RIFF
     parsing and Pillow decoding use a duplicate of that exact file descriptor,
     so neither phase reopens a mutable pathname.
     """
-
     if (
         not isinstance(expected_frames, int)
         or isinstance(expected_frames, bool)
@@ -244,12 +237,11 @@ def validate_webp(
         or expected_duration_ms < 0
     ):
         raise _invalid_output("expected duration must be a non-negative integer")
-
     try:
         with _open_webp_validation_source(source) as (held, file_size):
             if file_size >= _RIFF_LIMIT:
                 raise _invalid_output("WebP output must be smaller than 4 GiB")
-            riff = _parse_riff(held, file_size)
+            riff = _parse_riff(held, file_size, is_cancelled=is_cancelled)
             held.seek(0)
             with _open_pillow(held) as image:
                 if image.format != "WEBP":
@@ -258,6 +250,7 @@ def validate_webp(
                 decoded_frames = getattr(image, "n_frames", 1)
                 has_alpha = False
                 for index in range(decoded_frames):
+                    _raise_if_fit_cancelled(is_cancelled)
                     image.seek(index)
                     image.load()
                     if rgba_ownership_tracker is not None:
@@ -267,7 +260,6 @@ def validate_webp(
         raise
     except (OSError, EOFError, ValueError, SyntaxError) as error:
         raise _invalid_output(f"invalid or truncated WebP output: {error}") from error
-
     if decoded_frames != riff.frames or decoded_frames != expected_frames:
         raise _invalid_output(
             "WebP frame count does not match the expected complete output"
@@ -282,7 +274,6 @@ def validate_webp(
         raise _invalid_output("WebP output contains a lossy frame")
     if riff.has_alpha_flag and not has_alpha:
         raise _invalid_output("WebP alpha flag does not match decoded pixels")
-
     return WebPInfo(
         width=width,
         height=height,
@@ -310,19 +301,13 @@ def fit_webp_to_size(
     attempt_progress: Callable[[int, int], None] | None = None,
 ) -> Path:
     """Fit a validated WebP to a byte target using at most twelve encodes."""
-
     _raise_if_fit_cancelled(is_cancelled)
-    if rgba_ownership_tracker is None:
-        source = _validate_frame_inputs(
-            source_frame_paths, delays_ms, is_cancelled=is_cancelled
-        )
-    else:
-        source = _validate_frame_inputs(
-            source_frame_paths,
-            delays_ms,
-            rgba_ownership_tracker,
-            is_cancelled=is_cancelled,
-        )
+    source = _validate_frame_inputs(
+        source_frame_paths,
+        delays_ms,
+        rgba_ownership_tracker,
+        is_cancelled=is_cancelled,
+    )
     if (
         not isinstance(target_bytes, int)
         or isinstance(target_bytes, bool)
@@ -336,7 +321,6 @@ def fit_webp_to_size(
         scratch = Path(tempfile.mkdtemp(prefix="webp-fit-", dir=work_dir))
     except OSError as error:
         raise _output_os_error(error, "cannot create auto-fit workspace") from error
-
     primary: BaseException | None = None
     prepared_output: Path | None = None
     scratch_cleaned = False
@@ -364,6 +348,7 @@ def fit_webp_to_size(
                 candidate,
                 rgba_ownership_tracker,
                 progress,
+                is_cancelled=is_cancelled,
             )
             _raise_if_fit_cancelled(is_cancelled)
             if summary.file_size <= target_bytes:
@@ -375,7 +360,7 @@ def fit_webp_to_size(
                 )
                 emitted = (
                     _collapse_identical_frames(
-                        candidate_frames, rgba_ownership_tracker
+                        candidate_frames, rgba_ownership_tracker, is_cancelled
                     )
                     if candidate_frames.animated
                     else candidate_frames
@@ -388,6 +373,7 @@ def fit_webp_to_size(
                     current_size,
                     target_bytes,
                     rgba_ownership_tracker,
+                    is_cancelled=is_cancelled,
                 )
                 _raise_if_fit_cancelled(is_cancelled)
                 _cleanup_tree(scratch, None)
@@ -411,7 +397,6 @@ def fit_webp_to_size(
                         )
                     )
                 return destination
-
             if attempt + 1 == _MAX_FIT_ENCODINGS:
                 break
             next_scale = solve_proportional_scale(
@@ -460,7 +445,6 @@ def fit_webp_to_size(
             current_size = next_size
             active_scaled_dir = scaled_dir
             cumulative_scale = next_scale
-
         raise _impossible_size(
             "lossless WebP cannot meet the requested size within 12 encodes and "
             "the 128 px minimum"
@@ -481,8 +465,10 @@ def _encode_candidate(
     destination: Path,
     rgba_ownership_tracker: RgbaOwnershipTracker | None,
     progress: Callable[[int, int], None] | None,
+    *,
+    is_cancelled: Callable[[], bool] | None = None,
 ) -> EncodeSummary:
-    if rgba_ownership_tracker is None and progress is None:
+    if rgba_ownership_tracker is None and progress is None and is_cancelled is None:
         return encode_lossless_webp(frame_paths, delays_ms, destination)
     return encode_lossless_webp(
         frame_paths,
@@ -490,6 +476,7 @@ def _encode_candidate(
         destination,
         rgba_ownership_tracker=rgba_ownership_tracker,
         progress=progress,
+        is_cancelled=is_cancelled,
     )
 
 
@@ -509,7 +496,6 @@ def _validate_frame_inputs(
         raise _invalid_output("frame count must be between 1 and 100000")
     if len(delays_ms) != count:
         raise _invalid_output("every frame must have exactly one delay")
-
     delays = tuple(delays_ms)
     if any(
         not isinstance(delay, int)
@@ -520,7 +506,6 @@ def _validate_frame_inputs(
         raise _invalid_output(
             "frame delays must be positive integers representable by WebP"
         )
-
     paths: list[Path] = []
     identities: list[_FileIdentity] = []
     expected_size: tuple[int, int] | None = None
@@ -551,7 +536,6 @@ def _validate_frame_inputs(
             ) from error
         paths.append(path)
         identities.append(identity)
-
     assert expected_size is not None
     return _FrameSet(
         tuple(paths), delays, expected_size, tuple(identities), count > 1
@@ -561,6 +545,7 @@ def _validate_frame_inputs(
 def _collapse_identical_frames(
     frames: _FrameSet,
     rgba_ownership_tracker: RgbaOwnershipTracker | None,
+    is_cancelled: Callable[[], bool] | None = None,
 ) -> _FrameSet:
     run_paths: list[Path] = []
     run_delays: list[int] = []
@@ -569,6 +554,7 @@ def _collapse_identical_frames(
     for path, identity, delay in zip(
         frames.paths, frames.identities, frames.delays_ms, strict=True
     ):
+        _raise_if_fit_cancelled(is_cancelled)
         pixels = _read_rgba_pixels(path, identity, rgba_ownership_tracker)
         if previous_pixels is not None and np.array_equal(previous_pixels, pixels):
             run_delays[-1] += delay
@@ -586,6 +572,7 @@ def _collapse_identical_frames(
         tuple(run_identities),
         frames.animated,
     )
+    _raise_if_fit_cancelled(is_cancelled)
     return _split_long_animation_runs(collapsed)
 
 
@@ -653,6 +640,7 @@ def _encode_animation(
     destination: Path,
     rgba_ownership_tracker: RgbaOwnershipTracker | None = None,
     progress: Callable[[int, int], None] | None = None,
+    is_cancelled: Callable[[], bool] | None = None,
 ) -> None:
     base_frames, repeat_counts = _animation_base_frames(frames)
     width, height = frames.size
@@ -680,9 +668,11 @@ def _encode_animation(
             container,
             rgba_ownership_tracker,
             progress,
+            is_cancelled,
         )
     finally:
         container.close()
+    _raise_if_fit_cancelled(is_cancelled)
     if len(base_frames.paths) == 1:
         _remove_last_animation_frame(destination)
     _expand_animation_frames(destination, repeat_counts)
@@ -695,8 +685,10 @@ def _encode_animation_frames(
     container: av.container.OutputContainer,
     rgba_ownership_tracker: RgbaOwnershipTracker | None,
     progress: Callable[[int, int], None] | None,
+    is_cancelled: Callable[[], bool] | None,
 ) -> None:
     if len(frames.paths) == 1:
+        _raise_if_fit_cancelled(is_cancelled)
         path = frames.paths[0]
         identity = frames.identities[0]
         delay = frames.delays_ms[0]
@@ -712,6 +704,7 @@ def _encode_animation_frames(
         )
         if progress is not None:
             progress(1, len(frames.paths))
+        _raise_if_fit_cancelled(is_cancelled)
         # libwebp_anim emits a still for one input frame; a distinct sentinel
         # forces animation metadata before the sentinel is removed.
         _encode_animation_frame(
@@ -730,6 +723,7 @@ def _encode_animation_frames(
         for index, (path, identity, delay) in enumerate(zip(
             frames.paths, frames.identities, frames.delays_ms, strict=True
         )):
+            _raise_if_fit_cancelled(is_cancelled)
             _encode_animation_frame(
                 path,
                 identity,
@@ -930,7 +924,12 @@ def _read_chunk_header_at(source: BinaryIO, position: int) -> tuple[bytes, int]:
     return _read_chunk_header(source)
 
 
-def _parse_riff(source: BinaryIO, actual_size: int) -> _RiffFacts:
+def _parse_riff(
+    source: BinaryIO,
+    actual_size: int,
+    *,
+    is_cancelled: Callable[[], bool] | None = None,
+) -> _RiffFacts:
     declared_size = _read_riff_header(source)
     if declared_size != actual_size:
         raise _invalid_output("RIFF length does not match the complete file")
@@ -943,7 +942,6 @@ def _parse_riff(source: BinaryIO, actual_size: int) -> _RiffFacts:
         return _RiffFacts(width, height, (), 0, has_alpha)
     if first[0] != b"VP8X":
         raise _invalid_output("animated WebP must begin with one VP8X chunk")
-
     width, height, has_alpha_flag = _parse_vp8x(source, first)
     second = _chunk_at(source, first[4], actual_size)
     if second[0] != b"ANIM":
@@ -957,11 +955,11 @@ def _parse_riff(source: BinaryIO, actual_size: int) -> _RiffFacts:
     background_has_alpha = animation_data[3] < 255
     loop = int.from_bytes(animation_data[4:6], "little")
     _require_zero_padding(source, second[3], second[1])
-
     position = second[4]
     delays: list[int] = []
     frame_alpha: list[bool] = []
     while position < actual_size:
+        _raise_if_fit_cancelled(is_cancelled)
         chunk = _chunk_at(source, position, actual_size)
         if chunk[0] == b"ANIM":
             raise _invalid_output("animated WebP contains a duplicate ANIM chunk")
@@ -1026,7 +1024,6 @@ def _parse_anmf(
         raise _invalid_output("ANMF duration must be a positive integer")
     if x + width > canvas[0] or y + height > canvas[1]:
         raise _invalid_output("ANMF frame rectangle exceeds the VP8X canvas")
-
     nested = _chunk_at(source, payload + 16, end)
     if nested[0] != b"VP8L" or nested[4] != end:
         raise _invalid_output("ANMF must contain exactly one lossless VP8L chunk")
@@ -1104,10 +1101,12 @@ def _validate_encoded_pixels(
     rgba_ownership_tracker: RgbaOwnershipTracker | None = None,
     *,
     allow_invisible_rgb_changes: bool = False,
+    is_cancelled: Callable[[], bool] | None = None,
 ) -> None:
     try:
         with _open_pillow(output) as encoded:
             for index, source_path in enumerate(source_paths):
+                _raise_if_fit_cancelled(is_cancelled)
                 expected_identity = (
                     expected_identities[index]
                     if expected_identities is not None
@@ -1181,7 +1180,6 @@ def _animation_rgba_pixels_match(
             with ImageChops.difference(source_alpha, encoded_alpha) as difference:
                 if difference.getbbox() is not None:
                     return False
-
             # libwebp's animation encoder rewrites RGB under fully transparent
             # pixels, and FFmpeg's libwebp_anim wrapper ignores WebP's `exact`
             # option. Alpha and RGB on every visible pixel remain exact here.
@@ -1275,12 +1273,6 @@ def _snapshot_frame_set(
                 os.fsync(output.fileno())
         _raise_if_fit_cancelled(is_cancelled)
         snapshot_paths.append(snapshot)
-    if rgba_ownership_tracker is None:
-        return _validate_frame_inputs(
-            tuple(snapshot_paths),
-            source.delays_ms,
-            is_cancelled=is_cancelled,
-        )
     return _validate_frame_inputs(
         tuple(snapshot_paths),
         source.delays_ms,
@@ -1311,6 +1303,8 @@ def _prepare_candidate(
     expected_dimensions: tuple[int, int],
     target_bytes: int,
     rgba_ownership_tracker: RgbaOwnershipTracker | None = None,
+    *,
+    is_cancelled: Callable[[], bool] | None = None,
 ) -> Path:
     temporary = _sibling_temporary(destination)
     primary: BaseException | None = None
@@ -1324,6 +1318,7 @@ def _prepare_candidate(
             expected_frames=len(frames.paths),
             expected_duration_ms=expected_duration_ms,
             rgba_ownership_tracker=rgba_ownership_tracker,
+            is_cancelled=is_cancelled,
         )
         expected_delays = frames.delays_ms if frames.animated else ()
         if info.delays_ms != expected_delays:
@@ -1336,6 +1331,7 @@ def _prepare_candidate(
             frames.identities,
             rgba_ownership_tracker=rgba_ownership_tracker,
             allow_invisible_rgb_changes=frames.animated,
+            is_cancelled=is_cancelled,
         )
         if info.file_size > target_bytes:
             raise _impossible_size(
@@ -1363,9 +1359,9 @@ def _raise_if_fit_cancelled(
     if is_cancelled is not None and is_cancelled():
         raise AppError(
             ErrorCode.JOB_CANCELLED,
-            "auto-fit",
+            "webp",
             "error.job.cancelled",
-            "lossless WebP auto-fit was cancelled at a safe point",
+            "lossless WebP encoding was cancelled at a safe point",
             "none",
         )
 
@@ -1477,7 +1473,6 @@ def _open_webp_validation_source(
                     f"additional duplicate WebP source cleanup failure: {cleanup_error}"
                 )
         raise
-
     primary: BaseException | None = None
     try:
         yield duplicate, before.size

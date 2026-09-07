@@ -1102,6 +1102,36 @@ def test_close_is_idempotent_and_unlinks_parent_slot() -> None:
         orphan.close()
 
 
+def test_close_terminates_a_child_stalled_in_inference() -> None:
+    segmentation = client("hang", timeout=2.0)
+    segmentation.start()
+    caught: list[AppError] = []
+
+    def run_segment() -> None:
+        try:
+            segmentation.segment(red_frame(), request())
+        except AppError as error:
+            caught.append(error)
+
+    thread = threading.Thread(target=run_segment)
+    thread.start()
+    deadline = time.monotonic() + 1
+    while segmentation.active_job_id is None and time.monotonic() < deadline:
+        time.sleep(0.005)
+    slot_name = segmentation.shared_memory_name
+    assert slot_name is not None
+    close_thread = threading.Thread(target=segmentation.close)
+    close_thread.start()
+    assert close_thread.join(timeout=1.5) is None
+    assert not close_thread.is_alive()
+    thread.join(timeout=2)
+    assert not thread.is_alive()
+    assert caught and caught[0].code is ErrorCode.SEGMENTATION_PROCESS_CRASHED
+    with pytest.raises(FileNotFoundError):
+        orphan = SharedMemory(name=slot_name, create=False)
+        orphan.close()
+
+
 def test_close_during_inference_waits_for_result_then_unlinks_slot() -> None:
     segmentation = client("delayed-cancel")
     segmentation.start()

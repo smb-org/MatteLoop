@@ -617,6 +617,7 @@ class PillowWebPEncoder:
                 destination,
                 rgba_ownership_tracker=ownership,
                 progress=frame_progress,
+                is_cancelled=lambda: context.cancellation.requested,
             )
         else:
             frame_progress, attempt_progress = auto_fit_progress(
@@ -633,6 +634,7 @@ class PillowWebPEncoder:
                 frame_progress,
                 attempt_progress,
             )
+        context.checkpoint("encode")
         return ValidatedCandidate.validate(
             destination,
             summary,
@@ -1594,7 +1596,6 @@ def _produce_cut_frame(
 
 def _decontaminate_edge_colors_in_place(rgba: np.ndarray) -> None:
     """Remove black-premultiplication from translucent edge RGB deterministically.
-
     Alpha is unchanged. Fully transparent pixels receive canonical black RGB;
     for ``0 < alpha < 255`` each channel is converted from black-premultiplied
     to straight color with integer half-up rounding and saturation. This is a
@@ -1806,7 +1807,6 @@ def _open_held_file(path: Path) -> int:
         flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
         flags |= getattr(os, "O_NOFOLLOW", 0)
         return os.open(path, flags)
-
     ctypes = importlib.import_module("ctypes")
     msvcrt = importlib.import_module("msvcrt")
     kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
