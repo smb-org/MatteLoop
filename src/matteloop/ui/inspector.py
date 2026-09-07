@@ -313,11 +313,6 @@ class Inspector(QFrame):
             QCoreApplication.translate("Inspector", "Clear output directory")
         )
         self.clear_output_directory_button.setEnabled(False)
-        for button in (
-            self.output_directory_button,
-            self.clear_output_directory_button,
-        ):
-            button.setStyleSheet("padding-left: 4px; padding-right: 4px;")
         self.output_filename_edit = compact_field(QLineEdit())
         self.output_filename_edit.setObjectName("output_filename")
         self.output_filename_edit.setAccessibleName(
@@ -473,9 +468,6 @@ class Inspector(QFrame):
             self.max_size_spinbox,
         ):
             widget.setEnabled(available)
-        self.clear_output_directory_button.setEnabled(
-            editable and presentation.output_directory_override is not None
-        )
         self.fps_warning.setVisible(available and presentation.fps > 60)
 
     def _apply_parameter_values(self, presentation: ParameterPresentation) -> None:

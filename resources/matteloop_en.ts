@@ -293,12 +293,12 @@
     <message>
         <location filename="../src/matteloop/ui/inspector.py" line="309"/>
         <source>Clear</source>
-        <translation type="unfinished">Clear</translation>
+        <translation>Clear</translation>
     </message>
     <message>
         <location filename="../src/matteloop/ui/inspector.py" line="313"/>
         <source>Clear output directory</source>
-        <translation type="unfinished">Clear output directory</translation>
+        <translation>Clear output directory</translation>
     </message>
     <message>
         <location filename="../src/matteloop/ui/inspector.py" line="319"/>
@@ -327,37 +327,37 @@
         <translation>Filename must be a single non-empty .webp filename.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="541"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="538"/>
         <source> s</source>
         <translation> s</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="557"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="554"/>
         <source>Crop</source>
         <translation>Crop</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="560"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="557"/>
         <source>Crop overlay</source>
         <translation>Crop overlay</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="564"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="561"/>
         <source>Reset Crop</source>
         <translation>Reset Crop</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="568"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="565"/>
         <source>Reset crop</source>
         <translation>Reset crop</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="625"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="622"/>
         <source>Crop %s</source>
         <translation>Crop %s</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="759"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="763"/>
         <source>Model status: %s</source>
         <translation>Model status: %s</translation>
     </message>
@@ -1775,50 +1775,50 @@ Freed %s.</translation>
         <translation>English</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/settings_dialog.py" line="53"/>
-        <location filename="../src/matteloop/ui/settings_dialog.py" line="55"/>
+        <location filename="../src/matteloop/ui/settings_dialog.py" line="54"/>
+        <location filename="../src/matteloop/ui/settings_dialog.py" line="56"/>
         <source>Preferences</source>
         <translation>Preferences</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/settings_dialog.py" line="76"/>
-        <location filename="../src/matteloop/ui/settings_dialog.py" line="129"/>
+        <location filename="../src/matteloop/ui/settings_dialog.py" line="77"/>
+        <location filename="../src/matteloop/ui/settings_dialog.py" line="127"/>
         <source>Interface language</source>
         <translation>Interface language</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/settings_dialog.py" line="83"/>
-        <location filename="../src/matteloop/ui/settings_dialog.py" line="134"/>
+        <location filename="../src/matteloop/ui/settings_dialog.py" line="84"/>
+        <location filename="../src/matteloop/ui/settings_dialog.py" line="132"/>
         <source>Compute acceleration</source>
-        <translation type="unfinished">Compute acceleration</translation>
+        <translation>Compute acceleration</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/settings_dialog.py" line="93"/>
+        <location filename="../src/matteloop/ui/settings_dialog.py" line="91"/>
         <source>Preferences actions</source>
         <translation>Preferences actions</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/settings_dialog.py" line="100"/>
+        <location filename="../src/matteloop/ui/settings_dialog.py" line="98"/>
         <source>Preferences description</source>
         <translation>Preferences description</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/settings_dialog.py" line="104"/>
+        <location filename="../src/matteloop/ui/settings_dialog.py" line="102"/>
         <source>These settings apply to every clip.</source>
         <translation>These settings apply to every clip.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/settings_dialog.py" line="109"/>
+        <location filename="../src/matteloop/ui/settings_dialog.py" line="107"/>
         <source>Interface language changes apply after restarting MatteLoop.</source>
         <translation>Interface language changes apply after restarting MatteLoop.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/settings_dialog.py" line="116"/>
+        <location filename="../src/matteloop/ui/settings_dialog.py" line="114"/>
         <source>Language restart note</source>
         <translation>Language restart note</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/settings_dialog.py" line="151"/>
+        <location filename="../src/matteloop/ui/settings_dialog.py" line="149"/>
         <source>Close preferences</source>
         <translation>Close preferences</translation>
     </message>

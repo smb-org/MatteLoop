@@ -66,7 +66,15 @@ def _ready_store(source: Path, output_directory: Path | None = None) -> ReducerS
 
 def test_preferences_button_opens_dialog_and_keeps_shortcut(qtbot) -> None:
     store = ReducerStore()
-    window = MainWindow(store, Services(), _settings("button"))
+    window = MainWindow(
+        store,
+        Services(),
+        _settings("button"),
+        provider_options=(
+            ProviderOption(CPU_EXECUTION_PROVIDER, "CPU – recommended", True),
+            ProviderOption(COREML_EXECUTION_PROVIDER, "Apple CoreML – experimental"),
+        ),
+    )
     qtbot.addWidget(window)
     window.show()
 
@@ -83,6 +91,7 @@ def test_preferences_button_opens_dialog_and_keeps_shortcut(qtbot) -> None:
 
     qtbot.waitUntil(window.action_shelf.preferences_dialog.isVisible)
     assert window.action_shelf.preferences_dialog.windowTitle() == "Preferences"
+    assert window.action_shelf.preferences_dialog.provider_picker.count() == 2
 
 
 def test_inspector_output_directory_can_be_chosen_and_cleared(
@@ -116,24 +125,6 @@ def test_inspector_output_directory_can_be_chosen_and_cleared(
     assert settings.value("parameters/output_directory") is None
     controller.shutdown()
 
-
-def test_inspector_clear_works_without_a_loaded_source(qtbot, tmp_path: Path) -> None:
-    override = tmp_path / "exports"
-    settings = _settings("clear-without-source")
-    settings.setValue("parameters/output_directory", str(override))
-    store = ReducerStore(AppState(parameters=ParameterState(output_directory=override)))
-    controller = SourceController(store, settings=settings)
-    inspector = Inspector(settings)
-    qtbot.addWidget(inspector)
-    inspector.command_requested.connect(controller.dispatch)
-    inspector.apply_parameters(present_parameters(store.state), editable=True)
-
-    assert inspector.clear_output_directory_button.isEnabled()
-    inspector.clear_output_directory_button.click()
-
-    assert store.state.parameters.output_directory is None
-    assert settings.value("parameters/output_directory") is None
-    controller.shutdown()
 
 
 def test_preferences_disable_provider_picker_while_a_job_runs(

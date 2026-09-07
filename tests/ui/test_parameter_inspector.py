@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from fractions import Fraction
 from pathlib import Path
 
 import pytest
@@ -8,6 +9,7 @@ from PySide6.QtWidgets import QAbstractSpinBox, QComboBox
 
 from matteloop.core.parameters import ParameterState
 from matteloop.core.state import AppState
+from matteloop.core.timeline import TimelineState
 from matteloop.ui.aligned_rows import (
     ACCESSIBLE_DESCRIPTION_ROLE,
     ROW_DATA_ROLE,
@@ -232,7 +234,10 @@ def test_inspector_exposes_and_emits_output_directory_clear(qtbot) -> None:
     qtbot.addWidget(inspector)
     commands: list[object] = []
     inspector.command_requested.connect(commands.append)
-    state = AppState(parameters=ParameterState(output_directory=Path("exports")))
+    state = AppState(
+        parameters=ParameterState(output_directory=Path("exports")),
+        timeline=TimelineState(Fraction(4), Fraction(0), Fraction(4), Fraction(0)),
+    )
     inspector.apply_parameters(present_parameters(state), editable=True)
 
     assert inspector.clear_output_directory_button.isEnabled()

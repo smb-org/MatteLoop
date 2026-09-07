@@ -27,6 +27,7 @@ from matteloop.ui.compact_widgets import (
     compact_field,
     form_layout,
 )
+from matteloop.ui.copy import provider_label
 from matteloop.ui.i18n import (
     SUPPORTED_LANGUAGES,
     persist_language,
@@ -83,10 +84,7 @@ class SettingsDialog(QDialog):
             QCoreApplication.translate("SettingsDialog", "Compute acceleration")
         )
         for option in self._provider_options:
-            self.provider_picker.addItem(
-                QCoreApplication.translate("ProviderCopy", option.label),
-                option.provider,
-            )
+            self.provider_picker.addItem("", option.provider)
         self.button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
         self.button_box.setObjectName("settings_actions")
         self.button_box.setAccessibleName(
@@ -163,6 +161,15 @@ class SettingsDialog(QDialog):
                 self.language_selector.findData(language)
             )
         with QSignalBlocker(self.provider_picker):
+            for index, option in enumerate(self._provider_options):
+                self.provider_picker.setItemText(
+                    index,
+                    provider_label(
+                        option.provider,
+                        recommended=option.recommended,
+                        model_id=state.parameters.model_id,
+                    ),
+                )
             provider_index = self.provider_picker.findData(
                 state.parameters.execution_provider
             )
