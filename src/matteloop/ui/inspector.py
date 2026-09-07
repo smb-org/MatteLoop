@@ -6,7 +6,6 @@ from PySide6.QtCore import QCoreApplication, QSettings, QSignalBlocker, Qt, Sign
 from PySide6.QtWidgets import (
     QCheckBox,
     QDoubleSpinBox,
-    QFormLayout,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -60,6 +59,7 @@ from matteloop.ui.compact_widgets import (
     ElidingComboBox,
     MiddleElidingLineEdit,
     compact_field,
+    form_layout,
 )
 from matteloop.ui.copy import (
     accessible_field_name,
@@ -712,7 +712,7 @@ class Inspector(QFrame):
 
     def _crop_controls(self) -> QWidget:
         controls = QWidget()
-        layout = self._form_layout(controls)
+        layout = form_layout(controls)
         layout.addRow(self.crop_toggle, self.crop_reset_button)
         layout.addRow(self._form_label("X"), self.crop_x_spinbox)
         layout.addRow(self._form_label("Y"), self.crop_y_spinbox)
@@ -722,7 +722,7 @@ class Inspector(QFrame):
 
     def _segmentation_controls(self) -> QWidget:
         controls = QWidget()
-        layout = self._form_layout(controls)
+        layout = form_layout(controls)
         model_row = QWidget()
         model_row.setObjectName("model_picker_row")
         model_layout = QHBoxLayout(model_row)
@@ -737,7 +737,7 @@ class Inspector(QFrame):
 
     def _time_controls(self) -> QWidget:
         controls = QWidget()
-        layout = self._form_layout(controls)
+        layout = form_layout(controls)
         layout.addRow(self._form_label("Output FPS"), self.fps_spinbox)
         layout.addRow(self._form_label(""), self.fps_warning)
         layout.addRow(self._form_label("Start"), self.start_spinbox)
@@ -747,7 +747,7 @@ class Inspector(QFrame):
 
     def _cleanup_controls(self) -> QWidget:
         controls = QWidget()
-        layout = self._form_layout(controls)
+        layout = form_layout(controls)
         layout.addRow(self._form_label(""), self.trim_checkbox)
         layout.addRow(self._form_label("Alpha threshold"), self.alpha_threshold_spinbox)
         layout.addRow(self._form_label("Padding"), self.padding_spinbox)
@@ -756,7 +756,7 @@ class Inspector(QFrame):
 
     def _output_controls(self) -> QWidget:
         controls = QWidget()
-        layout = self._form_layout(controls)
+        layout = form_layout(controls)
         directory = QWidget()
         directory_layout = QVBoxLayout(directory)
         directory_layout.setContentsMargins(0, 0, 0, 0)
@@ -767,17 +767,6 @@ class Inspector(QFrame):
         layout.addRow(self._form_label("Filename"), self.output_filename_edit)
         layout.addRow(self._form_label("Maximum size"), self.max_size_spinbox)
         return controls
-
-    def _form_layout(self, controls: QWidget) -> QFormLayout:
-        layout = QFormLayout(controls)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setLabelAlignment(
-            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
-        )
-        layout.setHorizontalSpacing(12)
-        layout.setVerticalSpacing(8)
-        layout.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
-        return layout
 
     @staticmethod
     def _form_label(text: str) -> QLabel:

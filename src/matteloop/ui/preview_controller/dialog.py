@@ -10,7 +10,6 @@ from PySide6.QtCore import QCoreApplication, QEvent, QObject, Qt, QTimer, Signal
 from PySide6.QtGui import QKeyEvent
 from PySide6.QtWidgets import (
     QDialog,
-    QFormLayout,
     QHBoxLayout,
     QLabel,
     QProgressBar,
@@ -22,6 +21,7 @@ from PySide6.QtWidgets import (
 from matteloop.core.state import ArtifactResult
 from matteloop.core.tokens import ProgressStage
 from matteloop.jobs.context import ProgressEvent
+from matteloop.ui.compact_widgets import form_layout
 from matteloop.ui.copy import (
     model_display_name,
     progress_detail,
@@ -173,7 +173,7 @@ class PreviewJobDialog(QDialog):
         self.completion_summary.setAccessibleName(
             QCoreApplication.translate("PreviewJobDialog", "Render completion summary")
         )
-        summary_layout = QFormLayout(self.completion_summary)
+        summary_layout = form_layout(self.completion_summary)
         self.completion_dimensions = self._summary_value(
             QCoreApplication.translate("PreviewJobDialog", "Output dimensions")
         )

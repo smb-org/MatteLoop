@@ -26,7 +26,7 @@ os.environ["LANG"] = "C"
 from PIL import Image
 from PySide6.QtCore import QLocale, QSettings
 from PySide6.QtGui import QImage
-from PySide6.QtWidgets import QApplication, QWidget
+from PySide6.QtWidgets import QApplication, QStyleFactory, QWidget
 
 from matteloop.core.parameters import ParameterState
 from matteloop.core.state import (
@@ -249,6 +249,16 @@ def _capture_model_manager(
         dialog.close()
 
 
+def _install_capture_style(application: QApplication) -> None:
+    """Use the macOS style so headless captures match the shipped app."""
+    style = QStyleFactory.create("macos")
+    if style is None:
+        raise RuntimeError(
+            "the macOS Qt style is unavailable; generate screenshots on macOS"
+        )
+    application.setStyle(style)
+
+
 def main() -> None:
     QLocale.setDefault(
         QLocale(QLocale.Language.English, QLocale.Country.UnitedStates)
@@ -261,6 +271,7 @@ def main() -> None:
     state = _state(metadata, source_frame, result_frame)
 
     application = QApplication.instance() or QApplication([])
+    _install_capture_style(application)
     install_theme(application)
     _capture_main_states(application, state, metadata, output)
     _capture_model_manager(application, output)

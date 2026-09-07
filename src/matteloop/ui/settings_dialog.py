@@ -4,13 +4,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import QCoreApplication, QSettings, QSignalBlocker, Qt
+from PySide6.QtCore import QCoreApplication, QSettings, QSignalBlocker
 from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
     QDialogButtonBox,
     QFileDialog,
-    QFormLayout,
     QHBoxLayout,
     QLabel,
     QPushButton,
@@ -20,7 +19,11 @@ from PySide6.QtWidgets import (
 
 from matteloop.core.parameters import OutputDirectoryChanged
 from matteloop.core.state import JobState
-from matteloop.ui.compact_widgets import MiddleElidingLineEdit, compact_field
+from matteloop.ui.compact_widgets import (
+    MiddleElidingLineEdit,
+    compact_field,
+    form_layout,
+)
 from matteloop.ui.i18n import (
     SUPPORTED_LANGUAGES,
     persist_language,
@@ -125,12 +128,7 @@ class SettingsDialog(QDialog):
         directory_layout.addWidget(self.choose_output_directory_button)
         directory_layout.addWidget(self.clear_output_directory_button)
 
-        form = QFormLayout()
-        form.setLabelAlignment(
-            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
-        )
-        form.setHorizontalSpacing(12)
-        form.setVerticalSpacing(8)
+        form = form_layout()
         label = QLabel(QCoreApplication.translate("SettingsDialog", "Output directory"))
         label.setAccessibleName(
             QCoreApplication.translate("SettingsDialog", "Output directory label")

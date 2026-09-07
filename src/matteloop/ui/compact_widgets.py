@@ -7,6 +7,7 @@ from PySide6.QtGui import QFontMetrics, QPaintEvent, QResizeEvent
 from PySide6.QtWidgets import (
     QAbstractSpinBox,
     QComboBox,
+    QFormLayout,
     QLineEdit,
     QSizePolicy,
     QStyle,
@@ -121,3 +122,23 @@ class MiddleElidingLineEdit(QLineEdit):
             QLineEdit.setText(self, display)
         finally:
             self.blockSignals(blocked)
+
+
+def form_layout(controls: QWidget | None = None) -> QFormLayout:
+    """Build the form every UI section uses, with one field growth policy.
+
+    Issue #79: compact_field() gives a field a zero size hint, so a form that
+    leaves the growth policy to the style renders 277px fields under Fusion --
+    what the tests and the screenshots see -- and zero-width ones under the
+    macOS style the application ships with. The policy lives here so no caller
+    has to remember it.
+    """
+    layout = QFormLayout(controls) if controls is not None else QFormLayout()
+    layout.setContentsMargins(0, 0, 0, 0)
+    layout.setLabelAlignment(
+        Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+    )
+    layout.setHorizontalSpacing(12)
+    layout.setVerticalSpacing(8)
+    layout.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
+    return layout
