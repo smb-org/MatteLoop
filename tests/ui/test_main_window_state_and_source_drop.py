@@ -404,6 +404,30 @@ def test_render_complete_banner_names_artifact_with_full_accessible_path(
     assert value.open_folder_button.accessibleName() == "Open folder"
 
 
+def test_unusable_runtime_banner_explains_segmentation_repair(qtbot) -> None:
+    settings = QSettings(
+        QSettings.IniFormat, QSettings.UserScope, "matteloop-review", "runtime"
+    )
+    settings.clear()
+    value = MainWindow(
+        Store(AppState()),
+        Services([]),
+        settings,
+        runtime_unavailable=True,
+    )
+    qtbot.addWidget(value)
+    value.show()
+
+    assert value.runtime_container.isVisible()
+    assert "ONNX Runtime" in value.runtime_banner.text()
+    assert "Segmentation is unavailable" in value.runtime_banner.text()
+    assert (
+        "uv sync --reinstall-package onnxruntime-directml"
+        in value.runtime_banner.text()
+    )
+    assert value.runtime_banner.accessibleName() == value.runtime_banner.text()
+
+
 def test_source_drop_accepts_one_local_video_and_dispatches_path(
     window, tmp_path, qtbot
 ):

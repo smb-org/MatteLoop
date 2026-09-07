@@ -8,6 +8,7 @@ from matteloop.core.execution_providers import (
     MIGRAPHX_EXECUTION_PROVIDER,
     ROCM_EXECUTION_PROVIDER,
     provider_options,
+    provider_options_from_runtime,
     select_provider,
 )
 
@@ -106,3 +107,14 @@ def test_stored_provider_wins_and_unavailable_choice_uses_preselection() -> None
         select_provider(COREML_EXECUTION_PROVIDER, options) == COREML_EXECUTION_PROVIDER
     )
     assert select_provider(CUDA_EXECUTION_PROVIDER, options) == CPU_EXECUTION_PROVIDER
+
+
+def test_runtime_provider_options_degrade_to_empty_when_runtime_is_unusable() -> None:
+    class BrokenRuntime:
+        def get_available_providers(self) -> list[str]:
+            raise AttributeError("get_available_providers is missing")
+
+    options = provider_options_from_runtime(BrokenRuntime())
+
+    assert options == ()
+    assert select_provider("DmlExecutionProvider", options) == CPU_EXECUTION_PROVIDER
