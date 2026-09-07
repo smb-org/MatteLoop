@@ -9,6 +9,7 @@ import contextlib
 import importlib.metadata
 import importlib.util
 import platform as platform_module
+import plistlib
 import shlex
 import shutil
 import stat
@@ -21,6 +22,10 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path, PureWindowsPath
 from zipfile import BadZipFile, ZipFile, ZipInfo
+
+from matteloop import __version__
+
+BUNDLE_IDENTIFIER = "io.github.smb-org.matteloop"
 
 if __package__:
     from scripts.compliance_evidence import (
@@ -461,6 +466,31 @@ def remove_previous_artifact(os_name: str, dist_path: Path = DIST_PATH) -> None:
         artifact.unlink()
 
 
+def patch_macos_bundle_metadata(
+    bundle: Path, *, version: str = __version__
+) -> None:
+    """Set the release identity fields Nuitka does not configure reliably.
+
+    The artifact decides, not the host: a `.app` carrying an Info.plist is a
+    macOS bundle wherever it was produced, and gating on sys.platform only made
+    the check invisible to CI, which runs on Linux.
+    """
+    info_plist = bundle / "Contents" / "Info.plist"
+    if bundle.suffix != ".app" or not info_plist.is_file():
+        return
+    with info_plist.open("rb") as source:
+        metadata = plistlib.load(source)
+    metadata.update(
+        {
+            "CFBundleShortVersionString": version,
+            "CFBundleVersion": version,
+            "CFBundleIdentifier": BUNDLE_IDENTIFIER,
+        }
+    )
+    with info_plist.open("wb") as destination:
+        plistlib.dump(metadata, destination, fmt=plistlib.FMT_XML, sort_keys=False)
+
+
 @contextlib.contextmanager
 def temporary_onnxruntime_dylib_alias(
     *, os_name: str = sys.platform, capi_directory: Path | None = None
@@ -547,6 +577,7 @@ def _run_native_build(media_wheel: Path | None, rebuild_media_stack: bool) -> in
                         check=False,
                     )
         _recover_long_command_deploy_mismatch(artifact, deployment_staging)
+        patch_macos_bundle_metadata(artifact)
     except (OSError, RuntimeError, ValueError) as error:
         print(
             f"Native build preparation or launch failed: {error}",
