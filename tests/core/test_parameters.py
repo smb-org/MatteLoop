@@ -124,6 +124,18 @@ def test_execution_provider_changes_stale_the_current_preview() -> None:
     assert changed.stale_category is PreviewInvalidationReason.COMPUTE_ACCELERATION
 
 
+def test_execution_provider_can_change_before_a_video_is_loaded() -> None:
+    changed = reduce(AppState(), ExecutionProviderChanged("CUDAExecutionProvider"))
+
+    assert changed.parameters.execution_provider == "CUDAExecutionProvider"
+
+
+def test_execution_provider_change_is_ignored_while_a_job_runs() -> None:
+    running = reduce(_ready(), RenderRequested("job", "request"))
+
+    assert reduce(running, ExecutionProviderChanged("CUDAExecutionProvider")) is running
+
+
 def test_cleanup_parameter_changes_stale_the_current_preview() -> None:
     state = _current()
 

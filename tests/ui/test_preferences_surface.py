@@ -9,6 +9,11 @@ from PySide6.QtCore import QSettings
 from PySide6.QtGui import QKeySequence
 from PySide6.QtWidgets import QDialogButtonBox, QFileDialog
 
+from matteloop.core.execution_providers import (
+    COREML_EXECUTION_PROVIDER,
+    CPU_EXECUTION_PROVIDER,
+    ProviderOption,
+)
 from matteloop.core.parameters import ParameterState
 from matteloop.core.state import (
     AppState,
@@ -61,7 +66,15 @@ def _ready_store(source: Path, output_directory: Path | None = None) -> ReducerS
 
 def test_preferences_button_opens_dialog_and_keeps_shortcut(qtbot) -> None:
     store = ReducerStore()
-    window = MainWindow(store, Services(), _settings("button"))
+    window = MainWindow(
+        store,
+        Services(),
+        _settings("button"),
+        provider_options=(
+            ProviderOption(CPU_EXECUTION_PROVIDER, "CPU – recommended", True),
+            ProviderOption(COREML_EXECUTION_PROVIDER, "Apple CoreML – experimental"),
+        ),
+    )
     qtbot.addWidget(window)
     window.show()
 
@@ -78,9 +91,10 @@ def test_preferences_button_opens_dialog_and_keeps_shortcut(qtbot) -> None:
 
     qtbot.waitUntil(window.action_shelf.preferences_dialog.isVisible)
     assert window.action_shelf.preferences_dialog.windowTitle() == "Preferences"
+    assert window.action_shelf.preferences_dialog.provider_picker.count() == 2
 
 
-def test_preferences_directory_matches_inspector_and_can_fall_back_to_source(
+def test_inspector_output_directory_can_be_chosen_and_cleared(
     monkeypatch: pytest.MonkeyPatch, qtbot, tmp_path: Path
 ) -> None:
     source = tmp_path / "source" / "clip.mp4"
@@ -90,20 +104,20 @@ def test_preferences_directory_matches_inspector_and_can_fall_back_to_source(
     settings = _settings("shared-directory")
     store = _ready_store(source)
     controller = SourceController(store, settings=settings)
-    preferences = SettingsDialog(store, controller)
     inspector = Inspector(settings)
-    qtbot.addWidget(preferences)
     qtbot.addWidget(inspector)
+    inspector.command_requested.connect(controller.dispatch)
     monkeypatch.setattr(QFileDialog, "getExistingDirectory", lambda *_args: str(chosen))
 
-    preferences.choose_output_directory_button.click()
+    inspector.output_directory_button.click()
 
     assert store.state.parameters.output_directory == chosen
     inspector.apply_parameters(present_parameters(store.state), editable=True)
     assert inspector.output_directory_edit.toolTip() == str(chosen)
+    assert inspector.clear_output_directory_button.isEnabled()
     assert settings.value("parameters/output_directory") == str(chosen)
 
-    preferences.clear_output_directory_button.click()
+    inspector.clear_output_directory_button.click()
 
     assert store.state.parameters.output_directory is None
     inspector.apply_parameters(present_parameters(store.state), editable=True)
@@ -112,41 +126,74 @@ def test_preferences_directory_matches_inspector_and_can_fall_back_to_source(
     controller.shutdown()
 
 
-def test_preferences_clear_works_without_a_loaded_source(qtbot, tmp_path: Path) -> None:
-    override = tmp_path / "exports"
-    settings = _settings("clear-without-source")
-    settings.setValue("parameters/output_directory", str(override))
-    store = ReducerStore(AppState(parameters=ParameterState(output_directory=override)))
-    controller = SourceController(store, settings=settings)
-    dialog = SettingsDialog(store, controller)
-    qtbot.addWidget(dialog)
 
-    dialog.clear_output_directory_button.click()
-
-    assert store.state.parameters.output_directory is None
-    assert settings.value("parameters/output_directory") is None
-    controller.shutdown()
-
-
-def test_preferences_disable_output_directory_controls_while_a_job_runs(
+def test_preferences_disable_provider_picker_while_a_job_runs(
     qtbot, tmp_path: Path
 ) -> None:
     source = tmp_path / "source" / "clip.mp4"
     source.parent.mkdir()
     store = _ready_store(source, tmp_path / "exports")
     store.dispatch(RenderRequested("job", "request"))
-    dialog = SettingsDialog(store, Services())
+    dialog = SettingsDialog(
+        store,
+        Services(),
+        provider_options=(
+            ProviderOption(CPU_EXECUTION_PROVIDER, "CPU – recommended", True),
+            ProviderOption(COREML_EXECUTION_PROVIDER, "Apple CoreML – experimental"),
+        ),
+    )
     qtbot.addWidget(dialog)
 
     dialog.load()
 
-    assert not dialog.output_directory_edit.isEnabled()
-    assert not dialog.choose_output_directory_button.isEnabled()
-    assert not dialog.clear_output_directory_button.isEnabled()
-    assert (
-        dialog.description_label.text()
-        == "Output directory controls are disabled while a job is running."
+    assert not dialog.provider_picker.isEnabled()
+    assert dialog.language_selector.isEnabled()
+
+
+def test_preferences_exposes_and_emits_the_selected_execution_provider(qtbot) -> None:
+    services = Services()
+    dialog = SettingsDialog(
+        ReducerStore(AppState()),
+        services,
+        provider_options=(
+            ProviderOption(CPU_EXECUTION_PROVIDER, "CPU – recommended", True),
+            ProviderOption(COREML_EXECUTION_PROVIDER, "Apple CoreML – experimental"),
+        ),
     )
+    qtbot.addWidget(dialog)
+
+    assert dialog.provider_picker.accessibleName() == "Compute acceleration"
+    assert dialog.provider_picker.currentData() == CPU_EXECUTION_PROVIDER
+    assert dialog.provider_picker.itemText(0) == "CPU – recommended"
+    assert dialog.provider_picker.itemText(1) == "Apple CoreML – experimental"
+    dialog.provider_picker.setCurrentIndex(1)
+
+    assert [type(command).__name__ for command in services.commands] == [
+        "ExecutionProviderChanged"
+    ]
+    assert services.commands[0].execution_provider == COREML_EXECUTION_PROVIDER
+
+
+def test_preferences_changes_provider_before_a_video_is_loaded(qtbot) -> None:
+    settings = _settings("provider-before-source")
+    store = ReducerStore(AppState())
+    controller = SourceController(store, settings=settings)
+    dialog = SettingsDialog(
+        store,
+        controller,
+        settings=settings,
+        provider_options=(
+            ProviderOption(CPU_EXECUTION_PROVIDER, "CPU – recommended", True),
+            ProviderOption(COREML_EXECUTION_PROVIDER, "Apple CoreML – experimental"),
+        ),
+    )
+    qtbot.addWidget(dialog)
+
+    dialog.provider_picker.setCurrentIndex(1)
+
+    assert store.state.parameters.execution_provider == COREML_EXECUTION_PROVIDER
+    assert settings.value("parameters/execution_provider") == COREML_EXECUTION_PROVIDER
+    controller.shutdown()
 
 
 def test_preferences_offers_no_cancel_it_cannot_honour(qtbot) -> None:

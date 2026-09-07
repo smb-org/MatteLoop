@@ -4,20 +4,20 @@
 <context>
     <name>ActionShelf</name>
     <message>
-        <location filename="../src/matteloop/ui/action_shelf.py" line="57"/>
-        <location filename="../src/matteloop/ui/action_shelf.py" line="61"/>
+        <location filename="../src/matteloop/ui/action_shelf.py" line="59"/>
+        <location filename="../src/matteloop/ui/action_shelf.py" line="63"/>
         <source>Preview Frame</source>
         <translation>Preview Frame</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/action_shelf.py" line="64"/>
-        <location filename="../src/matteloop/ui/action_shelf.py" line="68"/>
+        <location filename="../src/matteloop/ui/action_shelf.py" line="66"/>
+        <location filename="../src/matteloop/ui/action_shelf.py" line="70"/>
         <source>Render Video</source>
         <translation>Render Video</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/action_shelf.py" line="73"/>
-        <location filename="../src/matteloop/ui/action_shelf.py" line="76"/>
+        <location filename="../src/matteloop/ui/action_shelf.py" line="75"/>
+        <location filename="../src/matteloop/ui/action_shelf.py" line="78"/>
         <source>Preferences</source>
         <translation>Preferences</translation>
     </message>
@@ -69,29 +69,29 @@
     </message>
     <message>
         <location filename="../src/matteloop/ui/copy.py" line="530"/>
-        <location filename="../src/matteloop/ui/copy.py" line="566"/>
-        <location filename="../src/matteloop/ui/copy.py" line="581"/>
+        <location filename="../src/matteloop/ui/copy.py" line="563"/>
+        <location filename="../src/matteloop/ui/copy.py" line="578"/>
         <source>X</source>
         <translation>X</translation>
     </message>
     <message>
         <location filename="../src/matteloop/ui/copy.py" line="531"/>
-        <location filename="../src/matteloop/ui/copy.py" line="567"/>
-        <location filename="../src/matteloop/ui/copy.py" line="582"/>
+        <location filename="../src/matteloop/ui/copy.py" line="564"/>
+        <location filename="../src/matteloop/ui/copy.py" line="579"/>
         <source>Y</source>
         <translation>Y</translation>
     </message>
     <message>
         <location filename="../src/matteloop/ui/copy.py" line="532"/>
-        <location filename="../src/matteloop/ui/copy.py" line="568"/>
-        <location filename="../src/matteloop/ui/copy.py" line="579"/>
+        <location filename="../src/matteloop/ui/copy.py" line="565"/>
+        <location filename="../src/matteloop/ui/copy.py" line="576"/>
         <source>Width</source>
         <translation>Width</translation>
     </message>
     <message>
         <location filename="../src/matteloop/ui/copy.py" line="533"/>
-        <location filename="../src/matteloop/ui/copy.py" line="569"/>
-        <location filename="../src/matteloop/ui/copy.py" line="580"/>
+        <location filename="../src/matteloop/ui/copy.py" line="566"/>
+        <location filename="../src/matteloop/ui/copy.py" line="577"/>
         <source>Height</source>
         <translation>Height</translation>
     </message>
@@ -118,242 +118,246 @@
     </message>
     <message>
         <location filename="../src/matteloop/ui/copy.py" line="550"/>
-        <location filename="../src/matteloop/ui/inspector.py" line="255"/>
-        <source>Compute acceleration</source>
-        <translation>Compute acceleration</translation>
-    </message>
-    <message>
-        <location filename="../src/matteloop/ui/copy.py" line="553"/>
-        <location filename="../src/matteloop/ui/inspector.py" line="261"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="235"/>
         <source>Edge treatment</source>
         <translation>Edge treatment</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="554"/>
-        <location filename="../src/matteloop/ui/inspector.py" line="275"/>
+        <location filename="../src/matteloop/ui/copy.py" line="551"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="249"/>
         <source>Output FPS</source>
         <translation>Output FPS</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="555"/>
-        <location filename="../src/matteloop/ui/copy.py" line="576"/>
+        <location filename="../src/matteloop/ui/copy.py" line="552"/>
+        <location filename="../src/matteloop/ui/copy.py" line="573"/>
         <source>Start</source>
         <translation>Start</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="556"/>
-        <location filename="../src/matteloop/ui/copy.py" line="577"/>
+        <location filename="../src/matteloop/ui/copy.py" line="553"/>
+        <location filename="../src/matteloop/ui/copy.py" line="574"/>
         <source>End</source>
         <translation>End</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="557"/>
-        <location filename="../src/matteloop/ui/copy.py" line="578"/>
+        <location filename="../src/matteloop/ui/copy.py" line="554"/>
+        <location filename="../src/matteloop/ui/copy.py" line="575"/>
         <source>Duration</source>
         <translation>Duration</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="558"/>
+        <location filename="../src/matteloop/ui/copy.py" line="555"/>
         <source>Alpha threshold</source>
         <translation>Alpha threshold</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="559"/>
+        <location filename="../src/matteloop/ui/copy.py" line="556"/>
         <source>Padding</source>
         <translation>Padding</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="560"/>
-        <location filename="../src/matteloop/ui/inspector.py" line="316"/>
+        <location filename="../src/matteloop/ui/copy.py" line="557"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="290"/>
         <source>Horizontal stretch</source>
         <translation>Horizontal stretch</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="563"/>
+        <location filename="../src/matteloop/ui/copy.py" line="560"/>
         <source>Directory</source>
         <translation>Directory</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="564"/>
+        <location filename="../src/matteloop/ui/copy.py" line="561"/>
         <source>Filename</source>
         <translation>Filename</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="565"/>
+        <location filename="../src/matteloop/ui/copy.py" line="562"/>
         <source>Maximum size</source>
         <translation>Maximum size</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="110"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="99"/>
         <source>Processing settings</source>
         <translation>Processing settings</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="144"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="124"/>
         <source>Retry Rebuild</source>
         <translation>Retry Rebuild</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="148"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="128"/>
         <source>Edited cut recovery</source>
         <translation>Edited cut recovery</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="151"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="131"/>
         <source>Edited cut frames could not be validated. Retry the rebuild scan.</source>
         <translation>Edited cut frames could not be validated. Retry the rebuild scan.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="158"/>
-        <location filename="../src/matteloop/ui/inspector.py" line="162"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="138"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="142"/>
         <source>Rebuild from edited cuts</source>
         <translation>Rebuild from edited cuts</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="166"/>
-        <location filename="../src/matteloop/ui/inspector.py" line="170"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="146"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="150"/>
         <source>Manage Models…</source>
         <translation>Manage Models…</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="173"/>
-        <location filename="../src/matteloop/ui/inspector.py" line="177"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="153"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="157"/>
         <source>Manage Workspaces…</source>
         <translation>Manage Workspaces…</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="199"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="179"/>
         <source>Segmentation model</source>
         <translation>Segmentation model</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="213"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="193"/>
         <source>cached locally</source>
         <translation>cached locally</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="215"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="195"/>
         <source>not cached yet</source>
         <translation>not cached yet</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="239"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="219"/>
         <source>Model status</source>
         <translation>Model status</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="264"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="238"/>
         <source>Standard</source>
         <translation>Standard</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="267"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="241"/>
         <source>Decontaminate colors</source>
         <translation>Decontaminate colors</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="278"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="252"/>
         <source> fps</source>
         <translation> fps</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="280"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="254"/>
         <source>High output FPS may increase render cost</source>
         <translation>High output FPS may increase render cost</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="287"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="261"/>
         <source>Output FPS cost warning</source>
         <translation>Output FPS cost warning</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="296"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="270"/>
         <source>Global trim</source>
         <translation>Global trim</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="300"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="274"/>
         <source>Global alpha trim</source>
         <translation>Global alpha trim</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="309"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="283"/>
         <source>Padding pixels</source>
         <translation>Padding pixels</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="323"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="297"/>
         <source>Output directory</source>
         <translation>Output directory</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="328"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="302"/>
         <source>Choose…</source>
         <translation>Choose…</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="332"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="306"/>
         <source>Choose output directory</source>
         <translation>Choose output directory</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="337"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="309"/>
+        <source>Clear</source>
+        <translation>Clear</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/inspector.py" line="313"/>
+        <source>Clear output directory</source>
+        <translation>Clear output directory</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/inspector.py" line="319"/>
         <source>Output filename</source>
         <translation>Output filename</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="342"/>
-        <location filename="../src/matteloop/ui/inspector.py" line="455"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="324"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="434"/>
         <source>Use one non-empty filename ending in .webp; path separators are not allowed.</source>
         <translation>Use one non-empty filename ending in .webp; path separators are not allowed.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="352"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="334"/>
         <source>Maximum file size in MiB</source>
         <translation>Maximum file size in MiB</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="354"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="336"/>
         <source> MiB</source>
         <translation> MiB</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="443"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="422"/>
         <source>Filename must be a single non-empty .webp filename.</source>
         <translation>Filename must be a single non-empty .webp filename.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="566"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="538"/>
         <source> s</source>
         <translation> s</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="582"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="554"/>
         <source>Crop</source>
         <translation>Crop</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="585"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="557"/>
         <source>Crop overlay</source>
         <translation>Crop overlay</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="589"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="561"/>
         <source>Reset Crop</source>
         <translation>Reset Crop</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="593"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="565"/>
         <source>Reset crop</source>
         <translation>Reset crop</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="650"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="622"/>
         <source>Crop %s</source>
         <translation>Crop %s</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="795"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="763"/>
         <source>Model status: %s</source>
         <translation>Model status: %s</translation>
     </message>
@@ -1761,98 +1765,62 @@ Freed %s.</translation>
 <context>
     <name>SettingsDialog</name>
     <message>
-        <location filename="../src/matteloop/ui/i18n.py" line="130"/>
+        <location filename="../src/matteloop/ui/i18n.py" line="131"/>
         <source>German</source>
         <translation>German</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/i18n.py" line="131"/>
+        <location filename="../src/matteloop/ui/i18n.py" line="132"/>
         <source>English</source>
         <translation>English</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/settings_dialog.py" line="46"/>
-        <location filename="../src/matteloop/ui/settings_dialog.py" line="48"/>
+        <location filename="../src/matteloop/ui/settings_dialog.py" line="54"/>
+        <location filename="../src/matteloop/ui/settings_dialog.py" line="56"/>
         <source>Preferences</source>
         <translation>Preferences</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/settings_dialog.py" line="65"/>
-        <location filename="../src/matteloop/ui/settings_dialog.py" line="134"/>
-        <source>Output directory</source>
-        <translation>Output directory</translation>
-    </message>
-    <message>
-        <location filename="../src/matteloop/ui/settings_dialog.py" line="68"/>
-        <source>Directory used for output files</source>
-        <translation>Directory used for output files</translation>
-    </message>
-    <message>
-        <location filename="../src/matteloop/ui/settings_dialog.py" line="75"/>
-        <source>Choose…</source>
-        <translation>Choose…</translation>
-    </message>
-    <message>
-        <location filename="../src/matteloop/ui/settings_dialog.py" line="79"/>
-        <location filename="../src/matteloop/ui/settings_dialog.py" line="210"/>
-        <source>Choose output directory</source>
-        <translation>Choose output directory</translation>
-    </message>
-    <message>
-        <location filename="../src/matteloop/ui/settings_dialog.py" line="82"/>
-        <source>Clear</source>
-        <translation>Clear</translation>
-    </message>
-    <message>
-        <location filename="../src/matteloop/ui/settings_dialog.py" line="86"/>
-        <source>Clear output directory</source>
-        <translation>Clear output directory</translation>
-    </message>
-    <message>
-        <location filename="../src/matteloop/ui/settings_dialog.py" line="91"/>
-        <location filename="../src/matteloop/ui/settings_dialog.py" line="141"/>
+        <location filename="../src/matteloop/ui/settings_dialog.py" line="77"/>
+        <location filename="../src/matteloop/ui/settings_dialog.py" line="127"/>
         <source>Interface language</source>
         <translation>Interface language</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/settings_dialog.py" line="98"/>
+        <location filename="../src/matteloop/ui/settings_dialog.py" line="84"/>
+        <location filename="../src/matteloop/ui/settings_dialog.py" line="132"/>
+        <source>Compute acceleration</source>
+        <translation>Compute acceleration</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/settings_dialog.py" line="91"/>
         <source>Preferences actions</source>
         <translation>Preferences actions</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/settings_dialog.py" line="105"/>
+        <location filename="../src/matteloop/ui/settings_dialog.py" line="98"/>
         <source>Preferences description</source>
         <translation>Preferences description</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/settings_dialog.py" line="109"/>
+        <location filename="../src/matteloop/ui/settings_dialog.py" line="102"/>
+        <source>These settings apply to every clip.</source>
+        <translation>These settings apply to every clip.</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/settings_dialog.py" line="107"/>
         <source>Interface language changes apply after restarting MatteLoop.</source>
         <translation>Interface language changes apply after restarting MatteLoop.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/settings_dialog.py" line="116"/>
+        <location filename="../src/matteloop/ui/settings_dialog.py" line="114"/>
         <source>Language restart note</source>
         <translation>Language restart note</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/settings_dialog.py" line="136"/>
-        <source>Output directory label</source>
-        <translation>Output directory label</translation>
-    </message>
-    <message>
-        <location filename="../src/matteloop/ui/settings_dialog.py" line="160"/>
+        <location filename="../src/matteloop/ui/settings_dialog.py" line="149"/>
         <source>Close preferences</source>
         <translation>Close preferences</translation>
-    </message>
-    <message>
-        <location filename="../src/matteloop/ui/settings_dialog.py" line="194"/>
-        <source>Choose where rendered output files are saved.</source>
-        <translation>Choose where rendered output files are saved.</translation>
-    </message>
-    <message>
-        <location filename="../src/matteloop/ui/settings_dialog.py" line="200"/>
-        <source>Output directory controls are disabled while a job is running.</source>
-        <translation>Output directory controls are disabled while a job is running.</translation>
     </message>
 </context>
 <context>
@@ -2104,196 +2072,196 @@ Freed %s.</translation>
 <context>
     <name>TransformGroup</name>
     <message>
-        <location filename="../src/matteloop/ui/transform_group.py" line="71"/>
+        <location filename="../src/matteloop/ui/transform_group.py" line="70"/>
         <source>Free</source>
         <translation>Free</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/transform_group.py" line="72"/>
-        <location filename="../src/matteloop/ui/transform_group.py" line="213"/>
+        <location filename="../src/matteloop/ui/transform_group.py" line="71"/>
+        <location filename="../src/matteloop/ui/transform_group.py" line="212"/>
         <source>First frame</source>
         <translation>First frame</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/transform_group.py" line="73"/>
-        <location filename="../src/matteloop/ui/transform_group.py" line="225"/>
+        <location filename="../src/matteloop/ui/transform_group.py" line="72"/>
+        <location filename="../src/matteloop/ui/transform_group.py" line="224"/>
         <source>Last frame</source>
         <translation>Last frame</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/transform_group.py" line="74"/>
+        <location filename="../src/matteloop/ui/transform_group.py" line="73"/>
         <source>X</source>
         <translation>X</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/transform_group.py" line="75"/>
+        <location filename="../src/matteloop/ui/transform_group.py" line="74"/>
         <source>Y</source>
         <translation>Y</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/transform_group.py" line="76"/>
+        <location filename="../src/matteloop/ui/transform_group.py" line="75"/>
         <source>Width</source>
         <translation>Width</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/transform_group.py" line="77"/>
+        <location filename="../src/matteloop/ui/transform_group.py" line="76"/>
         <source>Height</source>
         <translation>Height</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/transform_group.py" line="78"/>
+        <location filename="../src/matteloop/ui/transform_group.py" line="77"/>
         <source>Aspect</source>
         <translation>Aspect</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/transform_group.py" line="79"/>
+        <location filename="../src/matteloop/ui/transform_group.py" line="78"/>
         <source>Percent</source>
         <translation>Percent</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/transform_group.py" line="80"/>
+        <location filename="../src/matteloop/ui/transform_group.py" line="79"/>
         <source>Mismatch</source>
         <translation>Mismatch</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/transform_group.py" line="81"/>
+        <location filename="../src/matteloop/ui/transform_group.py" line="80"/>
         <source>Preset</source>
         <translation>Preset</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/transform_group.py" line="82"/>
+        <location filename="../src/matteloop/ui/transform_group.py" line="81"/>
         <source>Keep original aspect ratio</source>
         <translation>Keep original aspect ratio</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/transform_group.py" line="85"/>
+        <location filename="../src/matteloop/ui/transform_group.py" line="84"/>
         <source>Stretch to fit</source>
         <translation>Stretch to fit</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/transform_group.py" line="88"/>
+        <location filename="../src/matteloop/ui/transform_group.py" line="87"/>
         <source>Center and crop to fit</source>
         <translation>Center and crop to fit</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/transform_group.py" line="91"/>
+        <location filename="../src/matteloop/ui/transform_group.py" line="90"/>
         <source>Add transparent padding</source>
         <translation>Add transparent padding</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/transform_group.py" line="94"/>
+        <location filename="../src/matteloop/ui/transform_group.py" line="93"/>
         <source>Crop</source>
         <translation>Crop</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/transform_group.py" line="95"/>
+        <location filename="../src/matteloop/ui/transform_group.py" line="94"/>
         <source>Trim</source>
         <translation>Trim</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/transform_group.py" line="96"/>
+        <location filename="../src/matteloop/ui/transform_group.py" line="95"/>
         <source>Resize</source>
         <translation>Resize</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/transform_group.py" line="97"/>
+        <location filename="../src/matteloop/ui/transform_group.py" line="96"/>
         <source>1:1</source>
         <translation>1:1</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/transform_group.py" line="98"/>
+        <location filename="../src/matteloop/ui/transform_group.py" line="97"/>
         <source>2:1</source>
         <translation>2:1</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/transform_group.py" line="99"/>
+        <location filename="../src/matteloop/ui/transform_group.py" line="98"/>
         <source>3:1</source>
         <translation>3:1</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/transform_group.py" line="100"/>
+        <location filename="../src/matteloop/ui/transform_group.py" line="99"/>
         <source>4:3</source>
         <translation>4:3</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/transform_group.py" line="101"/>
+        <location filename="../src/matteloop/ui/transform_group.py" line="100"/>
         <source>16:9</source>
         <translation>16:9</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/transform_group.py" line="133"/>
+        <location filename="../src/matteloop/ui/transform_group.py" line="132"/>
         <source>Transform</source>
         <translation>Transform</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/transform_group.py" line="216"/>
-        <location filename="../src/matteloop/ui/transform_group.py" line="228"/>
+        <location filename="../src/matteloop/ui/transform_group.py" line="215"/>
+        <location filename="../src/matteloop/ui/transform_group.py" line="227"/>
         <source>Use Playhead</source>
         <translation>Use Playhead</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/transform_group.py" line="220"/>
+        <location filename="../src/matteloop/ui/transform_group.py" line="219"/>
         <source>Use playhead for first frame</source>
         <translation>Use playhead for first frame</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/transform_group.py" line="232"/>
+        <location filename="../src/matteloop/ui/transform_group.py" line="231"/>
         <source>Use playhead for last frame</source>
         <translation>Use playhead for last frame</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/transform_group.py" line="237"/>
-        <location filename="../src/matteloop/ui/transform_group.py" line="241"/>
+        <location filename="../src/matteloop/ui/transform_group.py" line="236"/>
+        <location filename="../src/matteloop/ui/transform_group.py" line="240"/>
         <source>Edit crop</source>
         <translation>Edit crop</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/transform_group.py" line="246"/>
+        <location filename="../src/matteloop/ui/transform_group.py" line="245"/>
         <source>Crop aspect ratio</source>
         <translation>Crop aspect ratio</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/transform_group.py" line="259"/>
+        <location filename="../src/matteloop/ui/transform_group.py" line="258"/>
         <source>Crop %s</source>
         <translation>Crop %s</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/transform_group.py" line="271"/>
+        <location filename="../src/matteloop/ui/transform_group.py" line="270"/>
         <source>Resize percentage</source>
         <translation>Resize percentage</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/transform_group.py" line="275"/>
+        <location filename="../src/matteloop/ui/transform_group.py" line="274"/>
         <source> %</source>
         <translation> %</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/transform_group.py" line="280"/>
+        <location filename="../src/matteloop/ui/transform_group.py" line="279"/>
         <source>Aspect mismatch handling</source>
         <translation>Aspect mismatch handling</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/transform_group.py" line="287"/>
+        <location filename="../src/matteloop/ui/transform_group.py" line="286"/>
         <source>Output size preset</source>
         <translation>Output size preset</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/transform_group.py" line="296"/>
+        <location filename="../src/matteloop/ui/transform_group.py" line="295"/>
         <source>Auto</source>
         <translation>Auto</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/transform_group.py" line="301"/>
+        <location filename="../src/matteloop/ui/transform_group.py" line="300"/>
         <source>Custom</source>
         <translation>Custom</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/transform_group.py" line="319"/>
+        <location filename="../src/matteloop/ui/transform_group.py" line="318"/>
         <source>Transform summary</source>
         <translation>Transform summary</translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/matteloop/ui/transform_group.py" line="647"/>
+        <location filename="../src/matteloop/ui/transform_group.py" line="646"/>
         <source>%n of %1 frames · %2 s · %3 px</source>
         <translation>
             <numerusform>%n of %1 frames · %2 s · %3 px</numerusform>
@@ -2301,12 +2269,12 @@ Freed %s.</translation>
         </translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/transform_group.py" line="655"/>
+        <location filename="../src/matteloop/ui/transform_group.py" line="654"/>
         <source> · rendered %s px, %s</source>
         <translation> · rendered %s px, %s</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/transform_group.py" line="672"/>
+        <location filename="../src/matteloop/ui/transform_group.py" line="671"/>
         <source>Set at least one of width or height.</source>
         <translation>Set at least one of width or height.</translation>
     </message>

@@ -1,14 +1,15 @@
 from __future__ import annotations
 
+from fractions import Fraction
+from pathlib import Path
+
 import pytest
 from PySide6.QtCore import QSettings, Qt
 from PySide6.QtWidgets import QAbstractSpinBox, QComboBox
 
-from matteloop.core.execution_providers import (
-    COREML_EXECUTION_PROVIDER,
-    CPU_EXECUTION_PROVIDER,
-    ProviderOption,
-)
+from matteloop.core.parameters import ParameterState
+from matteloop.core.state import AppState
+from matteloop.core.timeline import TimelineState
 from matteloop.ui.aligned_rows import (
     ACCESSIBLE_DESCRIPTION_ROLE,
     ROW_DATA_ROLE,
@@ -16,6 +17,7 @@ from matteloop.ui.aligned_rows import (
     RowStatus,
 )
 from matteloop.ui.inspector import Inspector
+from matteloop.ui.parameter_presentation import present_parameters
 
 
 def _settings() -> QSettings:
@@ -227,29 +229,24 @@ def test_inspector_emits_edge_mode_from_the_standard_combo(qtbot) -> None:
     assert [type(command).__name__ for command in commands] == ["EdgeModeChanged"]
 
 
-def test_inspector_exposes_and_emits_the_selected_execution_provider(qtbot) -> None:
-    inspector = Inspector(
-        _settings(),
-        provider_options=(
-            ProviderOption(CPU_EXECUTION_PROVIDER, "CPU – recommended", True),
-            ProviderOption(
-                COREML_EXECUTION_PROVIDER,
-                "Apple CoreML – experimental",
-            ),
-        ),
-    )
+def test_inspector_exposes_and_emits_output_directory_clear(qtbot) -> None:
+    inspector = Inspector(_settings())
     qtbot.addWidget(inspector)
     commands: list[object] = []
     inspector.command_requested.connect(commands.append)
+    state = AppState(
+        parameters=ParameterState(output_directory=Path("exports")),
+        timeline=TimelineState(Fraction(4), Fraction(0), Fraction(4), Fraction(0)),
+    )
+    inspector.apply_parameters(present_parameters(state), editable=True)
 
-    assert inspector.provider_picker.currentData() == CPU_EXECUTION_PROVIDER
-    assert inspector.provider_picker.itemText(1) == "Apple CoreML – experimental"
-    inspector.provider_picker.setCurrentIndex(1)
+    assert inspector.clear_output_directory_button.isEnabled()
+    inspector.clear_output_directory_button.click()
 
     assert [type(command).__name__ for command in commands] == [
-        "ExecutionProviderChanged"
+        "OutputDirectoryChanged"
     ]
-    assert commands[0].execution_provider == COREML_EXECUTION_PROVIDER
+    assert commands[0].directory is None
 
 
 def test_inspector_explains_invalid_output_filename_without_emitting_a_command(

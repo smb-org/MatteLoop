@@ -24,8 +24,7 @@ composite. MatteLoop is the whole path from that clip to that loop:
 - **Trim, crop and resize** the finished cut, and watch it loop on screen until
   it is right.
 - **Render** a lossless transparent animated WebP.
-- **Open Preferences** from the gear button to choose or clear the output
-  directory.
+- **Choose or clear the output directory** in the inspector's Output section.
 
 The interface is available in English and German. Change the language in
 Preferences from the gear button; the choice applies after restarting

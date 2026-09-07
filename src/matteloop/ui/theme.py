@@ -62,6 +62,9 @@ def _control_stylesheet() -> str:
         f"""
         QPushButton {{ background: {CONTROL_COLOR}; border: 1px solid {DIVIDER_COLOR};
                        border-radius: 4px; min-height: 40px; padding: 0 12px; }}
+        QPushButton#choose_output_directory, QPushButton#clear_output_directory {{
+            padding-left: 4px; padding-right: 4px;
+        }}
         QPushButton:hover {{ border-color: {HOVER_COLOR}; }}
         QPushButton:focus, QComboBox:focus, QAbstractSpinBox:focus,
         QLineEdit:focus, QCheckBox:focus, QToolButton:focus,

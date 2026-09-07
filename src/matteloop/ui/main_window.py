@@ -130,13 +130,12 @@ class MainWindow(QMainWindow):
         self.inspector = Inspector(
             self._settings,
             model_options=self._model_options,
-            provider_options=self._provider_options,
         )
         self.inspector_scroll = self.inspector.scroll_area
         self.inspector_content = self.inspector.scroll_area.widget()
         self.action_shelf = ActionShelf(
-            self._store, self._services, settings=self._settings
-        )
+            self._store, self._services, settings=self._settings,
+            provider_options=self._provider_options)
         self.preview_button = self.action_shelf.preview_button
         self.render_button = self.action_shelf.render_button
         self.rebuild_button = self.inspector.rebuild_button

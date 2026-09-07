@@ -21,21 +21,13 @@ from PySide6.QtWidgets import (
 )
 
 from matteloop.core.crop_state import CropChanged, CropToggleChanged, ResetCrop
-from matteloop.core.execution_providers import (
-    CPU_EXECUTION_PROVIDER,
-    ProviderOption,
-    is_allowed_provider,
-)
-from matteloop.core.execution_providers import (
-    provider_options as build_provider_options,
-)
 from matteloop.core.parameters import (
     V1_MODEL_IDS,
     AlphaThresholdChanged,
     EdgeModeChanged,
-    ExecutionProviderChanged,
     GlobalTrimChanged,
     ModelChanged,
+    OutputDirectoryChanged,
     OutputFilenameChanged,
     OutputFpsChanged,
     OutputMaxSizeChanged,
@@ -69,7 +61,6 @@ from matteloop.ui.copy import (
     model_license,
     model_purpose,
     model_status,
-    provider_label,
     section_title,
 )
 from matteloop.ui.crop_presentation import CropPresentation
@@ -101,8 +92,6 @@ class Inspector(QFrame):
         settings: QSettings,
         model_options: tuple[tuple[str, bool], ...] | None = None,
         parent: QWidget | None = None,
-        *,
-        provider_options: tuple[ProviderOption, ...] | None = None,
     ) -> None:
         super().__init__(parent)
         self.setObjectName("inspector")
@@ -111,15 +100,6 @@ class Inspector(QFrame):
         )
         self._settings = settings
         self._model_options = dict(model_options or ())
-        self._provider_options = (
-            build_provider_options((CPU_EXECUTION_PROVIDER,))
-            if provider_options is None
-            else provider_options
-        )
-        self._available_provider_ids = tuple(
-            option.provider for option in self._provider_options
-        )
-        self._provider_model_id = ""
         self._build_parameter_controls()
         self._build_crop_controls()
         self._build_scrollable_content()
@@ -245,16 +225,10 @@ class Inspector(QFrame):
             Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
         )
         self.set_model_status("ready")
-        self._build_provider_controls(catalog.default_id)
+        self._build_edge_control()
         self.model_picker.currentIndexChanged.connect(self._update_model_accessibility)
 
-    def _build_provider_controls(self, model_id: str) -> None:
-        self.provider_picker = compact_field(ElidingComboBox())
-        self.provider_picker.setObjectName("provider_picker")
-        self.provider_picker.setAccessibleName(
-            QCoreApplication.translate("Inspector", "Compute acceleration")
-        )
-        self._set_provider_options(model_id)
+    def _build_edge_control(self) -> None:
         self.edge_picker = compact_field(ElidingComboBox())
         self.edge_picker.setObjectName("edge_picker")
         self.edge_picker.setAccessibleName(
@@ -331,6 +305,14 @@ class Inspector(QFrame):
         self.output_directory_button.setAccessibleName(
             QCoreApplication.translate("Inspector", "Choose output directory")
         )
+        self.clear_output_directory_button = QPushButton(
+            QCoreApplication.translate("Inspector", "Clear")
+        )
+        self.clear_output_directory_button.setObjectName("clear_output_directory")
+        self.clear_output_directory_button.setAccessibleName(
+            QCoreApplication.translate("Inspector", "Clear output directory")
+        )
+        self.clear_output_directory_button.setEnabled(False)
         self.output_filename_edit = compact_field(QLineEdit())
         self.output_filename_edit.setObjectName("output_filename")
         self.output_filename_edit.setAccessibleName(
@@ -355,7 +337,6 @@ class Inspector(QFrame):
 
     def _connect_parameter_controls(self) -> None:
         self.model_picker.currentIndexChanged.connect(self._model_changed)
-        self.provider_picker.currentIndexChanged.connect(self._provider_changed)
         self.edge_picker.currentIndexChanged.connect(self._edge_changed)
         self.fps_spinbox.valueChanged.connect(
             lambda value: self._emit_if_editable(OutputFpsChanged(value))
@@ -382,6 +363,9 @@ class Inspector(QFrame):
         self.output_directory_button.clicked.connect(
             lambda: self.command_requested.emit(OutputDirectoryRequested())
         )
+        self.clear_output_directory_button.clicked.connect(
+            lambda: self._emit_if_editable(OutputDirectoryChanged(None))
+        )
         self.output_filename_edit.editingFinished.connect(self._filename_changed)
         self.max_size_spinbox.valueChanged.connect(
             lambda value: self._emit_if_editable(
@@ -406,11 +390,6 @@ class Inspector(QFrame):
             detail = ""
         self.model_picker.setToolTip(detail)
         self.model_picker.setAccessibleDescription(detail)
-
-    def _provider_changed(self, _index: int) -> None:
-        selected = self.provider_picker.currentData()
-        if is_allowed_provider(selected):
-            self._emit_if_editable(ExecutionProviderChanged(selected))
 
     def _edge_changed(self, _index: int) -> None:
         try:
@@ -474,7 +453,6 @@ class Inspector(QFrame):
         available = editable and presentation.duration is not None
         for widget in (
             self.model_picker,
-            self.provider_picker,
             self.edge_picker,
             self.fps_spinbox,
             self.start_spinbox,
@@ -485,6 +463,7 @@ class Inspector(QFrame):
             self.padding_spinbox,
             self.stretch_spinbox,
             self.output_directory_button,
+            self.clear_output_directory_button,
             self.output_filename_edit,
             self.max_size_spinbox,
         ):
@@ -494,7 +473,6 @@ class Inspector(QFrame):
     def _apply_parameter_values(self, presentation: ParameterPresentation) -> None:
         widgets = (
             self.model_picker,
-            self.provider_picker,
             self.edge_picker,
             self.fps_spinbox,
             self.start_spinbox,
@@ -512,12 +490,6 @@ class Inspector(QFrame):
             model_index = self.model_picker.findData(presentation.model_id)
             if model_index >= 0:
                 self.model_picker.setCurrentIndex(model_index)
-            self._set_provider_options(presentation.model_id)
-            provider_index = self.provider_picker.findData(
-                presentation.execution_provider
-            )
-            if provider_index >= 0:
-                self.provider_picker.setCurrentIndex(provider_index)
             edge_index = self.edge_picker.findData(presentation.edge_mode.value)
             if edge_index >= 0:
                 self.edge_picker.setCurrentIndex(edge_index)
@@ -731,7 +703,6 @@ class Inspector(QFrame):
         model_layout.addWidget(self.model_picker, 1)
         model_layout.addWidget(self.model_status)
         layout.addRow(self._form_label("Model"), model_row)
-        layout.addRow(self._form_label("Compute acceleration"), self.provider_picker)
         layout.addRow(self._form_label("Edge treatment"), self.edge_picker)
         return controls
 
@@ -758,11 +729,19 @@ class Inspector(QFrame):
         controls = QWidget()
         layout = form_layout(controls)
         directory = QWidget()
+        # The path needs the full column: three widgets on one row squeezed it
+        # to "/Use...Loop". Buttons go underneath, as they did before Clear
+        # joined them.
         directory_layout = QVBoxLayout(directory)
         directory_layout.setContentsMargins(0, 0, 0, 0)
         directory_layout.setSpacing(8)
         directory_layout.addWidget(self.output_directory_edit)
-        directory_layout.addWidget(self.output_directory_button)
+        directory_buttons = QHBoxLayout()
+        directory_buttons.setContentsMargins(0, 0, 0, 0)
+        directory_buttons.setSpacing(8)
+        directory_buttons.addWidget(self.output_directory_button, 1)
+        directory_buttons.addWidget(self.clear_output_directory_button)
+        directory_layout.addLayout(directory_buttons)
         layout.addRow(self._form_label("Directory"), directory)
         layout.addRow(self._form_label("Filename"), self.output_filename_edit)
         layout.addRow(self._form_label("Maximum size"), self.max_size_spinbox)
@@ -790,7 +769,6 @@ class Inspector(QFrame):
         """Return standard parameter controls in consequence order."""
         return (
             self.model_picker,
-            self.provider_picker,
             self.edge_picker,
             self.fps_spinbox,
             self.start_spinbox,
@@ -801,6 +779,7 @@ class Inspector(QFrame):
             self.padding_spinbox,
             self.stretch_spinbox,
             self.output_directory_button,
+            self.clear_output_directory_button,
             self.output_filename_edit,
             self.max_size_spinbox,
         )
@@ -810,7 +789,6 @@ class Inspector(QFrame):
         return (
             self.disclosures["segmentation"][0],
             self.model_picker,
-            self.provider_picker,
             self.edge_picker,
             self.manage_models,
             self.disclosures["time_sampling"][0],
@@ -828,6 +806,7 @@ class Inspector(QFrame):
             *self.transform_group.tab_widgets(),
             self.disclosures["output"][0],
             self.output_directory_button,
+            self.clear_output_directory_button,
             self.output_filename_edit,
             self.max_size_spinbox,
             self.disclosures["workspace"][0],
@@ -856,31 +835,3 @@ class Inspector(QFrame):
         workspace_body.setVisible(workspace_button.isChecked())
         workspace_button.style().unpolish(workspace_button)
         workspace_button.style().polish(workspace_button)
-
-    def _set_provider_options(self, model_id: str) -> None:
-        if self._provider_model_id == model_id and self.provider_picker.count():
-            return
-        selected = self.provider_picker.currentData()
-        options = build_provider_options(
-            self._available_provider_ids, model_id=model_id
-        )
-        self._provider_options = options
-        self._provider_model_id = model_id
-        self.provider_picker.blockSignals(True)
-        try:
-            self.provider_picker.clear()
-            for option in options:
-                self.provider_picker.addItem(
-                    provider_label(
-                        option.provider,
-                        recommended=option.recommended,
-                        model_id=model_id,
-                    ),
-                    option.provider,
-                )
-        finally:
-            self.provider_picker.blockSignals(False)
-        if selected is not None:
-            index = self.provider_picker.findData(selected)
-            if index >= 0:
-                self.provider_picker.setCurrentIndex(index)

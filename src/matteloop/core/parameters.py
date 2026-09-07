@@ -169,7 +169,7 @@ def reduce_parameters(state: AppState, event: ParameterEvent) -> AppState:
     """Apply an inspector event and use the central stale-preview reducer."""
     from matteloop.core.state import JobState, capabilities
 
-    if isinstance(event, OutputDirectoryChanged):
+    if isinstance(event, (OutputDirectoryChanged, ExecutionProviderChanged)):
         if state.job.phase is not JobState.IDLE:
             return state
     elif not capabilities(state).can_edit:
