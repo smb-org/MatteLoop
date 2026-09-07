@@ -260,6 +260,23 @@ def test_new_preview_image_pauses_and_a_repeated_call_is_ignored(qtbot) -> None:
     assert canvas.playing
 
 
+@pytest.mark.parametrize("empty", [None, QImage()])
+def test_empty_presentation_keeps_a_paused_result_session(qtbot, empty) -> None:
+    canvas = ResultPlayerCanvas()
+    qtbot.addWidget(canvas)
+    frames = _player_frames(2, (100, 100))
+    canvas.set_frames(frames)
+    canvas.pause()
+
+    canvas.set_presented_frame(empty, "placeholder")
+
+    assert canvas._frames is frames  # noqa: SLF001
+    assert canvas.current_frame == 0
+    assert not canvas.playing
+    assert canvas._frame is not None  # noqa: SLF001
+    assert canvas.text() == ""
+
+
 def test_set_frames_shows_the_truncation_marker_when_cache_was_truncated(qtbot) -> None:
     canvas = ResultPlayerCanvas()
     qtbot.addWidget(canvas)

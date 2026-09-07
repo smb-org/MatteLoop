@@ -286,7 +286,7 @@ class PreviewStage(QFrame):
         )
         self.result_canvas = ResultPlayerCanvas(runtime_root=runtime_root)
         self.original_canvas.set_cover_frame(False)
-        self.result_canvas.set_cover_frame(True)
+        self.result_canvas.set_cover_frame(False)
         self.original_canvas.setText(
             QCoreApplication.translate("PreviewStage", "Original")
         )

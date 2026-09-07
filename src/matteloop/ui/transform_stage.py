@@ -32,7 +32,12 @@ from matteloop.core.state import AppState
 from matteloop.core.timebase import webp_delays
 from matteloop.jobs.transform_stage import framing_plan
 from matteloop.jobs.transform_store import load_transform
-from matteloop.jobs.workspace import CutFrame, CutManifest, CutWorkspace
+from matteloop.jobs.workspace import (
+    CutFrame,
+    CutManifest,
+    CutWorkspace,
+    detect_external_edits,
+)
 from matteloop.ui.crop_canvas import CropCanvas
 from matteloop.ui.crop_presentation import CropPresentation
 from matteloop.ui.ports import StateStore
@@ -478,6 +483,16 @@ class TransformStageController(QObject):
         plan = self._plan
         if canvas is None or session is None or facts is None or plan is None:
             return
+        if self._store.state.edited_cuts:
+            refreshed = detect_external_edits(session.workspace)
+            if (
+                refreshed.frames != session.manifest.frames
+                or refreshed.union_metadata != session.manifest.union_metadata
+                or refreshed.edited != session.manifest.edited
+            ):
+                self._session = replace(session, manifest=refreshed)
+                self._schedule_facts()
+                return
         self._cancel_frame_load()
         generation = next(self._frame_generations)
         self._frame_generation = generation
@@ -521,6 +536,12 @@ class TransformStageController(QObject):
         self._player_frames = frames
         if self._player_canvas is not None:
             self._player_canvas.set_frames(frames)
+            facts = self._facts
+            if facts is not None:
+                transform = self._store.state.parameters.transform
+                self._player_canvas.set_kept_range(
+                    transform.kept_range(facts.frame_count)
+                )
 
     @Slot(str, int)
     def _frame_load_failed(self, message: str, generation: int) -> None:
@@ -602,7 +623,9 @@ def _resolve_union(
     session: CutSession, framing: FramingSpec, frame_reader: FrameReader,
     cancelled: Callable[[], bool] = lambda: False,
 ) -> PixelBounds:
-    metadata = session.manifest.union_metadata
+    metadata = (
+        None if session.manifest.edited else session.manifest.union_metadata
+    )
     if metadata is not None:
         try:
             matches = Decimal(metadata.alpha_threshold) == framing.alpha_threshold

@@ -23,7 +23,12 @@ from matteloop.core.parameters import (
 from matteloop.core.specs import CropSpec, FramingSpec, TransformSpec
 from matteloop.core.state import (
     AppState,
+    ArtifactResult,
+    EditedCutsChanged,
+    EditedCutsScanRequested,
     JobKind,
+    RenderRequested,
+    RenderSucceeded,
     SourceLoaded,
     SourceLoadRequested,
     reduce,
@@ -32,7 +37,11 @@ from matteloop.core.timebase import webp_delays
 from matteloop.jobs.render import FilesystemWorkspacePort
 from matteloop.jobs.transform_stage import framing_plan
 from matteloop.jobs.transform_store import store_transform
-from matteloop.jobs.workspace import CutFrame, CutWorkspace
+from matteloop.jobs.workspace import (
+    CutFrame,
+    CutWorkspace,
+    detect_external_edits,
+)
 from matteloop.ui.crop_canvas import CropCanvas
 from matteloop.ui.result_player import PlayerFrames, ResultPlayerCanvas
 from matteloop.ui.store import ReducerStore
@@ -135,6 +144,100 @@ def test_restore_for_dispatches_identity_then_the_stored_transform(
 
     controller.restore_for(workspace)
     assert store.state.parameters.transform == spec
+    controller.shutdown()
+
+
+def test_restored_trim_is_applied_when_the_first_frame_cache_arrives(
+    tmp_path, qtbot
+) -> None:
+    artifact = _seed_cut(tmp_path, "seed-restore-playback")
+    stored = TransformSpec(first_frame=1)
+    store_transform(artifact.cut_workspace, stored, [])
+    store = ReducerStore(_ready_state(tmp_path / "source.mp4"))
+    controller = TransformStageController(store)
+    canvas = ResultPlayerCanvas()
+    qtbot.addWidget(canvas)
+    group = TransformGroup(lambda _event: None)
+    qtbot.addWidget(group)
+    controller.attach(group, canvas)
+
+    controller.restore_for(artifact.cut_workspace)
+    controller.open_artifact(artifact)
+
+    qtbot.waitUntil(lambda: canvas.current_frame is not None, timeout=5000)
+
+    assert canvas.current_frame == 1
+    assert canvas._kept == range(1, artifact.manifest.frame_count)  # noqa: SLF001
+    controller.shutdown()
+
+
+def _rendered_state(path: Path) -> AppState:
+    return reduce(
+        reduce(
+            _ready_state(path), RenderRequested("render", "render-request")
+        ),
+        RenderSucceeded(
+            "render", ArtifactResult("source", "render-request", path / "output.webp")
+        ),
+    )
+
+
+def test_edited_cut_refreshes_framing_before_loading_new_frame_bytes(
+    tmp_path, qtbot
+) -> None:
+    artifact = render_service(workspace=FilesystemWorkspacePort()).render(
+        request(
+            tmp_path,
+            framing=FramingSpec(True, Decimal("2"), 32, Decimal("1")),
+        ),
+        job(tmp_path, "seed-edited-framing", JobKind.RENDER),
+    )
+    original_frame = artifact.manifest.frames[0]
+    frame_path = artifact.cut_workspace.path / original_frame.filename
+    with Image.open(frame_path) as opened:
+        edited = opened.convert("RGBA")
+    edited.putpixel((0, 0), (255, 0, 0, 255))
+    edited.save(frame_path, format="PNG")
+    edited.close()
+    refreshed = detect_external_edits(artifact.cut_workspace)
+
+    store = ReducerStore(_rendered_state(tmp_path / "source.mp4"))
+    controller = TransformStageController(store)
+    canvas = ResultPlayerCanvas()
+    qtbot.addWidget(canvas)
+    group = TransformGroup(lambda _event: None)
+    qtbot.addWidget(group)
+    controller.attach(group, canvas)
+    store.dispatch(GlobalTrimChanged(True))
+    store.dispatch(PaddingChanged(32))
+    controller.open_artifact(artifact)
+    qtbot.waitUntil(lambda: canvas.current_frame is not None, timeout=5000)
+    original_size = controller.facts.framed_size  # type: ignore[union-attr]
+
+    store.dispatch(
+        EditedCutsScanRequested("source", "render-request", "edited-cuts")
+    )
+    store.dispatch(EditedCutsChanged("source", "render-request", "edited-cuts", True))
+    store.dispatch(TransformChanged(TransformSpec(crop=CropSpec(0, 0, 64, 64))))
+
+    qtbot.waitUntil(
+        lambda: controller.session is not None
+        and controller.session.manifest.frames == refreshed.frames,
+        timeout=5000,
+    )
+    qtbot.waitUntil(
+        lambda: controller.facts is not None
+        and controller.facts.framed_size != original_size,
+        timeout=5000,
+    )
+    qtbot.waitUntil(
+        lambda: canvas._frames is not None  # noqa: SLF001
+        and canvas._frames.key[1] == controller.facts.framed_size,  # noqa: SLF001
+        timeout=5000,
+    )
+
+    assert canvas._frames is not None  # noqa: SLF001
+    assert canvas._frames.key[1] == controller.facts.framed_size  # noqa: SLF001
     controller.shutdown()
 
 
