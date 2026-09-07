@@ -8,7 +8,6 @@ Ownership and lock/protocol order::
     wire lock: Request   -- send_bytes -----> one session / one inference
       then Cancel        -- send_bytes -----> observed after inference
     validates metadata   <- recv_bytes ------ Response OR matching CancelAck
-
 Local validation, slot preparation, and bounded encoding finish before an active
 identity exists. Publication and request transport are one wire-locked operation,
 so an admitted cancel can only follow a request already on the wire. Code never
@@ -374,12 +373,15 @@ class SegmentationClient:
     def close(self) -> None:
         """Stop, prove dead, and unlink parent state; safe to call repeatedly."""
         self._before_close_operation_wait()
-        self._claim_close_operation()
+        if not self._claim_close_operation():
+            with self._lifecycle_lock:
+                job_id = self.active_job_id
+                self._discard_process_unlocked(graceful=False, job_id=job_id)
+            return
         try:
             with self._wire_lock:
                 with self._lifecycle_lock:
-                    with self._state_lock:
-                        job_id = self._active_job_id
+                    job_id = self.active_job_id
                     self._discard_process_unlocked(graceful=True, job_id=job_id)
         finally:
             self._release_operation()
@@ -403,15 +405,15 @@ class SegmentationClient:
             self._operation_owner_thread_id = get_ident()
             self._operation_job_id = job_id
 
-    def _claim_close_operation(self) -> None:
-        current_thread_id = get_ident()
+    def _claim_close_operation(self) -> bool:
         with self._operation_owner_lock:
-            if self._operation_owner_thread_id == current_thread_id:
+            if self._operation_owner_thread_id == get_ident():
                 raise self._busy_error(self._operation_job_id)
-        self._operation_lock.acquire()
+        if not self._operation_lock.acquire(timeout=_JOIN_TIMEOUT_SECONDS):
+            return False
         with self._operation_owner_lock:
-            self._operation_owner_thread_id = current_thread_id
-            self._operation_job_id = None
+            self._operation_owner_thread_id = get_ident()
+        return True
 
     def _release_operation(self) -> None:
         with self._operation_owner_lock:
@@ -1172,7 +1174,6 @@ def _send_child(connection: Connection, message: ChildMessage) -> bool:
 
 def _create_rembg_session(model_spec: dict[str, object]) -> object:
     from matteloop.jobs.models.catalog import ModelCatalog
-
     verified = _validate_verified_launch_payload(
         model_spec, catalog=ModelCatalog.load_resource()
     )
@@ -1216,7 +1217,6 @@ def _validate_verified_launch_payload(
     model_spec: object, *, catalog: object
 ) -> _VerifiedModelLaunch:
     from matteloop.jobs.models.catalog import ExecutionClass, ModelCatalog
-
     expected_keys = {
         "schema_version",
         "model_id",

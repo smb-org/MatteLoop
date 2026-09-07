@@ -56,6 +56,7 @@ def auto_fit_webp(
         fitted_summary.frames,
         sum(delays_ms) if len(frame_paths) > 1 else 0,
         rgba_ownership_tracker=ownership,
+        is_cancelled=lambda: context.cancellation.requested,
     )
     return EncodeSummary(
         destination,

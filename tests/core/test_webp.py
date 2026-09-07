@@ -297,6 +297,28 @@ def test_animation_encode_reports_each_frame_after_it_is_walked(
     assert progress == [(1, 3), (2, 3), (3, 3)]
 
 
+def test_animation_encode_cancels_before_the_next_frame_is_written(
+    tmp_path: Path,
+) -> None:
+    paths = rgba_fixture_paths(tmp_path)
+    output = tmp_path / "out.webp"
+    output.write_bytes(b"known-good")
+    progress: list[tuple[int, int]] = []
+
+    with pytest.raises(AppError) as exc:
+        encode_lossless_webp(
+            paths,
+            (67, 66, 67),
+            output,
+            is_cancelled=lambda: len(progress) >= 1,
+            progress=lambda completed, total: progress.append((completed, total)),
+        )
+
+    assert exc.value.code is ErrorCode.JOB_CANCELLED
+    assert progress == [(1, 3)]
+    assert output.read_bytes() == b"known-good"
+
+
 def test_identical_rgba_frames_become_one_held_frame_with_exact_duration(
     tmp_path: Path,
 ) -> None:
@@ -568,11 +590,14 @@ def test_fit_cancels_between_encode_attempts_and_preserves_destination(
     encode_count = 0
 
     def report_too_large(
-        paths: Sequence[Path], delays: Sequence[int], destination: Path
+        paths: Sequence[Path],
+        delays: Sequence[int],
+        destination: Path,
+        **kwargs: Any,
     ) -> EncodeSummary:
         nonlocal encode_count
         encode_count += 1
-        summary = actual_encode(paths, delays, destination)
+        summary = actual_encode(paths, delays, destination, **kwargs)
         return replace(summary, file_size=1_000_000)
 
     monkeypatch.setattr(webp_module, "encode_lossless_webp", report_too_large)
@@ -589,6 +614,31 @@ def test_fit_cancels_between_encode_attempts_and_preserves_destination(
 
     assert exc.value.code is ErrorCode.JOB_CANCELLED
     assert encode_count == 1
+    assert output.read_bytes() == b"known-good"
+    assert not tuple((tmp_path / "work").glob("webp-fit-*"))
+
+
+def test_fit_encode_cancels_before_the_next_frame_is_written(
+    tmp_path: Path,
+) -> None:
+    paths = rgba_fixture_paths(tmp_path)
+    output = tmp_path / "out.webp"
+    output.write_bytes(b"known-good")
+    progress: list[tuple[int, int]] = []
+
+    with pytest.raises(AppError) as exc:
+        fit_webp_to_size(
+            paths,
+            (67, 66, 67),
+            1_000_000,
+            tmp_path / "work",
+            output,
+            is_cancelled=lambda: len(progress) >= 1,
+            progress=lambda completed, total: progress.append((completed, total)),
+        )
+
+    assert exc.value.code is ErrorCode.JOB_CANCELLED
+    assert progress == [(1, 3)]
     assert output.read_bytes() == b"known-good"
     assert not tuple((tmp_path / "work").glob("webp-fit-*"))
 
@@ -1199,8 +1249,10 @@ def test_validation_failure_closes_decoder_and_preserves_existing_destination(
     output.write_bytes(b"existing")
     actual_validate = webp_module.validate_webp
 
-    def reject_temporary(path: Path, expected_frames: int, expected_duration_ms: int):
-        info = actual_validate(path, expected_frames, expected_duration_ms)
+    def reject_temporary(
+        path: Path, expected_frames: int, expected_duration_ms: int, **kwargs: Any
+    ):
+        info = actual_validate(path, expected_frames, expected_duration_ms, **kwargs)
         raise AppError(
             ErrorCode.INVALID_OUTPUT,
             "webp",
@@ -1228,7 +1280,12 @@ def test_encode_cancellation_cleans_partial_sibling_and_preserves_destination(
     output = tmp_path / "out.webp"
     output.write_bytes(b"existing")
 
-    def cancel_encode(_source: Path, _identity: object, temporary: Path) -> None:
+    def cancel_encode(
+        _source: Path,
+        _identity: object,
+        temporary: Path,
+        _tracker: RgbaOwnershipTracker | None,
+    ) -> None:
         temporary.write_bytes(b"partial")
         raise Cancelled
 
@@ -1284,7 +1341,7 @@ def test_primary_exception_keeps_cleanup_failure_as_an_observable_note(
     actual_unlink = Path.unlink
 
     def cancel_encode(*args: Any) -> None:
-        temporary = args[-1]
+        temporary = args[-2]
         temporary.write_bytes(b"partial")
         raise Cancelled("cancelled")
 
