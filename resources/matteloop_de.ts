@@ -432,6 +432,11 @@
         <source>Open folder</source>
         <translation>Ordner öffnen</translation>
     </message>
+    <message>
+        <location filename="../src/matteloop/ui/copy.py" line="594"/>
+        <source>Segmentation is unavailable because ONNX Runtime could not enumerate any providers. Repair the installation with: uv sync --reinstall-package onnxruntime-directml</source>
+        <translation>Segmentierung ist nicht verfügbar, weil ONNX Runtime keine Provider auflisten konnte. Reparieren Sie die Installation mit: uv sync --reinstall-package onnxruntime-directml</translation>
+    </message>
 </context>
 <context>
     <name>ModelCopy</name>

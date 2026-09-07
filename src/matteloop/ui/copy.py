@@ -587,3 +587,13 @@ def accessible_field_name(name: str) -> str:
         "x": QCoreApplication.translate("Inspector", "X"),
         "y": QCoreApplication.translate("Inspector", "Y"),
     }.get(name, name)
+
+
+def runtime_banner_copy() -> str:
+    """Translate the startup notice for an unusable ONNX Runtime."""
+    return QCoreApplication.translate(
+        "MainWindow",
+        "Segmentation is unavailable because ONNX Runtime could not "
+        "enumerate any providers. Repair the installation with: "
+        "uv sync --reinstall-package onnxruntime-directml",
+    )

@@ -12,6 +12,7 @@ import subprocess
 import sys
 import tempfile
 from collections.abc import Sequence
+from dataclasses import dataclass
 from importlib import metadata
 from pathlib import Path
 from typing import Any
@@ -24,6 +25,22 @@ _ONNXRUNTIME_DISTRIBUTIONS = (
     "onnxruntime-gpu",
     "onnxruntime",
 )
+_ONNXRUNTIME_REPAIR_COMMAND = "uv sync --reinstall-package onnxruntime-directml"
+
+
+@dataclass(frozen=True, slots=True)
+class _ProviderDiagnostics:
+    """Collected provider facts plus the state needed by each caller."""
+
+    lines: tuple[str, ...]
+    runtime_usable: bool
+    total_failure: bool
+    partial_failure: bool
+    failure_reason: str | None
+    distribution: str
+    distribution_version: str
+    device: str
+    available_providers: tuple[str, ...]
 
 
 def _run_gui() -> int:
@@ -61,7 +78,7 @@ def _run_gui() -> int:
     install_theme(application)
     stored_model = settings.value("parameters/model_id")
     model_id = stored_model if stored_model in V1_MODEL_IDS else "birefnet-portrait"
-    _log_runtime_diagnostics()
+    runtime_usable = _log_runtime_diagnostics()
     provider_options = provider_options_from_runtime(model_id=model_id)
     store = ReducerStore(
         AppState(parameters=load_parameters(settings, provider_options))
@@ -77,6 +94,7 @@ def _run_gui() -> int:
         settings,
         model_options=controller.model_options,
         provider_options=provider_options,
+        runtime_unavailable=not runtime_usable,
     )
     controller.set_dialog_parent(window)
     controller.attach_transform_stage(
@@ -123,56 +141,93 @@ def _error_reason(error: BaseException) -> str:
     return str(error) or type(error).__name__
 
 
-def _log_runtime_diagnostics() -> None:
-    try:
-        runtime = _load_onnxruntime()
-        distribution, distribution_version = _onnxruntime_distribution()
-        available_providers = tuple(runtime.get_available_providers())  # type: ignore[attr-defined]
-        device = runtime.get_device()  # type: ignore[attr-defined]
-    except Exception as error:
-        _LOGGER.warning("Could not collect ONNX Runtime startup diagnostics: %s", error)
-        return
-    _LOGGER.info(
-        "ONNX Runtime distribution=%s version=%s device=%s available_providers=%s",
-        distribution,
-        distribution_version,
-        device,
-        available_providers,
-    )
+def _log_runtime_diagnostics() -> bool:
+    report = _collect_provider_diagnostics_report(include_video_adapters=False)
+    if report.total_failure:
+        _LOGGER.error(
+            "ONNX Runtime startup diagnostics failed: %s. Repair with: %s",
+            report.failure_reason or "no execution providers were reported",
+            _ONNXRUNTIME_REPAIR_COMMAND,
+        )
+    elif report.partial_failure:
+        _LOGGER.warning(
+            "Could not collect complete ONNX Runtime startup diagnostics: %s",
+            report.failure_reason or "an optional runtime detail was unavailable",
+        )
+    else:
+        _LOGGER.info(
+            "ONNX Runtime distribution=%s version=%s device=%s available_providers=%s",
+            report.distribution,
+            report.distribution_version,
+            report.device,
+            report.available_providers,
+        )
+    return report.runtime_usable
 
 
-def _runtime_diagnostic_lines(
+def _runtime_diagnostic_report(
     runtime: object | None, runtime_error: str | None
-) -> tuple[str, ...]:
-    from matteloop.core.execution_providers import (
-        ProviderOption,
-        provider_options_from_runtime,
+) -> _ProviderDiagnostics:
+    if runtime is None:
+        return _unavailable_runtime_report(runtime_error or "runtime unavailable")
+
+    device, device_error = _runtime_device(runtime)
+    available_providers, providers_error = _runtime_providers(runtime)
+    if providers_error is not None:
+        return _provider_failure_report(device, providers_error, device_error)
+
+    return _available_provider_report(device, device_error, available_providers)
+
+
+def _unavailable_runtime_report(reason: str) -> _ProviderDiagnostics:
+    return _ProviderDiagnostics(
+        (
+            f"onnxruntime device: unavailable ({reason})",
+            f"onnxruntime available providers: unavailable ({reason})",
+            f"provider options: unavailable ({reason})",
+        ),
+        False,
+        True,
+        False,
+        reason,
+        "none",
+        "none",
+        f"unavailable ({reason})",
+        (),
     )
 
-    if runtime is None:
-        unavailable = runtime_error or "runtime unavailable"
-        return (
-            f"onnxruntime device: unavailable ({unavailable})",
-            f"onnxruntime available providers: unavailable ({unavailable})",
-            f"provider options: unavailable ({unavailable})",
-        )
 
-    try:
-        device = str(getattr(runtime, "get_device")())
-    except Exception as error:
-        device = f"unavailable ({_error_reason(error)})"
-    try:
-        available_providers = tuple(
-            str(provider) for provider in getattr(runtime, "get_available_providers")()
-        )
-        available_text = repr(list(available_providers))
-    except Exception as error:
-        available_text = f"unavailable ({_error_reason(error)})"
-    options: tuple[ProviderOption, ...] = ()
+def _provider_failure_report(
+    device: str, providers_error: str, device_error: str | None
+) -> _ProviderDiagnostics:
+    return _ProviderDiagnostics(
+        (
+            f"onnxruntime device: {device}",
+            f"onnxruntime available providers: unavailable ({providers_error})",
+            f"provider options: unavailable ({providers_error})",
+        ),
+        False,
+        True,
+        device_error is not None,
+        providers_error,
+        "unknown",
+        "unknown",
+        device,
+        (),
+    )
+
+
+def _available_provider_report(
+    device: str, device_error: str | None, available_providers: tuple[str, ...]
+) -> _ProviderDiagnostics:
+    from matteloop.core.execution_providers import provider_options
+
+    available_text = repr(list(available_providers))
     options_error: str | None = None
     try:
-        options = provider_options_from_runtime(runtime)
+        options = provider_options(available_providers, device=device)
     except Exception as error:
+        options = ()
         options_error = _error_reason(error)
     lines = [
         f"onnxruntime device: {device}",
@@ -189,11 +244,56 @@ def _runtime_diagnostic_lines(
         )
     else:
         lines.append("provider options: none")
-    return tuple(lines)
+    failure_reason = options_error or device_error
+    if not available_providers:
+        failure_reason = "get_available_providers() returned no providers"
+    return _ProviderDiagnostics(
+        tuple(lines),
+        bool(available_providers),
+        not available_providers,
+        failure_reason is not None and bool(available_providers),
+        failure_reason,
+        "unknown",
+        "unknown",
+        device,
+        available_providers,
+    )
 
 
-def _collect_provider_diagnostics(runtime: object | None = None) -> tuple[str, ...]:
-    """Collect headless runtime facts without creating an ONNX session."""
+def _runtime_device(runtime: object) -> tuple[str, str | None]:
+    try:
+        return str(getattr(runtime, "get_device")()), None
+    except Exception as error:
+        reason = _error_reason(error)
+        return f"unavailable ({reason})", reason
+
+
+def _runtime_providers(runtime: object) -> tuple[tuple[str, ...], str | None]:
+    try:
+        return (
+            tuple(
+                str(provider)
+                for provider in getattr(runtime, "get_available_providers")()
+            ),
+            None,
+        )
+    except Exception as error:
+        return (), _error_reason(error)
+
+
+def _runtime_diagnostic_lines(
+    runtime: object | None, runtime_error: str | None
+) -> tuple[str, ...]:
+    return _runtime_diagnostic_report(runtime, runtime_error).lines
+
+
+def _collect_provider_diagnostics_report(
+    runtime: object | None = None,
+    *,
+    include_video_adapters: bool = True,
+) -> _ProviderDiagnostics:
+    """Collect facts and the usability result shared by CLI, logging, and GUI."""
+    distribution_error: str | None = None
     try:
         distribution, distribution_version = _onnxruntime_distribution()
         distribution_text = (
@@ -202,7 +302,10 @@ def _collect_provider_diagnostics(runtime: object | None = None) -> tuple[str, .
             else f"{distribution} {distribution_version}"
         )
     except Exception as error:
+        distribution = "unavailable"
+        distribution_version = "unavailable"
         distribution_text = f"unavailable ({_error_reason(error)})"
+        distribution_error = _error_reason(error)
     lines = [
         f"MatteLoop version: {__version__}",
         f"Python/platform: {platform.python_version()} / {platform.platform()}",
@@ -215,10 +318,27 @@ def _collect_provider_diagnostics(runtime: object | None = None) -> tuple[str, .
         except Exception as error:
             runtime_error = _error_reason(error)
             lines.append(f"onnxruntime: unavailable ({runtime_error})")
-    lines.extend(_runtime_diagnostic_lines(runtime, runtime_error))
-    if sys.platform == "win32":
+    report = _runtime_diagnostic_report(runtime, runtime_error)
+    lines.extend(report.lines)
+    if include_video_adapters and sys.platform == "win32":
         lines.extend(_video_adapter_diagnostics())
-    return tuple(lines)
+    failure_reason = report.failure_reason or distribution_error
+    return _ProviderDiagnostics(
+        tuple(lines),
+        report.runtime_usable,
+        report.total_failure,
+        report.partial_failure or distribution_error is not None,
+        failure_reason,
+        distribution,
+        distribution_version,
+        report.device,
+        report.available_providers,
+    )
+
+
+def _collect_provider_diagnostics(runtime: object | None = None) -> tuple[str, ...]:
+    """Collect headless runtime facts without creating an ONNX session."""
+    return _collect_provider_diagnostics_report(runtime).lines
 
 
 def _video_adapter_diagnostics() -> tuple[str, ...]:
@@ -255,6 +375,20 @@ def _video_adapter_diagnostics() -> tuple[str, ...]:
         return (f"video adapters: unavailable ({_error_reason(error)})",)
 
 
+def _run_provider_command() -> int:
+    report = _collect_provider_diagnostics_report()
+    for line in report.lines:
+        print(line)
+    if report.runtime_usable:
+        return 0
+    print(
+        "ONNX Runtime unusable: "
+        f"{report.failure_reason or 'no execution providers were reported'}. "
+        f"Repair with: {_ONNXRUNTIME_REPAIR_COMMAND}"
+    )
+    return 1
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run MatteLoop, handling headless diagnostics before Qt is imported."""
     multiprocessing.freeze_support()
@@ -276,9 +410,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(application_title())
         return 0
     if args.providers:
-        for line in _collect_provider_diagnostics():
-            print(line)
-        return 0
+        return _run_provider_command()
     if args.smoke_test:
         from matteloop.smoke import run_smoke
 

@@ -120,6 +120,8 @@ def _status_stylesheet() -> str:
         QLabel#model_status[status='ready'] {{ color: {SUCCESS_COLOR}; }}
         QLabel#model_status[status='downloading'] {{ color: {WARNING_COLOR}; }}
         QLabel#model_status[status='not_cached'] {{ color: {SECONDARY_COLOR}; }}
+        QFrame#runtime_banner_container {{ border-top: 1px solid {DIVIDER_COLOR}; }}
+        QLabel#runtime_banner {{ color: {ERROR_COLOR}; }}
         QToolButton {{ text-align: left; min-height: 40px; padding: 0 8px;
                        color: {TEXT_COLOR}; border: 0; font-weight: 600; }}
         QToolButton:hover {{ color: {HOVER_COLOR};
