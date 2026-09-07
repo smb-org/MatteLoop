@@ -243,6 +243,10 @@ class SourceController(QObject):
         """Expose the cut-session owner for lifecycle and UI integration tests."""
         return self._transform_stage
 
+    def confirm_discard_unsaved_transform(self, parent: QWidget | None = None) -> bool:
+        """Ask the transform stage before abandoning the open cut's edits."""
+        return self._transform_stage.confirm_discard_if_needed(parent)
+
     def _open_cut_key(self) -> str | None:
         """Name the cut the Transform group currently edits, if any.
 
@@ -278,6 +282,9 @@ class SourceController(QObject):
     def dispatch(self, command: WindowCommand) -> None:
         if self._closed:
             return
+        if isinstance(command, (ChooseVideoRequested, VideoDropped)):
+            if not self.confirm_discard_unsaved_transform(self._dialog_parent):
+                return
         if isinstance(command, ChooseVideoRequested):
             self._choose_video(command.replace)
         elif isinstance(command, VideoDropped):

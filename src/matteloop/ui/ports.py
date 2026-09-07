@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
+from PySide6.QtWidgets import QWidget
+
 from matteloop.core.crop_state import CropEvent
 from matteloop.core.parameters import ParameterEvent
 from matteloop.core.state import AppState, Event
@@ -97,3 +99,5 @@ class WindowServices(Protocol):
     """Controller-owned command dispatcher; implemented in Task 15."""
 
     def dispatch(self, command: WindowCommand) -> None: ...
+
+    def confirm_discard_unsaved_transform(self, parent: QWidget | None) -> bool: ...

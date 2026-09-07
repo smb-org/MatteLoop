@@ -221,7 +221,6 @@ class MainWindow(QMainWindow):
         self.manage_workspaces_button.clicked.connect(
             lambda: self._services.dispatch(ManageWorkspacesRequested())
         )
-
     def _set_tab_order(self) -> None:
         """Declare a deterministic keyboard route through the shell."""
         widgets = [
@@ -244,17 +243,14 @@ class MainWindow(QMainWindow):
         )
         for before, after in zip(widgets, widgets[1:], strict=False):
             self.setTabOrder(before, after)
-
     def resizeEvent(self, event) -> None:  # type: ignore[no-untyped-def]
         super().resizeEvent(event)
         if hasattr(self, "inspector"):
             self._resize_inspector()
             self._update_success_artifact()
-
     def _resize_inspector(self) -> None:
         width = min(400, max(340, 340 + max(0, self.width() - 1100)))
         self.inspector.parentWidget().setFixedWidth(width)  # type: ignore[union-attr]
-
     def render_state(self, state: AppState) -> None:
         """Render a complete immutable snapshot; never starts work itself."""
         model = present(state)
@@ -315,6 +311,10 @@ class MainWindow(QMainWindow):
         return (self._last_focus or FocusTarget.NONE).value
 
     def closeEvent(self, event) -> None:  # type: ignore[no-untyped-def]
+        confirm = getattr(self._services, "confirm_discard_unsaved_transform", None)
+        if callable(confirm) and not confirm(self):
+            event.ignore()
+            return
         if self._unsubscribe is not None:
             unsubscribe, self._unsubscribe = self._unsubscribe, None
             unsubscribe()
