@@ -1,5 +1,6 @@
 [app]
 title = MatteLoop
+version = 0.2.1
 project_dir = .
 input_file = packaging/entrypoint.py
 exec_directory = dist
@@ -31,6 +32,8 @@ extra_args =
 	--no-deployment-flag=self-execution
 	--assume-yes-for-downloads
 	--windows-console-mode=attach
+	--file-version=0.2.1
+	--product-version=0.2.1
 	--noinclude-qt-translations
 	--output-filename=matteloop
 	--include-qt-plugins=platforms,imageformats

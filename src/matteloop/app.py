@@ -16,7 +16,7 @@ from importlib import metadata
 from pathlib import Path
 from typing import Any
 
-from matteloop import __version__
+from matteloop import __version__, application_title
 
 _LOGGER = logging.getLogger(__name__)
 _ONNXRUNTIME_DISTRIBUTIONS = (
@@ -273,7 +273,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.version:
-        print(f"MatteLoop {__version__}")
+        print(application_title())
         return 0
     if args.providers:
         for line in _collect_provider_diagnostics():
