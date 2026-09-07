@@ -5,7 +5,7 @@ from __future__ import annotations
 import threading
 import time
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import Decimal
 from fractions import Fraction
 from pathlib import Path
@@ -238,6 +238,68 @@ def test_edited_cut_refreshes_framing_before_loading_new_frame_bytes(
 
     assert canvas._frames is not None  # noqa: SLF001
     assert canvas._frames.key[1] == controller.facts.framed_size  # noqa: SLF001
+    controller.shutdown()
+
+
+def test_edited_cut_detection_is_not_repeated_for_each_frame_reload(
+    tmp_path, qtbot, monkeypatch
+) -> None:
+    artifact = _seed_cut(tmp_path, "edited-detection-once")
+    calls: list[CutWorkspace] = []
+
+    def detect_once(workspace: CutWorkspace):
+        calls.append(workspace)
+        return artifact.manifest
+
+    monkeypatch.setattr(
+        "matteloop.ui.transform_stage.detect_external_edits", detect_once
+    )
+    store = _FakeStore(
+        replace(_rendered_state(tmp_path / "source.mp4"), edited_cuts=True)
+    )
+    controller = TransformStageController(store)
+    canvas = ResultPlayerCanvas()
+    qtbot.addWidget(canvas)
+    group = TransformGroup(lambda _event: None)
+    qtbot.addWidget(group)
+    controller.attach(group, canvas)
+
+    controller.open_artifact(artifact)
+    qtbot.waitUntil(lambda: canvas.current_frame is not None, timeout=5000)
+    assert len(calls) == 1
+
+    controller._start_frame_load()  # noqa: SLF001 -- a second crop/resize reload
+    controller._start_frame_load()  # noqa: SLF001 -- another debounced gesture
+
+    assert len(calls) == 1
+    controller.shutdown()
+
+
+def test_external_edit_detection_failure_shows_a_result_status_marker(
+    tmp_path, qtbot, monkeypatch
+) -> None:
+    artifact = _seed_cut(tmp_path, "edited-detection-failure")
+
+    def fail_detection(_workspace: CutWorkspace):
+        raise OSError("frame disappeared during external edit")
+
+    monkeypatch.setattr(
+        "matteloop.ui.transform_stage.detect_external_edits", fail_detection
+    )
+    store = _FakeStore(
+        replace(_rendered_state(tmp_path / "source.mp4"), edited_cuts=True)
+    )
+    controller = TransformStageController(store)
+    canvas = ResultPlayerCanvas()
+    qtbot.addWidget(canvas)
+    group = TransformGroup(lambda _event: None)
+    qtbot.addWidget(group)
+    controller.attach(group, canvas)
+
+    controller.open_artifact(artifact)
+
+    qtbot.waitUntil(lambda: bool(canvas.status_label.text()), timeout=5000)
+    assert "frame disappeared during external edit" in canvas.status_label.text()
     controller.shutdown()
 
 
