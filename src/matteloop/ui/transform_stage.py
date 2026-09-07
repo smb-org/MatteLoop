@@ -4,8 +4,8 @@
 ``AppState`` names a cut workspace, and ``core/state.py`` is frozen. This
 controller tracks a ``CutSession`` from the render worker's raw artifact,
 recomputes the cut-derived ``CutFacts`` the ``TransformGroup`` readout needs
-whenever a framing-relevant parameter changes, and restores a cut's stored
-transform before "Use this set" rebuilds it (E17).
+whenever a framing-relevant parameter changes, and supplies a cut's stored
+transform when "Use this set" rebuilds it (E17).
 
 It deliberately does not cache a ``FramingSpec`` (T6): framing always comes
 from ``store.state.parameters``, read fresh each recomputation, so an edit
@@ -192,8 +192,8 @@ class TransformStageController(QObject):
         self._session = CutSession(workspace, manifest, _fps_from_manifest(manifest))
         self._schedule_facts()
 
-    def restore_for(self, workspace: CutWorkspace) -> None:
-        """Dispatch the cut's stored transform before a rebuild request.
+    def restore_for(self, workspace: CutWorkspace) -> TransformSpec:
+        """Return the cut's stored transform without changing global state.
 
         Clamps the crop when facts for this exact cut are already known
         (E14); otherwise the rebuild's own ``open_artifact`` clamps it --
@@ -209,7 +209,7 @@ class TransformStageController(QObject):
             clamped = clamp_crop(transform.crop, *facts.framed_size)
             if clamped != transform.crop:
                 transform = replace(transform, crop=clamped)
-        self._store.dispatch(TransformChanged(transform))
+        return transform
 
     def close_session(self) -> None:
         self._session = None

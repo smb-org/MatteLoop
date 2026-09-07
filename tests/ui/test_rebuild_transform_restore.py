@@ -32,7 +32,11 @@ from matteloop.core.state import (
     reduce,
 )
 from matteloop.jobs.transform_store import store_transform, transform_sidecar_path
-from matteloop.jobs.workspace import CutWorkspace, WorkspaceLifecycle
+from matteloop.jobs.workspace import (
+    CutWorkspace,
+    WorkspaceLifecycle,
+    WorkspaceSummary,
+)
 from matteloop.ui.controller import SourceController
 from matteloop.ui.ports import RenderVideoRequested
 from matteloop.ui.preview_controller import PreviewRuntime
@@ -46,6 +50,35 @@ class _Metadata:
     height: int = 128
     duration: Fraction = Fraction(2)
     average_rate: Fraction = Fraction(30)
+
+
+@dataclass(frozen=True)
+class _RebuildManifest:
+    cache_key_inputs: dict[str, object]
+    source_path: str
+
+
+def _rebuild_manifest(source: Path) -> _RebuildManifest:
+    return _RebuildManifest(
+        cache_key_inputs={
+            "sampling": {
+                "start": {"numerator": 0, "denominator": 1},
+                "end": {"numerator": 2, "denominator": 1},
+                "fps": 15,
+            },
+            "crop": {"x": 0, "y": 0, "width": 128, "height": 128},
+            "model": {"id": "u2net"},
+            "edge_settings": {
+                "mode": "standard",
+                "alpha_matting": {
+                    "foreground_threshold": 240,
+                    "background_threshold": 10,
+                    "erode_size": 10,
+                },
+            },
+        },
+        source_path=str(source),
+    )
 
 
 class _MatchedCutRuntime(PreviewRuntime):
@@ -217,4 +250,61 @@ def test_rebuilding_a_cut_without_a_stored_transform_stays_identity(
 
     qtbot.waitUntil(lambda: len(runtime.rebuild_requests) == 1, timeout=5000)
     assert runtime.rebuild_requests[0].transform == TransformSpec()
+    controller.shutdown()
+
+
+def test_canceling_a_different_cut_rebuild_keeps_the_open_transform(
+    tmp_path, qtbot
+) -> None:
+    opened = _promoted_cut(tmp_path, "a")
+    matched = _promoted_cut(tmp_path, "b")
+    store_transform(matched, TransformSpec(first_frame=2), [])
+    output = tmp_path / "source.webp"
+    output.write_bytes(b"existing")
+    runtime = _MatchedCutRuntime(matched)
+    store, controller = _controller(tmp_path, runtime)
+    controller.render_controller.open_cut_key = lambda: opened.cache_key
+    live = TransformSpec(crop=CropSpec(4, 4, 32, 32))
+    store.dispatch(TransformChanged(live))
+
+    controller.render_controller._use_workspace(  # noqa: SLF001
+        WorkspaceSummary(matched, _rebuild_manifest(tmp_path / "source.mp4"), 0)
+    )
+    dialog = controller.render_controller.collision_dialog
+    assert dialog is not None
+    assert store.state.parameters.transform == live
+    qtbot.mouseClick(dialog.buttons()[2], Qt.MouseButton.LeftButton)
+    qtbot.waitUntil(
+        lambda: controller.render_controller.collision_dialog is None, timeout=1000
+    )
+    assert store.state.parameters.transform == live
+    assert not runtime.rebuild_requests
+    controller.shutdown()
+
+
+def test_canceling_the_open_cut_rebuild_keeps_the_open_transform(
+    tmp_path, qtbot
+) -> None:
+    workspace = _promoted_cut(tmp_path, "a")
+    store_transform(workspace, TransformSpec(first_frame=2), [])
+    output = tmp_path / "source.webp"
+    output.write_bytes(b"existing")
+    runtime = _MatchedCutRuntime(workspace)
+    store, controller = _controller(tmp_path, runtime)
+    controller.render_controller.open_cut_key = lambda: workspace.cache_key
+    live = TransformSpec(crop=CropSpec(4, 4, 32, 32))
+    store.dispatch(TransformChanged(live))
+
+    controller.render_controller._use_workspace(  # noqa: SLF001
+        WorkspaceSummary(workspace, _rebuild_manifest(tmp_path / "source.mp4"), 0)
+    )
+    dialog = controller.render_controller.collision_dialog
+    assert dialog is not None
+    assert store.state.parameters.transform == live
+    qtbot.mouseClick(dialog.buttons()[2], Qt.MouseButton.LeftButton)
+    qtbot.waitUntil(
+        lambda: controller.render_controller.collision_dialog is None, timeout=1000
+    )
+    assert store.state.parameters.transform == live
+    assert not runtime.rebuild_requests
     controller.shutdown()
