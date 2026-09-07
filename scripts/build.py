@@ -467,12 +467,17 @@ def remove_previous_artifact(os_name: str, dist_path: Path = DIST_PATH) -> None:
 
 
 def patch_macos_bundle_metadata(
-    bundle: Path, *, version: str = __version__, os_name: str | None = None
+    bundle: Path, *, version: str = __version__
 ) -> None:
-    """Set the release identity fields Nuitka does not configure reliably."""
-    if (os_name or sys.platform) != "darwin" or bundle.suffix != ".app":
-        return
+    """Set the release identity fields Nuitka does not configure reliably.
+
+    The artifact decides, not the host: a `.app` carrying an Info.plist is a
+    macOS bundle wherever it was produced, and gating on sys.platform only made
+    the check invisible to CI, which runs on Linux.
+    """
     info_plist = bundle / "Contents" / "Info.plist"
+    if bundle.suffix != ".app" or not info_plist.is_file():
+        return
     with info_plist.open("rb") as source:
         metadata = plistlib.load(source)
     metadata.update(

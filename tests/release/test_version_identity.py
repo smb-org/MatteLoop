@@ -94,7 +94,7 @@ def test_macos_bundle_metadata_identifies_the_current_build(tmp_path: Path) -> N
         )
     )
 
-    patch_macos_bundle_metadata(info_plist.parents[1], os_name="darwin")
+    patch_macos_bundle_metadata(info_plist.parents[1])
 
     metadata = plistlib.loads(info_plist.read_bytes())
     assert metadata["CFBundleShortVersionString"] == __version__
