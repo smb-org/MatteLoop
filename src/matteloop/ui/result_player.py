@@ -236,11 +236,9 @@ class ResultPlayerCanvas(CropCanvas):
 
     def set_presented_frame(self, image: object, placeholder: str) -> None:
         """Yield to a genuinely new preview image; ignore a repeated one (E26)."""
-        if (
-            self._frames is not None
-            and isinstance(image, QImage)
-            and not image.isNull()
-        ):
+        if self._frames is not None:
+            if not isinstance(image, QImage) or image.isNull():
+                return
             if image is self._last_preview_image:
                 return
             self._last_preview_image = image

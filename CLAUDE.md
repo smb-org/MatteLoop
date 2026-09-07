@@ -49,8 +49,8 @@ The three rules that get broken most often:
 - **A `fix:` commit needs a `Trigger:` line** naming a repro or a
   previously-failing test. No observed trigger, no fix.
 - **Third consecutive `fix:` on the same file — stop and ask the user.**
-- **Commit bodies are substantive.** Short summary line, blank line, then what
-  actually changed. Never a one-liner, never test results in the body.
+- **Commit bodies are substantive.** Never a one-liner, never test results in
+  the body. See *Commit messages* below for the shape.
 - **Degrade, never refuse.** A precondition the user cannot fix from the UI must
   fall back, not abort the job.
 
@@ -99,6 +99,37 @@ Change all of these together:
 The coupling test in `tests/jobs/models/test_catalog.py` fails when the
 installed runtime and the manifest pin disagree. It is a floor, not a
 substitute for this list: it cannot see steps 3, 4 or 7.
+
+## Raising the version (REQUIRED — all of it)
+
+`matteloop.__version__` is the source of truth, and everything a user reads
+derives from it: the window title, `--version`, the first line of the startup
+diagnostics, and the macOS bundle's `CFBundleShortVersionString` and
+`CFBundleVersion`, patched at build time from that value.
+
+Two files carry the number, and the second is the one that gets forgotten:
+
+1. `src/matteloop/__init__.py` — `__version__`.
+2. `packaging/pysidedeploy.spec` — **three** occurrences: `version` under
+   `[app]`, and `--file-version` and `--product-version` in `extra_args`. Nuitka
+   writes the Windows executable's version resource from the latter two; there
+   is no way to derive them from the package at build time, so they are copies.
+
+`tests/release/test_version_identity.py` fails when those disagree. It is a
+floor, not a substitute for this list: it cannot see the tag, the release notes,
+or the README.
+
+Then, still by hand:
+
+3. The tag, `vX.Y.Z`, matching exactly. The release workflow is
+   `workflow_dispatch`, so nothing enforces that the tag and the built version
+   agree — a mismatch here is what shipped `1.0` in two releases.
+4. Release notes: what is new. The README never carries version history.
+5. **A minor release checks the README and the screenshots** before the bump
+   (see *Keeping the README honest*). A patch needs no pass.
+
+Never patch a version into a built artifact by hand. If a number is wrong in a
+bundle, it is wrong in one of the two files above, and the fix belongs there.
 
 ## Working on issues (REQUIRED)
 
@@ -151,6 +182,63 @@ lies about what a control does, a comment that contradicts the code.
   finding is not the same as a clean report, and "the checks were green" is not
   an answer to "what did the analysis say?".
 
+## Commit messages (REQUIRED)
+
+English throughout. One commit carries one complete change — the fix or feature
+together with its tests, its documentation and its configuration. Do not split a
+change across a commit per file, and do not commit an intermediate step that
+does not stand on its own.
+
+**Subject:** `<icon> <type>(<module>): summary`, imperative, at most 50
+characters, then a blank line.
+
+```
+🐛 fix(inspector): stop Clear claiming a source it lacks
+```
+
+The module is the part of the application the change lives in — `inspector`,
+`timeline`, `render`, `packaging`, `guardrails`. Leave it out when a change
+genuinely spans the application.
+
+| Icon | Type | Icon | Type |
+|---|---|---|---|
+| 🚀 | perf | 📝 | docs |
+| ✨ | feat | 🧪 | test |
+| 🛠 | improve | 🔒 | security |
+| 🐛 | fix | ⚙️ | config |
+| 📊 | db | 🎨 | style |
+| 🔄 | refactor | ⬆️ | deps |
+|  |  | 🔧 | chore |
+
+**Body:** bullet points grouped by kind, each group led by its icon. Concrete
+statements, not general ones: name the function, the value, the observed
+behaviour. List only what a reader needs — compact and precise, never an essay.
+Reference the issue.
+
+```
+🐛 fix(render): refuse a request whose source changed
+
+- 🐛 Defects:
+  - `_start` read the current `source_id` while the reuse probe held a
+    request built from the previous one, so video A rendered under B's
+    identity and its artifact was accepted as B's.
+  - Selecting a cut for rebuild dispatched its transform before the user
+    agreed, so cancelling left the open cut showing another cut's edits.
+- 🧪 One test per defect, each failing without its fix.
+
+Trigger: repro — start a render on a large clip, replace the source while
+the reuse probe is still hashing.
+
+Refs #60
+```
+
+**A `fix:` still needs its `Trigger:` line** (`docs/engineering-guardrails.md`),
+placed after the bullets and before the issue reference.
+
+**No attribution trailers.** No `Co-Authored-By`, no generator line, and — as
+the global rule already states — never a session URL, in a commit message, a
+pull request body, an issue or a comment.
+
 ## Keeping the README honest (REQUIRED)
 
 The README is the product page, not a build note. A change a user can see is
@@ -163,6 +251,15 @@ not finished until the README shows the application as it now is.
   without a test is.
 - **A new user-visible string is not done until it is wrapped for Qt
   translation and present in the German catalogue.**
+- **Never pass a variable to `tr()` or `translate()`.** `lupdate` extracts
+  string literals, so `translate("Ctx", label)` extracts nothing: the catalogue
+  keeps whatever entry happened to be there, the German interface silently
+  falls back to English, and the tests stay green because they assert the
+  English path. The literal has to sit at the call site — put it in
+  `QT_TRANSLATE_NOOP()` where the constant is defined and translate at the
+  render site, or pass a token and let the renderer choose between literals.
+  Caught twice in review already: once across the inspector, the provider names
+  and the transform presets, once in a disabled button's reason.
 - **A minor release checks the README and the screenshots before the version
   bump.** A patch carries corrections and needs no pass. A minor carries
   something new — and the screenshots are the part that rots silently, because

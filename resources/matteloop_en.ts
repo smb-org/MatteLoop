@@ -361,6 +361,11 @@
         <source>Model status: %s</source>
         <translation>Model status: %s</translation>
     </message>
+    <message>
+        <location filename="../src/matteloop/ui/inspector.py" line="844"/>
+        <source>Open a video to manage its workspaces.</source>
+        <translation>Open a video to manage its workspaces.</translation>
+    </message>
 </context>
 <context>
     <name>InspectorDisclosure</name>
@@ -1752,12 +1757,12 @@ Freed %s.</translation>
         <translation>Pause the result loop</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/result_player.py" line="339"/>
+        <location filename="../src/matteloop/ui/result_player.py" line="337"/>
         <source>Previewing the first %s of %s frames</source>
         <translation>Previewing the first %s of %s frames</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/result_player.py" line="427"/>
+        <location filename="../src/matteloop/ui/result_player.py" line="425"/>
         <source>Cut frames could not be read</source>
         <translation>Cut frames could not be read</translation>
     </message>
@@ -1777,18 +1782,19 @@ Freed %s.</translation>
     <message>
         <location filename="../src/matteloop/ui/settings_dialog.py" line="54"/>
         <location filename="../src/matteloop/ui/settings_dialog.py" line="56"/>
+        <location filename="../src/matteloop/ui/settings_dialog.py" line="141"/>
         <source>Preferences</source>
         <translation>Preferences</translation>
     </message>
     <message>
         <location filename="../src/matteloop/ui/settings_dialog.py" line="77"/>
-        <location filename="../src/matteloop/ui/settings_dialog.py" line="127"/>
+        <location filename="../src/matteloop/ui/settings_dialog.py" line="130"/>
         <source>Interface language</source>
         <translation>Interface language</translation>
     </message>
     <message>
         <location filename="../src/matteloop/ui/settings_dialog.py" line="84"/>
-        <location filename="../src/matteloop/ui/settings_dialog.py" line="132"/>
+        <location filename="../src/matteloop/ui/settings_dialog.py" line="135"/>
         <source>Compute acceleration</source>
         <translation>Compute acceleration</translation>
     </message>
@@ -1818,7 +1824,7 @@ Freed %s.</translation>
         <translation>Language restart note</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/settings_dialog.py" line="149"/>
+        <location filename="../src/matteloop/ui/settings_dialog.py" line="159"/>
         <source>Close preferences</source>
         <translation>Close preferences</translation>
     </message>
@@ -2282,12 +2288,12 @@ Freed %s.</translation>
 <context>
     <name>TransformStage</name>
     <message>
-        <location filename="../src/matteloop/ui/transform_stage.py" line="224"/>
+        <location filename="../src/matteloop/ui/transform_stage.py" line="241"/>
         <source>Discard unsaved transform changes?</source>
         <translation>Discard unsaved transform changes?</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/transform_stage.py" line="227"/>
+        <location filename="../src/matteloop/ui/transform_stage.py" line="244"/>
         <source>The current cut has unsaved transform changes. Discard them and continue?</source>
         <translation>The current cut has unsaved transform changes. Discard them and continue?</translation>
     </message>

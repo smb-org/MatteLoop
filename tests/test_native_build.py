@@ -2,6 +2,7 @@ import contextlib
 import hashlib
 import json
 import os
+import plistlib
 import shutil
 import stat
 import subprocess
@@ -849,6 +850,12 @@ def test_successful_native_build_uses_extracted_av_and_publishes_compliance(
     checksum = published.with_name(f"{published.name}.sha256")
     assert received_av == [extracted_av]
     assert len(commands) == 2
+    metadata = plistlib.loads(
+        (artifact / "Contents" / "Info.plist").read_bytes()
+    )
+    assert metadata["CFBundleShortVersionString"] == native_build.__version__
+    assert metadata["CFBundleVersion"] == native_build.__version__
+    assert metadata["CFBundleIdentifier"] == native_build.BUNDLE_IDENTIFIER
     assert published.read_bytes() == compliance.read_bytes()
     assert checksum.read_text(encoding="utf-8") == (
         f"{hashlib.sha256(compliance.read_bytes()).hexdigest()}  {published.name}\n"
@@ -1040,6 +1047,17 @@ def _stub_native_main(
     returncodes: tuple[int, ...] = (0, 0),
     qt_companion: QtSourceCompanion | None = None,
 ) -> list[list[str]]:
+    if artifact.suffix == ".app":
+        info_plist = artifact / "Contents" / "Info.plist"
+        info_plist.parent.mkdir(parents=True, exist_ok=True)
+        info_plist.write_bytes(
+            plistlib.dumps(
+                {
+                    "CFBundleShortVersionString": "1.0",
+                    "CFBundleExecutable": "matteloop",
+                }
+            )
+        )
     commands: list[list[str]] = []
     monkeypatch.setattr(native_build, "ROOT", root)
     monkeypatch.setattr(native_build, "DIST_PATH", root / "dist")

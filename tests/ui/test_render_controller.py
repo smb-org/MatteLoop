@@ -10,7 +10,6 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QDesktopServices, QImage
 
 from matteloop.core.crop_state import CropChanged
-from matteloop.core.parameters import TransformChanged
 from matteloop.core.specs import CropSpec, TransformSpec
 from matteloop.core.state import (
     AppState,
@@ -44,6 +43,7 @@ from matteloop.ui.render_pipeline import _StageReporter, render_prepared
 from matteloop.ui.store import ReducerStore
 from tests.fixtures.media_factory import make_video
 from tests.jobs.render_support import frozen_segmentation_result
+from tests.ui.rebuild_support import rebuild_manifest
 
 
 @dataclass(frozen=True)
@@ -224,6 +224,19 @@ class MatchingCutsRuntime(FakeRenderRuntime):
         return self.workspace
 
 
+class DelayedProbeRuntime(FakeRenderRuntime):
+    def __init__(self) -> None:
+        super().__init__()
+        self.probe_started = Event()
+        self.release_probe = Event()
+
+    def find_matching_workspace(self, request, context):
+        del request, context
+        self.probe_started.set()
+        assert self.release_probe.wait(5)
+        return None
+
+
 class RebuildRuntime(FakeRenderRuntime):
     """Answers ``rebuild`` the way a matched-cut path requires."""
 
@@ -233,35 +246,6 @@ class RebuildRuntime(FakeRenderRuntime):
         return type("Artifact", (), {"output_path": request.output.path})()
 
 
-@dataclass(frozen=True)
-class _RebuildManifest:
-    """Duck-typed stand-in exposing only what request_for_workspace reads."""
-
-    cache_key_inputs: dict[str, object]
-    source_path: str
-
-
-def _rebuild_manifest(source: Path) -> _RebuildManifest:
-    return _RebuildManifest(
-        cache_key_inputs={
-            "sampling": {
-                "start": {"numerator": 0, "denominator": 1},
-                "end": {"numerator": 2, "denominator": 1},
-                "fps": 15,
-            },
-            "crop": {"x": 0, "y": 0, "width": 128, "height": 128},
-            "model": {"id": "u2net"},
-            "edge_settings": {
-                "mode": "standard",
-                "alpha_matting": {
-                    "foreground_threshold": 240,
-                    "background_threshold": 10,
-                    "erode_size": 10,
-                },
-            },
-        },
-        source_path=str(source),
-    )
 
 
 class RecordingStore(ReducerStore):
@@ -616,6 +600,32 @@ def test_matching_cut_set_offers_three_choices_with_rebuild_default(
     controller.shutdown()
 
 
+def test_delayed_reuse_probe_cannot_render_a_replaced_source(
+    tmp_path, qtbot
+) -> None:
+    source_a = tmp_path / "source-a.mp4"
+    source_b = tmp_path / "source-b.mp4"
+    source_a.write_bytes(b"fixture-a")
+    source_b.write_bytes(b"fixture-b")
+    runtime = DelayedProbeRuntime()
+    store = RecordingStore(_current_state(source_a))
+    controller = SourceController(store, preview_runtime=runtime)
+
+    controller.dispatch(RenderVideoRequested())
+    qtbot.waitUntil(runtime.probe_started.is_set, timeout=5000)
+
+    store.dispatch(SourceLoadRequested("source-b", "load-b"))
+    store.dispatch(SourceLoaded("source-b", "load-b", Metadata(source_b)))
+    runtime.release_probe.set()
+
+    qtbot.waitUntil(
+        lambda: controller.render_controller._probe_thread is None,  # noqa: SLF001
+        timeout=5000,
+    )
+    assert not runtime.render_requests
+    controller.shutdown()
+
+
 def test_artifact_ready_fires_with_the_workers_raw_artifact(tmp_path, qtbot) -> None:
     source = tmp_path / "source.mp4"
     source.write_bytes(b"fixture")
@@ -650,16 +660,16 @@ def test_use_this_set_restores_the_stored_transform_before_rebuilding(
         None,
         "source-aaaaaaaa",
     )
-    manifest = _rebuild_manifest(source)
+    manifest = rebuild_manifest(source)
     runtime = RebuildRuntime()
     store = RecordingStore(_current_state(source))
     controller = SourceController(store, preview_runtime=runtime)
     restored: list[CutWorkspace] = []
     restored_transform = TransformSpec(first_frame=2)
 
-    def restore(target: CutWorkspace) -> None:
+    def restore(target: CutWorkspace) -> TransformSpec:
         restored.append(target)
-        store.dispatch(TransformChanged(restored_transform))
+        return restored_transform
 
     controller.render_controller.transform_restore = restore
 

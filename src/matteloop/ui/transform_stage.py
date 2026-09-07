@@ -4,8 +4,8 @@
 ``AppState`` names a cut workspace, and ``core/state.py`` is frozen. This
 controller tracks a ``CutSession`` from the render worker's raw artifact,
 recomputes the cut-derived ``CutFacts`` the ``TransformGroup`` readout needs
-whenever a framing-relevant parameter changes, and restores a cut's stored
-transform before "Use this set" rebuilds it (E17).
+whenever a framing-relevant parameter changes, and supplies a cut's stored
+transform when "Use this set" rebuilds it (E17).
 
 It deliberately does not cache a ``FramingSpec`` (T6): framing always comes
 from ``store.state.parameters``, read fresh each recomputation, so an edit
@@ -33,7 +33,12 @@ from matteloop.core.state import AppState
 from matteloop.core.timebase import webp_delays
 from matteloop.jobs.transform_stage import framing_plan
 from matteloop.jobs.transform_store import load_transform
-from matteloop.jobs.workspace import CutFrame, CutManifest, CutWorkspace
+from matteloop.jobs.workspace import (
+    CutFrame,
+    CutManifest,
+    CutWorkspace,
+    detect_external_edits,
+)
 from matteloop.ui.crop_canvas import CropCanvas
 from matteloop.ui.crop_presentation import CropPresentation
 from matteloop.ui.ports import StateStore
@@ -82,13 +87,14 @@ class _CutFactsWorker(QObject):
     """Recompute one ``CutFacts`` off the GUI thread; also resolves the
     ``FramingPlan`` the player's frame loader needs (C2) to apply per frame."""
 
-    succeeded = Signal(object, object, int)
-    failed = Signal(int)
+    succeeded = Signal(object, object, int, object)
+    failed = Signal(int, object)
     finished = Signal()
 
     def __init__(
         self, session: CutSession, framing: FramingSpec, frame_reader: FrameReader,
         generation: int, cancelled: Callable[[], bool] = lambda: False,
+        refresh_external_edits: bool = False,
     ) -> None:
         super().__init__()
         self._session = session
@@ -96,19 +102,27 @@ class _CutFactsWorker(QObject):
         self._frame_reader = frame_reader
         self._generation = generation
         self._cancelled = cancelled
+        self._refresh_external_edits = refresh_external_edits
 
     @Slot()
     def run(self) -> None:
         try:
+            session = self._session
+            if self._refresh_external_edits:
+                session = replace(
+                    session,
+                    manifest=detect_external_edits(session.workspace),
+                )
             facts, plan = _compute_facts(
-                self._session, self._framing, self._frame_reader, self._cancelled
+                session, self._framing, self._frame_reader, self._cancelled
             )
         except _CutFactsCancelled:
             pass
-        except Exception:
-            self.failed.emit(self._generation)
+        except Exception as error:
+            self.failed.emit(self._generation, error)
         else:
-            self.succeeded.emit(facts, plan, self._generation)
+            refreshed_session = session if self._refresh_external_edits else None
+            self.succeeded.emit(facts, plan, self._generation, refreshed_session)
         finally:
             self.finished.emit()
 
@@ -154,6 +168,9 @@ class TransformStageController(QObject):
         self._frame_thread: QThread | None = None
         self._frame_worker: FrameLoadWorker | None = None
         self._frame_cancel_event: threading.Event | None = None
+        self._external_edit_refresh_pending = False
+        self._edited_cuts = store.state.edited_cuts
+        self._edited_cuts_request_id = store.state.edited_cuts_request_id
         self._cache_budget = cache_budget
         self._debounce_timer = QTimer(self)
         self._debounce_timer.setSingleShot(True)
@@ -191,10 +208,10 @@ class TransformStageController(QObject):
         ):
             return
         self._session = CutSession(workspace, manifest, _fps_from_manifest(manifest))
-        self._schedule_facts()
+        self._schedule_facts(refresh_external_edits=self._store.state.edited_cuts)
 
-    def restore_for(self, workspace: CutWorkspace) -> None:
-        """Dispatch the cut's stored transform before a rebuild request.
+    def restore_for(self, workspace: CutWorkspace) -> TransformSpec:
+        """Return the cut's stored transform without changing global state.
 
         Clamps the crop when facts for this exact cut are already known
         (E14); otherwise the rebuild's own ``open_artifact`` clamps it --
@@ -210,7 +227,7 @@ class TransformStageController(QObject):
             clamped = clamp_crop(transform.crop, *facts.framed_size)
             if clamped != transform.crop:
                 transform = replace(transform, crop=clamped)
-        self._store.dispatch(TransformChanged(transform))
+        return transform
 
     def confirm_discard_if_needed(self, parent: QWidget | None = None) -> bool:
         """Ask before abandoning a transform that differs from its sidecar."""
@@ -237,6 +254,7 @@ class TransformStageController(QObject):
     def close_session(self) -> None:
         self._session = None
         self._plan = None
+        self._external_edit_refresh_pending = False
         self._current_generation = next(self._generations)
         self._set_facts(None)
 
@@ -324,15 +342,26 @@ class TransformStageController(QObject):
     def _state_changed(self, state: AppState) -> None:
         if state.source_id != self._source_id:
             self._source_id = state.source_id
+            self._edited_cuts = state.edited_cuts
+            self._edited_cuts_request_id = state.edited_cuts_request_id
             self._source_changed(state.parameters)
             return
         parameters = state.parameters
         framing = _framing_from_parameters(parameters)
         framing_changed = framing != self._framing
+        edit_scan_completed = (
+            self._edited_cuts_request_id is not None
+            and state.edited_cuts_request_id is None
+            and state.edited_cuts
+        )
+        edited_cuts_became_true = state.edited_cuts and not self._edited_cuts
+        refresh_external_edits = edit_scan_completed or edited_cuts_became_true
+        self._edited_cuts = state.edited_cuts
+        self._edited_cuts_request_id = state.edited_cuts_request_id
         if framing_changed:
             self._framing = framing
-            if self._session is not None:
-                self._schedule_facts()
+        if self._session is not None and (framing_changed or refresh_external_edits):
+            self._schedule_facts(refresh_external_edits=refresh_external_edits)
         transform = parameters.transform
         last_transform = self._last_transform
         transform_changed = transform != last_transform
@@ -378,16 +407,25 @@ class TransformStageController(QObject):
         presentation = self._crop_edit_presentation(transform)
         canvas.set_crop_edit(True, presentation, transform)
 
-    def _schedule_facts(self) -> None:
+    def _schedule_facts(self, *, refresh_external_edits: bool = False) -> None:
         session = self._session
         if session is None:
             return
+        refresh_external_edits = (
+            refresh_external_edits or self._external_edit_refresh_pending
+        )
+        self._external_edit_refresh_pending = refresh_external_edits
         self._join_worker()
         generation = next(self._generations)
         self._current_generation = generation
         cancel = self._facts_cancel_event = threading.Event()
         worker = _CutFactsWorker(
-            session, self._framing, self._frame_reader, generation, cancel.is_set
+            session,
+            self._framing,
+            self._frame_reader,
+            generation,
+            cancel.is_set,
+            refresh_external_edits,
         )
         thread = QThread(self)
         worker.moveToThread(thread)
@@ -410,14 +448,25 @@ class TransformStageController(QObject):
             self._thread = None
             self._worker = None
 
-    @Slot(object, object, int)
-    def _facts_ready(self, facts: object, plan: object, generation: int) -> None:
+    @Slot(object, object, int, object)
+    def _facts_ready(
+        self,
+        facts: object,
+        plan: object,
+        generation: int,
+        refreshed_session: object | None = None,
+    ) -> None:
         if (
             generation != self._current_generation
             or not isinstance(facts, CutFacts)
             or not isinstance(plan, FramingPlan)
         ):
             return
+        if refreshed_session is not None:
+            if not isinstance(refreshed_session, CutSession):
+                return
+            self._session = refreshed_session
+            self._external_edit_refresh_pending = False
         self._plan = plan
         self._clamp_current_crop(facts)
         self._set_facts(facts)
@@ -430,10 +479,12 @@ class TransformStageController(QObject):
             # just stored, not whatever was live when editing began.
             self._refresh_crop_edit_presentation(self._store.state.parameters.transform)
 
-    @Slot(int)
-    def _facts_failed(self, generation: int) -> None:
+    @Slot(int, object)
+    def _facts_failed(self, generation: int, error: object) -> None:
         if generation == self._current_generation:
+            self._external_edit_refresh_pending = False
             self._set_facts(None)
+            self._set_player_status_marker(error)
 
     def _clamp_current_crop(self, facts: CutFacts) -> None:
         transform = self._store.state.parameters.transform
@@ -501,6 +552,8 @@ class TransformStageController(QObject):
         plan = self._plan
         if canvas is None or session is None or facts is None or plan is None:
             return
+        if self._external_edit_refresh_pending:
+            return
         self._cancel_frame_load()
         generation = next(self._frame_generations)
         self._frame_generation = generation
@@ -544,13 +597,22 @@ class TransformStageController(QObject):
         self._player_frames = frames
         if self._player_canvas is not None:
             self._player_canvas.set_frames(frames)
+            facts = self._facts
+            if facts is not None:
+                transform = self._store.state.parameters.transform
+                self._player_canvas.set_kept_range(
+                    transform.kept_range(facts.frame_count)
+                )
 
     @Slot(str, int)
     def _frame_load_failed(self, message: str, generation: int) -> None:
         if generation != self._frame_generation:
             return
+        self._set_player_status_marker(message)
+
+    def _set_player_status_marker(self, message: object) -> None:
         if self._player_canvas is not None:
-            self._player_canvas.set_status_marker(message)
+            self._player_canvas.set_status_marker(str(message))
 
     def _cancel_frame_load(self, *, wait: bool = False) -> None:
         """Stop the in-flight frame load, if any, without blocking on it.
@@ -625,7 +687,9 @@ def _resolve_union(
     session: CutSession, framing: FramingSpec, frame_reader: FrameReader,
     cancelled: Callable[[], bool] = lambda: False,
 ) -> PixelBounds:
-    metadata = session.manifest.union_metadata
+    metadata = (
+        None if session.manifest.edited else session.manifest.union_metadata
+    )
     if metadata is not None:
         try:
             matches = Decimal(metadata.alpha_threshold) == framing.alpha_threshold

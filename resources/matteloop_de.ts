@@ -361,6 +361,11 @@
         <source>Model status: %s</source>
         <translation>Modellstatus: %s</translation>
     </message>
+    <message>
+        <location filename="../src/matteloop/ui/inspector.py" line="844"/>
+        <source>Open a video to manage its workspaces.</source>
+        <translation>Öffnen Sie ein Video, um dessen Arbeitsbereiche zu verwalten.</translation>
+    </message>
 </context>
 <context>
     <name>InspectorDisclosure</name>
@@ -1752,12 +1757,12 @@ Freed %s.</source>
         <translation>Ergebniswiedergabe pausieren</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/result_player.py" line="339"/>
+        <location filename="../src/matteloop/ui/result_player.py" line="337"/>
         <source>Previewing the first %s of %s frames</source>
         <translation>Die ersten %s von %s Bildern werden in der Vorschau angezeigt</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/result_player.py" line="427"/>
+        <location filename="../src/matteloop/ui/result_player.py" line="425"/>
         <source>Cut frames could not be read</source>
         <translation>Schnittbilder konnten nicht gelesen werden</translation>
     </message>
@@ -1777,18 +1782,19 @@ Freed %s.</source>
     <message>
         <location filename="../src/matteloop/ui/settings_dialog.py" line="54"/>
         <location filename="../src/matteloop/ui/settings_dialog.py" line="56"/>
+        <location filename="../src/matteloop/ui/settings_dialog.py" line="141"/>
         <source>Preferences</source>
         <translation>Einstellungen</translation>
     </message>
     <message>
         <location filename="../src/matteloop/ui/settings_dialog.py" line="77"/>
-        <location filename="../src/matteloop/ui/settings_dialog.py" line="127"/>
+        <location filename="../src/matteloop/ui/settings_dialog.py" line="130"/>
         <source>Interface language</source>
         <translation>Oberflächensprache</translation>
     </message>
     <message>
         <location filename="../src/matteloop/ui/settings_dialog.py" line="84"/>
-        <location filename="../src/matteloop/ui/settings_dialog.py" line="132"/>
+        <location filename="../src/matteloop/ui/settings_dialog.py" line="135"/>
         <source>Compute acceleration</source>
         <translation>Beschleunigung</translation>
     </message>
@@ -1818,7 +1824,7 @@ Freed %s.</source>
         <translation>Hinweis zum Neustart für die Sprache</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/settings_dialog.py" line="149"/>
+        <location filename="../src/matteloop/ui/settings_dialog.py" line="159"/>
         <source>Close preferences</source>
         <translation>Einstellungen schließen</translation>
     </message>
@@ -2282,12 +2288,12 @@ Freed %s.</source>
 <context>
     <name>TransformStage</name>
     <message>
-        <location filename="../src/matteloop/ui/transform_stage.py" line="224"/>
+        <location filename="../src/matteloop/ui/transform_stage.py" line="241"/>
         <source>Discard unsaved transform changes?</source>
         <translation>Ungespeicherte Transformationsänderungen verwerfen?</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/transform_stage.py" line="227"/>
+        <location filename="../src/matteloop/ui/transform_stage.py" line="244"/>
         <source>The current cut has unsaved transform changes. Discard them and continue?</source>
         <translation>Das aktuelle Schnittset enthält ungespeicherte Transformationsänderungen. Sollen sie verworfen und fortgefahren werden?</translation>
     </message>
