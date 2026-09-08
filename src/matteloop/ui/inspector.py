@@ -65,7 +65,7 @@ from matteloop.ui.copy import (
 )
 from matteloop.ui.crop_presentation import CropPresentation
 from matteloop.ui.inspector_disclosure import configure_disclosure, read_bool
-from matteloop.ui.inspector_reset import build_reset_button
+from matteloop.ui.inspector_reset import action_availability, build_reset_button
 from matteloop.ui.parameter_presentation import (
     ParameterPresentation,
     decimal_from_widget_value,
@@ -161,6 +161,7 @@ class Inspector(QFrame):
         for key, title, default in _DISCLOSURES:
             section = self._section(key, title, default)
             content_layout.addWidget(section)
+        content_layout.addWidget(self.reset_parameters_button)
         content_layout.addStretch(1)
         self.scroll_area.setWidget(content)
         outer.addWidget(self.scroll_area)
@@ -505,12 +506,13 @@ class Inspector(QFrame):
             self.padding_spinbox,
             self.stretch_spinbox,
             self.output_directory_button,
-            self.clear_output_directory_button,
             self.output_filename_edit,
             self.max_size_spinbox,
-            self.reset_parameters_button,
         ):
             widget.setEnabled(available)
+        clear_enabled, reset_enabled = action_availability(presentation)
+        self.clear_output_directory_button.setEnabled(available and clear_enabled)
+        self.reset_parameters_button.setEnabled(available and reset_enabled)
         self.fps_warning.setVisible(available and presentation.fps > 60)
 
     def _apply_parameter_values(self, presentation: ParameterPresentation) -> None:
@@ -767,7 +769,6 @@ class Inspector(QFrame):
         layout.addRow(self._form_label("Alpha threshold"), self.alpha_threshold_spinbox)
         layout.addRow(self._form_label("Padding"), self.padding_spinbox)
         layout.addRow(self._form_label("Horizontal stretch"), self.stretch_spinbox)
-        layout.addRow(self._form_label(""), self.reset_parameters_button)
         return controls
 
     def _output_controls(self) -> QWidget:

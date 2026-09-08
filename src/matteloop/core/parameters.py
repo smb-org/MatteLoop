@@ -229,17 +229,40 @@ def _reduce_parameters_reset(state: AppState) -> AppState:
         try:
             timeline = timeline.set_fps(defaults.fps)
         except ValueError:
-            return state
+            # Keep the selected range and its current valid FPS when 15 fps
+            # cannot produce one output frame in that range.
+            parameters = replace(parameters, fps=timeline.fps)
     if parameters == state.parameters and timeline == state.timeline:
         return state
     model_available = state.model_available
     if parameters.model_id != state.parameters.model_id:
         model_available = False
-    return _invalidate(
-        replace(state, timeline=timeline, model_available=model_available),
-        parameters,
-        PreviewInvalidationReason.CROP_CLEANUP,
-    )
+    updated_state = replace(state, timeline=timeline, model_available=model_available)
+    reason: PreviewInvalidationReason | None = None
+    if (
+        parameters.model_id != state.parameters.model_id
+        or parameters.edge_mode != state.parameters.edge_mode
+    ):
+        reason = PreviewInvalidationReason.SEGMENTATION
+    elif parameters.fps != state.parameters.fps or (
+        state.timeline is not None
+        and timeline is not None
+        and timeline.fps != state.timeline.fps
+    ):
+        reason = PreviewInvalidationReason.SAMPLING
+    elif any(
+        current != previous
+        for current, previous in (
+            (parameters.trim, state.parameters.trim),
+            (parameters.alpha_threshold, state.parameters.alpha_threshold),
+            (parameters.padding, state.parameters.padding),
+            (parameters.stretch_x, state.parameters.stretch_x),
+        )
+    ):
+        reason = PreviewInvalidationReason.CROP_CLEANUP
+    if reason is None:
+        return replace(updated_state, parameters=parameters)
+    return _invalidate(updated_state, parameters, reason)
 
 
 def _reduce_model(state: AppState, event: ModelChanged) -> AppState:

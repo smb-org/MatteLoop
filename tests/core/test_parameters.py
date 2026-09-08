@@ -224,7 +224,64 @@ def test_reset_restores_inspector_parameters_and_preserves_other_state() -> None
     assert reset.timeline.playhead == state.timeline.playhead
     assert reset.timeline.fps == defaults.fps
     assert reset.preview is PreviewState.STALE
+    assert reset.stale_category is PreviewInvalidationReason.SEGMENTATION
+
+
+def test_reset_keeps_other_defaults_when_the_selected_range_is_short() -> None:
+    current = _current()
+    assert current.timeline is not None
+    parameters = replace(
+        current.parameters,
+        fps=120,
+        alpha_threshold=Decimal("0.4"),
+        padding=8,
+        stretch_x=Decimal("1.25"),
+    )
+    timeline = replace(
+        current.timeline,
+        end=Fraction(1, 120),
+        fps=120,
+    )
+    state = replace(current, parameters=parameters, timeline=timeline)
+
+    reset = reduce(state, ParametersReset())
+
+    assert reset.parameters.fps == 120
+    assert reset.parameters.alpha_threshold == ParameterState().alpha_threshold
+    assert reset.parameters.padding == ParameterState().padding
+    assert reset.parameters.stretch_x == ParameterState().stretch_x
+    assert reset.timeline is timeline
+    assert reset.timeline.start == Fraction(0)
+    assert reset.timeline.end == Fraction(1, 120)
+    assert reset.preview is PreviewState.STALE
     assert reset.stale_category is PreviewInvalidationReason.CROP_CLEANUP
+
+
+def test_reset_names_segmentation_when_only_the_model_differs() -> None:
+    current = _current()
+    state = replace(
+        current,
+        parameters=replace(current.parameters, model_id="u2net"),
+    )
+
+    reset = reduce(state, ParametersReset())
+
+    assert reset.parameters.model_id == ParameterState().model_id
+    assert reset.stale_category is PreviewInvalidationReason.SEGMENTATION
+
+
+def test_reset_keeps_a_current_preview_when_only_maximum_size_differs() -> None:
+    current = _current()
+    state = replace(
+        current,
+        parameters=replace(current.parameters, max_mib=Decimal("12.5")),
+    )
+
+    reset = reduce(state, ParametersReset())
+
+    assert reset.parameters.max_mib == ParameterState().max_mib
+    assert reset.preview is PreviewState.CURRENT
+    assert reset.stale_category is None
 
 
 def test_reset_parameters_is_ignored_while_a_job_runs() -> None:

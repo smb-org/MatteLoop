@@ -276,13 +276,19 @@ def test_inspector_exposes_reset_action_and_explains_what_it_preserves(qtbot) ->
     qtbot.addWidget(inspector)
     commands: list[object] = []
     inspector.command_requested.connect(commands.append)
+    state = AppState(
+        parameters=ParameterState(model_id="u2net"),
+        timeline=TimelineState(Fraction(4), Fraction(0), Fraction(4), Fraction(0)),
+    )
+    inspector.apply_parameters(present_parameters(state), editable=True)
 
     assert inspector.reset_parameters_button.text() == "Reset to defaults"
     assert inspector.reset_parameters_button.accessibleName() == (
         "Reset inspector parameters"
     )
     assert inspector.reset_parameters_button.toolTip() == (
-        "Compute acceleration, output directory, and output filename are not affected."
+        "Compute acceleration, transform, output directory, and output filename "
+        "are not affected."
     )
 
     inspector.reset_parameters_button.click()
@@ -377,6 +383,46 @@ def test_inspector_exposes_and_emits_output_directory_clear(qtbot) -> None:
         "OutputDirectoryChanged"
     ]
     assert commands[0].directory is None
+
+
+def test_inspector_disables_clear_without_an_output_directory_override(qtbot) -> None:
+    inspector = Inspector(_settings())
+    qtbot.addWidget(inspector)
+    commands: list[object] = []
+    inspector.command_requested.connect(commands.append)
+    state = AppState(
+        timeline=TimelineState(Fraction(4), Fraction(0), Fraction(4), Fraction(0))
+    )
+    inspector.apply_parameters(present_parameters(state), editable=True)
+
+    assert not inspector.clear_output_directory_button.isEnabled()
+    inspector.clear_output_directory_button.click()
+
+    assert commands == []
+
+
+def test_inspector_disables_reset_when_all_resettable_values_are_default(qtbot) -> None:
+    inspector = Inspector(_settings())
+    qtbot.addWidget(inspector)
+    state = AppState(
+        timeline=TimelineState(Fraction(4), Fraction(0), Fraction(4), Fraction(0))
+    )
+    inspector.apply_parameters(present_parameters(state), editable=True)
+
+    assert not inspector.reset_parameters_button.isEnabled()
+
+
+def test_inspector_places_reset_after_the_disclosures_and_at_the_end_of_tab_order(
+    qtbot,
+) -> None:
+    inspector = Inspector(_settings())
+    qtbot.addWidget(inspector)
+
+    assert (
+        inspector.reset_parameters_button.parentWidget()
+        is inspector.scroll_area.widget()
+    )
+    assert inspector.tab_widgets()[-1] is inspector.reset_parameters_button
 
 
 def test_inspector_explains_invalid_output_filename_without_emitting_a_command(
