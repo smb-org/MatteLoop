@@ -25,10 +25,17 @@ composite. MatteLoop is the whole path from that clip to that loop:
   it is right.
 - **Render** a lossless transparent animated WebP.
 - **Choose or clear the output directory** in the inspector's Output section.
+- **Replace the open clip** by dropping another video onto the window, or with
+  the Replace button. Unsaved transform edits are never discarded without
+  asking first.
+- **Reset the render parameters** to their defaults when a setting has drifted
+  and you would rather start from the top.
 
 The interface is available in English and German. Change the language in
 Preferences from the gear button; the choice applies after restarting
-MatteLoop.
+MatteLoop. Preferences also holds **compute acceleration**, which describes
+this machine's graphics hardware rather than the clip, so it stays out of the
+inspector.
 
 The result is lossless and genuinely transparent — an alpha channel, not a
 matte painted onto a colour.

@@ -124,6 +124,13 @@ as a damaged application. That bundle cannot be re-signed either; `codesign`
 refuses it over the plain `.pxd` and `.py` files inside `Contents/MacOS/av`.
 Never edit a built bundle's `Info.plist`.
 
+After changing them, run `uv sync --reinstall-package matteloop` before the
+test suite: the editable install caches the version in its own metadata, and
+`tests/test_app_smoke.py` compares `--version` against *that*, so it fails with
+a confusing "0.3.0 != 0.2.1" until the package is reinstalled. CI syncs fresh
+and never sees it. `uv.lock` does not record the project version, so it needs
+no change.
+
 `tests/release/test_version_identity.py` fails when those disagree. It is a
 floor, not a substitute for this list: it cannot see the tag, the release notes,
 or the README.
