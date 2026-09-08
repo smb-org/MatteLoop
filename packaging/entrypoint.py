@@ -6,11 +6,11 @@ import re
 import sys
 
 _RESOURCE_TRACKER_PAYLOAD = re.compile(
-    r"from multiprocessing\.resource_tracker import main;main\([0-9]+\)\Z"
+    r"from multiprocessing\.resource_tracker import main;main\(([0-9]+)\)\Z"
 )
 
 
-def _prepare_multiprocessing_payload(argv: list[str]) -> str | None:
+def _prepare_multiprocessing_payload(argv: list[str]) -> int | None:
     """Return a safe multiprocessing payload and remove its interpreter args."""
     try:
         code_index = argv.index("-c")
@@ -21,23 +21,26 @@ def _prepare_multiprocessing_payload(argv: list[str]) -> str | None:
         raise ValueError("matteloop: interpreter -c argument is missing its code")
 
     payload = argv[code_index + 1]
-    if _RESOURCE_TRACKER_PAYLOAD.fullmatch(payload) is None:
+    match = _RESOURCE_TRACKER_PAYLOAD.fullmatch(payload)
+    if match is None:
         raise ValueError(
             "matteloop: refusing to execute unsupported interpreter payload; "
             "only the multiprocessing resource-tracker bootstrap is supported"
         )
 
     del argv[1 : code_index + 2]
-    return payload
+    return int(match.group(1))
 
 
 if __name__ == "__main__":
     try:
-        interpreter_payload = _prepare_multiprocessing_payload(sys.argv)
+        interpreter_fd = _prepare_multiprocessing_payload(sys.argv)
     except ValueError as error:
         raise SystemExit(str(error)) from None
-    if interpreter_payload is not None:
-        exec(interpreter_payload, {"__name__": "__main__"})
+    if interpreter_fd is not None:
+        from multiprocessing.resource_tracker import main as resource_tracker_main
+
+        resource_tracker_main(interpreter_fd)
     else:
         from matteloop.app import main
 
