@@ -42,10 +42,19 @@ environment for the build; run the commands below from the repository root.
 The `onnxruntime` and `onnxruntime-directml` distributions both install the
 same `onnxruntime` import package. Do not treat a present distribution version
 as proof that the import package is intact. If `matteloop --providers` reports
-an unusable runtime, repair the shared package with:
+an unusable runtime, repair the shared package with the command for your
+platform:
+
+Windows:
 
 ```sh
 uv sync --reinstall-package onnxruntime-directml
+```
+
+macOS and Linux:
+
+```sh
+uv sync --reinstall-package onnxruntime
 ```
 
 ## Translation catalogues
