@@ -73,13 +73,16 @@ def present(state: AppState) -> PresentationModel:
     elif not state.model_available:
         message = "Download required"
     result_status_marker: str | None
+    result_status_category: str | None = None
     if state.edited_cuts and state.preview_result is not None:
         message = "Model preview — rebuild uses edited cut frames"
     result_accessible_description = message
+    result_accessible_category = None
     if state.preview is Preview.STALE and stale_category:
-        result_accessible_description = f"{stale_category}: {message}"
+        result_accessible_category = stale_category
     if state.edited_cuts and state.preview_result is not None:
         result_accessible_description = "Model preview — rebuild uses edited cut frames"
+        result_accessible_category = None
     if state.edited_cuts:
         result_status_marker = "Edited cuts changed"
     elif (
@@ -89,7 +92,8 @@ def present(state: AppState) -> PresentationModel:
     ):
         result_status_marker = marker
     elif marker is not None and stale_category is not None:
-        result_status_marker = f"{marker} · {stale_category}"
+        result_status_marker = marker
+        result_status_category = stale_category
     else:
         result_status_marker = marker
     result_status = "error" if state.source is Source.ERROR else state.preview.value
@@ -151,7 +155,9 @@ def present(state: AppState) -> PresentationModel:
         result_checkerboard=result_checkerboard,
         result_accessible_name="Background-removed result",
         result_accessible_description=result_accessible_description,
+        result_accessible_category=result_accessible_category,
         result_status_marker=result_status_marker,
+        result_status_category=result_status_category,
         result_status_icon=result_status_icon,
         recovery_visible=state.edited_cuts_error is not None,
         recovery_label=recovery_copy(state.edited_cuts_error),

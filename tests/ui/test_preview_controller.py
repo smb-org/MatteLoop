@@ -336,7 +336,7 @@ def test_job_dialog_keeps_stage_detail_and_overall_progress_separate(qtbot) -> N
     dialog.set_progress(
         ProgressEvent(
             "job",
-            "Encode",
+            ProgressStage.ENCODE,
             12,
             39,
             "Encode frame 12 of 39",
@@ -370,10 +370,12 @@ def test_job_dialog_marks_unknown_overall_progress_as_indeterminate(qtbot) -> No
     dialog.set_progress(
         ProgressEvent(
             "job",
-            "Auto-fit, attempt 3 of at most 12",
+            ProgressStage.AUTO_FIT,
             12,
             39,
             "Frame 12 of 39",
+            attempt=3,
+            maximum=12,
         )
     )
 

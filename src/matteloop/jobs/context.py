@@ -19,13 +19,15 @@ from matteloop.jobs.protocol import PROTOCOL_VERSION, CancelAck
 @dataclass(frozen=True, slots=True)
 class ProgressEvent:
     job_id: str
-    stage: str | ProgressStage
+    stage: ProgressStage
     completed: int
     total: int | None = None
     detail: str = ""
     overall_completed: int | None = None
     overall_total: int | None = None
     overall_indeterminate: bool = False
+    attempt: int | None = None
+    maximum: int | None = None
 
 
 class JobTerminalState(StrEnum):
@@ -70,16 +72,18 @@ class CancellationState:
 
 
 def _validate_progress_args(
-    stage: str | ProgressStage,
+    stage: ProgressStage,
     completed: int,
     total: int | None,
     detail: str,
     overall_completed: int | None,
     overall_total: int | None,
     overall_indeterminate: bool,
+    attempt: int | None,
+    maximum: int | None,
 ) -> None:
-    if not isinstance(stage, str) or not stage:
-        raise ValueError("stage must be a non-empty string")
+    if not isinstance(stage, ProgressStage):
+        raise ValueError("stage must be a ProgressStage")
     if (
         not isinstance(completed, int)
         or isinstance(completed, bool)
@@ -94,6 +98,7 @@ def _validate_progress_args(
         raise ValueError("detail must be a string")
     if not isinstance(overall_indeterminate, bool):
         raise ValueError("overall_indeterminate must be a bool")
+    _validate_attempt_counts(attempt, maximum)
     if overall_indeterminate and (
         overall_completed is not None or overall_total is not None
     ):
@@ -115,6 +120,24 @@ def _validate_progress_args(
     ):
         raise ValueError(
             "overall counts must be integers with total at least completed"
+        )
+
+
+def _validate_attempt_counts(attempt: int | None, maximum: int | None) -> None:
+    """Validate the optional bounded auto-fit attempt metadata."""
+    if (attempt is None) != (maximum is None):
+        raise ValueError("attempt and maximum must be supplied together")
+    if attempt is not None and (
+        not isinstance(attempt, int)
+        or isinstance(attempt, bool)
+        or attempt < 1
+        or maximum is None
+        or not isinstance(maximum, int)
+        or isinstance(maximum, bool)
+        or maximum < attempt
+    ):
+        raise ValueError(
+            "attempt counts must be positive integers with maximum at least attempt"
         )
 
 
@@ -205,7 +228,7 @@ class JobContext:
 
     def progress(
         self,
-        stage: str | ProgressStage,
+        stage: ProgressStage,
         completed: int,
         *,
         total: int | None = None,
@@ -213,6 +236,8 @@ class JobContext:
         overall_completed: int | None = None,
         overall_total: int | None = None,
         overall_indeterminate: bool = False,
+        attempt: int | None = None,
+        maximum: int | None = None,
     ) -> ProgressEvent:
         _validate_progress_args(
             stage,
@@ -222,6 +247,8 @@ class JobContext:
             overall_completed,
             overall_total,
             overall_indeterminate,
+            attempt,
+            maximum,
         )
         with self._lock:
             if self._terminal_state not in {
@@ -244,6 +271,8 @@ class JobContext:
                 overall_completed,
                 overall_total,
                 overall_indeterminate,
+                attempt,
+                maximum,
             )
             if overall_indeterminate:
                 self._overall_progress = None
@@ -255,15 +284,17 @@ class JobContext:
 
     def frame_progress(
         self,
-        stage: str | ProgressStage,
+        stage: ProgressStage,
         completed: int,
         total: int,
         *,
         overall: tuple[int, int] | None = None,
         overall_indeterminate: bool = False,
+        attempt: int | None = None,
+        maximum: int | None = None,
     ) -> ProgressEvent:
         """Publish a counted frame event with the standard detail wording."""
-        detail = f"{stage} frame {completed} of {total}"
+        detail = f"Frame {completed} of {total}"
         effective_overall = overall
         if effective_overall is None and not overall_indeterminate:
             effective_overall = self.overall_progress
@@ -275,6 +306,8 @@ class JobContext:
                 total=total,
                 detail=detail,
                 overall_indeterminate=overall_indeterminate,
+                attempt=attempt,
+                maximum=maximum,
             )
         return self.progress(
             stage,
@@ -283,6 +316,8 @@ class JobContext:
             detail=detail,
             overall_completed=effective_overall[0] + completed,
             overall_total=effective_overall[1],
+            attempt=attempt,
+            maximum=maximum,
         )
 
     def request_cancel(self) -> bool:

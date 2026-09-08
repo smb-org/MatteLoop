@@ -113,7 +113,7 @@ class ActiveJob:
     job_id: str | None = None
     kind: JobKind | None = None
     phase: JobState = JobState.IDLE
-    stage: str | Stage = ""
+    stage: Stage | None = None
     initiator_focus: FocusTarget = FocusTarget.NONE
 
 @dataclass(frozen=True)
@@ -265,7 +265,7 @@ class JobStageChanged:
     job_id: str
     source_id: str
     request_id: str
-    stage: str | Stage
+    stage: Stage
 
 
 @dataclass(frozen=True)
@@ -645,7 +645,9 @@ def reduce(state: AppState, event: Event) -> AppState:
             return state
         return replace(
             state,
-            job=replace(state.job, phase=JobState.CANCELLING, stage="Cancelling"),
+            job=replace(
+                state.job, phase=JobState.CANCELLING, stage=Stage.CANCELLING
+            ),
             focus_target=FocusTarget.JOB_DIALOG,
         )
     if isinstance(event, CancelAcknowledged):

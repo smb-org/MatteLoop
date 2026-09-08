@@ -281,7 +281,7 @@ class PreviewController(QObject):
         if self._dialog is None:
             return
         stage = getattr(notification, "stage", "")
-        if isinstance(stage, str) and stage:
+        if isinstance(stage, ProgressStage):
             self._dialog.set_stage(stage)
         if isinstance(notification, ModelPrepared):
             self._dialog.setWindowTitle(

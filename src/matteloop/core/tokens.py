@@ -11,6 +11,15 @@ class ProgressStage(StrEnum):
     SEGMENTATION = "segmentation"
     DECODE = "decode"
     RENDER_CUT = "render_cut"
+    FRAMING = "framing"
+    CUT_PROMOTION = "cut_promotion"
+    VALIDATION = "validation"
+    POST_PROCESS = "post_process"
+    AUTO_FIT = "auto_fit"
+    ENCODE = "encode"
+    VALIDATE = "validate"
+    COMPLETE = "complete"
+    CANCELLING = "cancelling"
 
 
 class PreviewInvalidationReason(StrEnum):

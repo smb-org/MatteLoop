@@ -621,6 +621,33 @@ def test_stale_category_is_visible_and_preview_accessible_name_is_dynamic(
     assert value.preview_button.accessibleName() == "Download & Preview"
 
 
+def test_main_window_does_not_render_english_status_copy_in_german(window) -> None:
+    from matteloop.ui.i18n import install_translators
+
+    value, _ = window
+    application = QApplication.instance()
+    assert application is not None
+    translators = install_translators(application, "de")
+    try:
+        stale = reduce(
+            _current(), PreviewInvalidated(PreviewInvalidationReason.CROP_CLEANUP)
+        )
+        value.render_state(stale)
+        english = "Settings changed — preview again · Crop & cleanup"
+        assert value.result_canvas.status_label.text() != english
+        assert value.result_canvas.status_label.text() == (
+            "Einstellungen geändert — Vorschau erneut anzeigen · "
+            "Zuschnitt und Bereinigung"
+        )
+        assert value.result_canvas.accessibleDescription() == (
+            "Zuschnitt und Bereinigung: Einstellungen geändert — "
+            "Vorschau erneut anzeigen"
+        )
+    finally:
+        for translator in translators:
+            application.removeTranslator(translator)
+
+
 def test_render_completion_focus_is_routed_to_the_job_dialog(window, qtbot) -> None:
     value, _ = window
     value.render_state(_current())
@@ -668,8 +695,11 @@ def test_stale_accessibility_and_workspace_flags_are_presenter_owned() -> None:
         reduce(_current(), PreviewInvalidated(PreviewInvalidationReason.CROP_CLEANUP))
     )
     assert stale.result_accessible_description == (
-        "Crop & cleanup: Settings changed — preview again"
+        "Settings changed — preview again"
     )
+    assert stale.result_accessible_category == "Crop & cleanup"
+    assert stale.result_status_marker == "Settings changed — preview again"
+    assert stale.result_status_category == "Crop & cleanup"
     assert stale.workspace_attention is False
     assert stale.workspace_open is False
     edited = present(_edited_error())
