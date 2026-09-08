@@ -24,3 +24,6 @@ packaging/deployment/
 onnxruntime_profile__*.json
 /core
 qemu_*.core
+# A stray SQLite session file some tool writes when a database name of
+# ":memory:" reaches a path. Its colon makes every Windows checkout fail.
+:memory:*

@@ -1325,3 +1325,18 @@ def test_native_build_recovers_a_mislabeled_bundle_end_to_end(
     assert native_build.main([]) == 0
     assert (artifact / "matteloop.exe").read_bytes() == b"bundle"
     assert not (tmp_path / "packaging" / "deployment").exists()
+
+
+def test_temporary_spec_ships_the_qt_catalogues(tmp_path: Path) -> None:
+    """Nuitka only bundles Qt translations with QtWebEngine, which we do not use.
+
+    Dropping --noinclude-qt-translations therefore shipped nothing, and the
+    bundle verification caught it only after the fact. The catalogues are named
+    explicitly, so assert the spec asks for them.
+    """
+    arguments = native_build._qt_translation_file_args()  # noqa: SLF001
+
+    for language in native_build._QT_TRANSLATION_LANGUAGES:  # noqa: SLF001
+        assert (
+            f"=PySide6/Qt/translations/qtbase_{language}.qm" in arguments
+        ), language
