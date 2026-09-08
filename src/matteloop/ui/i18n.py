@@ -114,13 +114,26 @@ def install_translators(
         application.installTranslator(app_translator)
         translators.append(app_translator)
 
-    qt_translations = (
-        Path(runtime_root).resolve() / "PySide6" / "Qt" / "translations"
-        if runtime_root is not None
-        else Path(QLibraryInfo.path(QLibraryInfo.LibraryPath.TranslationsPath))
-    )
+    # The bundled layout differs by platform — PySide6/Qt/translations on
+    # macOS, PySide6/translations on Windows — so ask Qt where it keeps them
+    # and fall back to both shapes under an explicit root.
+    candidates = [Path(QLibraryInfo.path(QLibraryInfo.LibraryPath.TranslationsPath))]
+    if runtime_root is not None:
+        root = Path(runtime_root).resolve()
+        candidates = [
+            root / "PySide6" / "Qt" / "translations",
+            root / "PySide6" / "translations",
+            *candidates,
+        ]
     qt_translator = QTranslator()
-    qt_catalogue = qt_translations / f"qtbase_{language}.qm"
+    qt_catalogue = next(
+        (
+            directory / f"qtbase_{language}.qm"
+            for directory in candidates
+            if (directory / f"qtbase_{language}.qm").is_file()
+        ),
+        candidates[0] / f"qtbase_{language}.qm",
+    )
     if qt_catalogue.is_file() and qt_translator.load(str(qt_catalogue)):
         application.installTranslator(qt_translator)
         translators.append(qt_translator)
