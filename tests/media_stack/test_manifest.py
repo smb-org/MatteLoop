@@ -200,6 +200,23 @@ def test_manifest_rejects_unknown_tool_keys(tmp_path: Path) -> None:
         load_manifest(path)
 
 
+def test_tool_input_matches_manifest_tool_versions() -> None:
+    manifest = load_manifest(MANIFEST)
+    tool_input = (MANIFEST.parent / "tools.in").read_text(encoding="utf-8")
+
+    assert all(
+        pin in tool_input
+        for pin in (
+            f"build=={manifest.tools.build}",
+            f"setuptools=={manifest.tools.setuptools}",
+            f"Cython=={manifest.tools.cython}",
+            f"wheel=={manifest.tools.wheel}",
+            f"delocate=={manifest.tools.delocate}",
+            f"delvewheel=={manifest.tools.delvewheel}",
+        )
+    )
+
+
 def test_identity_is_stable_for_the_same_manifest_and_target(tmp_path: Path) -> None:
     manifest_path = tmp_path / "manifest.toml"
     manifest_path.write_bytes(MANIFEST.read_bytes())
@@ -275,3 +292,22 @@ def test_identity_changes_when_manifest_bytes_change(tmp_path: Path) -> None:
     assert media_stack_identity(first_path, **common) != media_stack_identity(
         second_path, **common
     )
+
+
+def test_identity_changes_when_tool_lock_bytes_change(tmp_path: Path) -> None:
+    manifest_path = tmp_path / "manifest.toml"
+    lock_path = tmp_path / "tools.lock"
+    manifest_path.write_bytes(MANIFEST.read_bytes())
+    lock_path.write_bytes((MANIFEST.parent / "tools.lock").read_bytes())
+    common = dict(
+        os_name="darwin",
+        machine="arm64",
+        python_tag="cp313",
+        deployment_target="13.0",
+        builder_revision=1,
+    )
+
+    first = media_stack_identity(manifest_path, **common)
+    lock_path.write_bytes(lock_path.read_bytes() + b"\n")
+
+    assert first != media_stack_identity(manifest_path, **common)

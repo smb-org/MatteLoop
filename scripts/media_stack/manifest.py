@@ -31,7 +31,7 @@ _FLOATING_TOKEN = re.compile(
 )
 _EXACT_VERSION = re.compile(r"[0-9]+(?:\.[0-9]+)+")
 _SHA256 = re.compile(r"[0-9a-f]{64}")
-MEDIA_STACK_BUILDER_REVISION = 2
+MEDIA_STACK_BUILDER_REVISION = 3
 
 
 @dataclass(frozen=True, slots=True)
@@ -141,10 +141,19 @@ def media_stack_identity(
     python_tag: str,
     deployment_target: str,
     builder_revision: int = MEDIA_STACK_BUILDER_REVISION,
+    tool_lock_path: Path | None = None,
 ) -> str:
     """Return the short cache identity for one manifest and build contract."""
+    lock_path = (
+        manifest_path.with_name("tools.lock")
+        if tool_lock_path is None
+        else tool_lock_path
+    )
+    lock_bytes = lock_path.read_bytes() if lock_path.is_file() else b""
     payload = (
         manifest_path.read_bytes()
+        + b"\0"
+        + lock_bytes
         + b"\0"
         + json.dumps(
             {

@@ -458,7 +458,7 @@ def test_verifier_accepts_provenance_from_the_current_builder_revision(
 
     wheel = _wheel_path(tmp_path)
     _write_fake_wheel(wheel)
-    _write_provenance(wheel, MACOS, builder_revision=2)
+    _write_provenance(wheel, MACOS, builder_revision=3)
     real_run = subprocess.run
 
     def run(
@@ -478,7 +478,7 @@ def test_verifier_accepts_provenance_from_the_current_builder_revision(
         machine=MACOS.machine,
         python_tag=MACOS.python_tag,
         deployment_target=MACOS.deployment_target,
-        builder_revision=2,
+        builder_revision=3,
     )
 
 
@@ -551,6 +551,9 @@ def test_verification_uses_private_snapshots_after_original_paths_are_replaced(
 
     manifest = tmp_path / "manifest.toml"
     manifest.write_bytes(MANIFEST.read_bytes())
+    (tmp_path / "tools.lock").write_bytes(
+        (MANIFEST.parent / "tools.lock").read_bytes()
+    )
     wheel = _wheel_path(tmp_path)
     _write_fake_wheel(wheel)
     _write_provenance(wheel, MACOS, manifest)

@@ -113,6 +113,7 @@ class VerificationReport:
 @dataclass(frozen=True, slots=True)
 class _InputSnapshots:
     manifest: Path
+    tool_lock: Path
     wheel: Path
     provenance: Path
     wheel_filename: str
@@ -223,6 +224,7 @@ def _verify_snapshots(
         snapshots.wheel,
         snapshots.manifest,
         target,
+        tool_lock_path=snapshots.tool_lock,
         wheel_filename=snapshots.wheel_filename,
     )
     provenance = _load_provenance(snapshots.provenance)
@@ -360,6 +362,12 @@ def _snapshot_inputs(wheel: Path, manifest: Path, destination: Path) -> _InputSn
         destination / "manifest",
         f"manifest does not exist: {manifest}",
     )
+    tool_lock = manifest.with_name("tools.lock")
+    tool_lock_snapshot = _snapshot_file(
+        tool_lock,
+        destination / "tool-lock",
+        f"tool lock does not exist: {tool_lock}",
+    )
     sidecar = provenance_path(wheel)
     provenance_snapshot = _snapshot_file(
         sidecar,
@@ -368,6 +376,7 @@ def _snapshot_inputs(wheel: Path, manifest: Path, destination: Path) -> _InputSn
     )
     return _InputSnapshots(
         manifest_snapshot,
+        tool_lock_snapshot,
         wheel_snapshot,
         provenance_snapshot,
         wheel.name,
@@ -392,6 +401,7 @@ def _expected_provenance(
     manifest_path: Path,
     target: BuildTarget,
     *,
+    tool_lock_path: Path | None = None,
     wheel_filename: str | None = None,
 ) -> dict[str, str]:
     return {
@@ -402,6 +412,7 @@ def _expected_provenance(
             python_tag=target.python_tag,
             deployment_target=target.deployment_target,
             builder_revision=MEDIA_STACK_BUILDER_REVISION,
+            tool_lock_path=tool_lock_path,
         ),
         "manifest_sha256": _sha256(manifest_path),
         "target_id": target.target_id,

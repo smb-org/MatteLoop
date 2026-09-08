@@ -122,9 +122,9 @@ uv run --frozen --no-sync python scripts/build_media_stack.py --json
 ```
 
 The default cache is `.matteloop-build-cache/media-stack`. Its 24-character
-identity covers the exact manifest bytes, builder-recipe revision, operating
-system, normalized machine architecture, CPython ABI tag, and deployment
-target. Changing any input selects a new
+identity covers the exact manifest and tool-lock bytes, builder-recipe revision,
+operating system, normalized machine architecture, CPython ABI tag, and
+deployment target. Changing any input selects a new
 `<identity>/finished/` directory. A successful directory contains:
 
 - the repaired `av-*.whl` and adjacent `*.provenance.json`;
@@ -136,6 +136,20 @@ target. Changing any input selects a new
   checksums, and rebuild instructions; and
 - `*.artifact-set.json`, cryptographically binding the wheel, provenance,
   report, compliance archive, target, ABI, manifest, and identity.
+
+The isolated build-tool environment installs from the checked-in
+`packaging/media-stack/tools.lock`, which includes hashes for the direct tools
+and their transitive dependencies. Its platform markers select `delocate` on
+macOS and `delvewheel` on Windows. Keep the direct pins in
+`packaging/media-stack/tools.in` aligned with the `[tools]` table in
+`manifest.toml`; regenerate the lock after changing either set of tool
+versions with this one command:
+
+```sh
+uv pip compile --universal --generate-hashes --python-version 3.13 \
+  --output-file packaging/media-stack/tools.lock \
+  packaging/media-stack/tools.in
+```
 
 A cache hit skips source compilation but validates the artifact-set binding and
 runs the complete wheel verifier again. To deliberately compile from scratch,
@@ -290,7 +304,8 @@ Do not infer Windows status from the committed workflow or macOS results.
 two-target build. It prepares the target toolchain, restores only the exact
 media-stack cache key, installs the frozen environment, and runs the same
 `scripts/build.py` gate. The key includes the runner OS, matrix target, and a
-hash of the media manifest, all `scripts/media_stack/**/*.py` files,
+hash of the media manifest, tool input and lock files, all
+`scripts/media_stack/**/*.py` files,
 `scripts/build_media_stack.py`, and `scripts/verify_media_stack.py`; it has no
 broad restore key.
 

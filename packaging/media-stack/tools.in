@@ -1,0 +1,7 @@
+# Direct media-stack build tools; keep versions aligned with manifest.toml.
+build==1.6.0
+setuptools==84.0.0
+Cython==3.3.0
+wheel==0.48.0
+delocate==0.13.0; sys_platform == "darwin"
+delvewheel==1.13.0; sys_platform == "win32"
