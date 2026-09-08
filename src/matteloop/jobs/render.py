@@ -604,7 +604,9 @@ class PillowWebPEncoder:
         ownership: RgbaOwnershipTracker,
     ) -> ValidatedCandidate:
         context.checkpoint("encode")
-        stage = "Auto-fit" if max_bytes is not None else "Encode"
+        stage = (
+            ProgressStage.AUTO_FIT if max_bytes is not None else ProgressStage.ENCODE
+        )
         overall = None if max_bytes is not None else context.overall_progress
         if max_bytes is None:
             frame_progress = cast(
@@ -1141,7 +1143,9 @@ class RenderService:
             )
             scratch = staged.scratch_root / context.job_id
             scratch_owners.append(staged.output_directory)
-            context.progress("Cut promotion", 0, detail="Promoting cut frames")
+            context.progress(
+                ProgressStage.CUT_PROMOTION, 0, detail="Promoting cut frames"
+            )
             durable, private, promoted_manifest = self._workspace.promote_render(
                 staged, manifest, scratch, context
             )
@@ -1199,7 +1203,9 @@ class RenderService:
                     "Rebuild requires rebuild=True and regenerate=False",
                 )
             self._segmentation.validate_for(request)
-            context.progress("Validation", 0, detail="Validating cut set")
+            context.progress(
+                ProgressStage.VALIDATION, 0, detail="Validating cut set"
+            )
             durable_manifest = self._workspace.detect_edits(cut_workspace)
             inputs = cut_cache_key_inputs(
                 request,
@@ -1259,7 +1265,9 @@ class RenderService:
             scratch = cut_workspace.scratch_root / context.job_id
             scratch_owners.append(cut_workspace.output_directory)
             private = self._workspace.snapshot_rebuild(cut_workspace, scratch, context)
-            context.progress("Validation", 0, detail="Validating cut snapshot")
+            context.progress(
+                ProgressStage.VALIDATION, 0, detail="Validating cut snapshot"
+            )
             snapshot_manifest = self._workspace.validate(private)
             tracker = RgbaOwnershipTracker(
                 (snapshot_manifest.width, snapshot_manifest.height)
@@ -1397,7 +1405,11 @@ class RenderService:
         try:
             frame_count = len(framed_paths)
             overall = context.overall_progress or (0, frame_count)
-            stage = "Auto-fit" if request.output.max_bytes is not None else "Encode"
+            stage = (
+                ProgressStage.AUTO_FIT
+                if request.output.max_bytes is not None
+                else ProgressStage.ENCODE
+            )
             overall_for_encode = (
                 None if request.output.max_bytes is not None else overall
             )
@@ -1427,7 +1439,9 @@ class RenderService:
                 overall=overall_for_encode,
                 overall_indeterminate=request.output.max_bytes is not None,
             )
-            context.progress("Validation", 0, detail="Validating encoded output")
+            context.progress(
+                ProgressStage.VALIDATION, 0, detail="Validating encoded output"
+            )
             context.checkpoint("encode")
             ownership_peak = tracker.peak
             ownership_current = tracker.current

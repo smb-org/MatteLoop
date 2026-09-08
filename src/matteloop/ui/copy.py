@@ -2,9 +2,32 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import QCoreApplication
+from typing import cast
+
+from PySide6.QtCore import QT_TRANSLATE_NOOP, QCoreApplication
 
 from matteloop.core.execution_providers import onnxruntime_repair_command
+
+_PRESENTED_STATUS_TEMPLATE = cast(
+    str, QT_TRANSLATE_NOOP("Presenter", "%1 · %2")
+)
+_PRESENTED_ACCESSIBLE_TEMPLATE = cast(
+    str, QT_TRANSLATE_NOOP("Presenter", "%1: %2")
+)
+# Keep dynamic category sources visible to lupdate; the render boundary translates
+# the value it receives instead of looking it up in an English-keyed table.
+_PRESENTED_CATEGORY_SOURCES = (
+    cast(str, QT_TRANSLATE_NOOP("Presenter", "Segmentation")),
+    cast(str, QT_TRANSLATE_NOOP("Presenter", "Compute acceleration")),
+    cast(str, QT_TRANSLATE_NOOP("Presenter", "Sampling")),
+    cast(str, QT_TRANSLATE_NOOP("Presenter", "Crop & cleanup")),
+    cast(str, QT_TRANSLATE_NOOP("Presenter", "Crop")),
+    cast(str, QT_TRANSLATE_NOOP("Presenter", "Framing")),
+    cast(str, QT_TRANSLATE_NOOP("Presenter", "Playhead")),
+    cast(str, QT_TRANSLATE_NOOP("Presenter", "Export range")),
+    cast(str, QT_TRANSLATE_NOOP("Presenter", "Preview failed")),
+    cast(str, QT_TRANSLATE_NOOP("Presenter", "Edited cuts")),
+)
 
 
 def model_display_name(model_id: str, fallback: str | None = None) -> str:
@@ -343,25 +366,44 @@ def _presented_dynamic_copy(value: str) -> str:
         return QCoreApplication.translate("Presenter", "Preview failed — %s") % (
             presented_copy(retry)
         )
-    if ": " in value:
-        category, message = value.split(": ", 1)
-        translated_category = {
-            "Segmentation": QCoreApplication.translate("Presenter", "Segmentation"),
-            "Compute acceleration": QCoreApplication.translate(
-                "Presenter", "Compute acceleration"
-            ),
-            "Sampling": QCoreApplication.translate("Presenter", "Sampling"),
-            "Crop & cleanup": QCoreApplication.translate("Presenter", "Crop & cleanup"),
-            "Crop": QCoreApplication.translate("Presenter", "Crop"),
-            "Framing": QCoreApplication.translate("Presenter", "Framing"),
-            "Playhead": QCoreApplication.translate("Presenter", "Playhead"),
-            "Export range": QCoreApplication.translate("Presenter", "Export range"),
-            "Preview failed": QCoreApplication.translate("Presenter", "Preview failed"),
-            "Edited cuts": QCoreApplication.translate("Presenter", "Edited cuts"),
-        }.get(category)
-        if translated_category is not None:
-            return f"{translated_category}: {presented_copy(message)}"
     return value
+
+
+def _translated_presenter_template(
+    template: str, first: str, second: str
+) -> str:
+    """Translate a literal presenter template before inserting dynamic copy."""
+    return (
+        QCoreApplication.translate("Presenter", template)
+        .replace("%1", first)
+        .replace("%2", second)
+    )
+
+
+def presented_status_copy(marker: str | None, category: str | None) -> str | None:
+    """Translate a status marker and category before joining them."""
+    if marker is None:
+        return None
+    translated_marker = presented_copy(marker)
+    if category is None:
+        return translated_marker
+    return _translated_presenter_template(
+        _PRESENTED_STATUS_TEMPLATE,
+        translated_marker,
+        QCoreApplication.translate("Presenter", category),
+    )
+
+
+def presented_accessible_description(category: str | None, message: str) -> str:
+    """Translate an optional stale category before joining the description."""
+    translated_message = presented_copy(message)
+    if category is None:
+        return translated_message
+    return _translated_presenter_template(
+        _PRESENTED_ACCESSIBLE_TEMPLATE,
+        QCoreApplication.translate("Presenter", category),
+        translated_message,
+    )
 
 
 def main_window_copy(value: str) -> str:

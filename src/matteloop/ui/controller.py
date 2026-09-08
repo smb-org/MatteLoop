@@ -197,6 +197,9 @@ class SourceController(QObject):
         )
         self._render_controller.transform_restore = self._transform_stage.restore_for
         self._render_controller.open_cut_key = self._open_cut_key
+        self._render_controller.confirm_discard_unsaved_transform = (
+            self.confirm_discard_unsaved_transform
+        )
         self._preview_controller.provider_ready.connect(self._provider_ready)
         self._render_controller.provider_ready.connect(self._provider_ready)
         self._working_provider = store.state.parameters.execution_provider

@@ -19,6 +19,7 @@ from matteloop.core.state import (
     JobState,
     SourceState,
 )
+from matteloop.core.tokens import ProgressStage
 from matteloop.jobs.models.catalog import ModelCatalog
 from matteloop.ui.aligned_rows import ROW_DATA_ROLE, AlignedRow, AlignedRowDelegate
 from matteloop.ui.model_manager import ModelManagerController, ModelManagerDialog
@@ -325,7 +326,7 @@ def test_model_manager_allows_active_and_blocks_running_job_removal(
                 "job-id",
                 JobKind.RENDER,
                 JobState.RENDERING,
-                "Encode",
+                ProgressStage.ENCODE,
                 FocusTarget.NONE,
             ),
         )
@@ -489,7 +490,7 @@ def test_model_manager_refuses_to_download_while_a_job_runs(
                     "job-id",
                     JobKind.RENDER,
                     JobState.RENDERING,
-                    "Encode",
+                    ProgressStage.ENCODE,
                     FocusTarget.NONE,
                 ),
             )
@@ -1144,7 +1145,7 @@ def test_model_manager_refuses_re_download_while_a_job_runs(
                 "job-id",
                 JobKind.RENDER,
                 JobState.RENDERING,
-                "Encode",
+                ProgressStage.ENCODE,
                 FocusTarget.NONE,
             ),
         )
@@ -1234,7 +1235,7 @@ def test_model_manager_refuses_outdated_removal_while_a_job_runs(
                 "job-id",
                 JobKind.RENDER,
                 JobState.RENDERING,
-                "Encode",
+                ProgressStage.ENCODE,
                 FocusTarget.NONE,
             ),
         )

@@ -5,8 +5,18 @@ from __future__ import annotations
 import time
 from fractions import Fraction
 from pathlib import Path
+from typing import cast
 
-from PySide6.QtCore import QCoreApplication, QEvent, QObject, Qt, QTimer, Signal, Slot
+from PySide6.QtCore import (
+    QT_TRANSLATE_NOOP,
+    QCoreApplication,
+    QEvent,
+    QObject,
+    Qt,
+    QTimer,
+    Signal,
+    Slot,
+)
 from PySide6.QtGui import QKeyEvent
 from PySide6.QtWidgets import (
     QDialog,
@@ -38,29 +48,59 @@ from matteloop.ui.source_presentation import (
     format_source_frame_rate,
 )
 
+_STAGE_COPY: dict[ProgressStage, str] = {
+    ProgressStage.PREPARING_MODEL: cast(str, QT_TRANSLATE_NOOP(
+        "PreviewJobDialog", "Preparing model"
+    )),
+    ProgressStage.DOWNLOADING_MODEL: cast(str, QT_TRANSLATE_NOOP(
+        "PreviewJobDialog", "Downloading model"
+    )),
+    ProgressStage.SEGMENTATION: cast(
+        str, QT_TRANSLATE_NOOP("PreviewJobDialog", "Segmentation")
+    ),
+    ProgressStage.DECODE: cast(str, QT_TRANSLATE_NOOP("PreviewJobDialog", "Decode")),
+    ProgressStage.RENDER_CUT: cast(
+        str, QT_TRANSLATE_NOOP("PreviewJobDialog", "Decode")
+    ),
+    ProgressStage.FRAMING: cast(str, QT_TRANSLATE_NOOP("PreviewJobDialog", "Framing")),
+    ProgressStage.CUT_PROMOTION: cast(str, QT_TRANSLATE_NOOP(
+        "PreviewJobDialog", "Cut promotion"
+    )),
+    ProgressStage.VALIDATION: cast(
+        str, QT_TRANSLATE_NOOP("PreviewJobDialog", "Validation")
+    ),
+    ProgressStage.POST_PROCESS: cast(str, QT_TRANSLATE_NOOP(
+        "PreviewJobDialog", "Post-process"
+    )),
+    ProgressStage.AUTO_FIT: cast(
+        str, QT_TRANSLATE_NOOP("PreviewJobDialog", "Auto-fit")
+    ),
+    ProgressStage.ENCODE: cast(str, QT_TRANSLATE_NOOP("PreviewJobDialog", "Encode")),
+    ProgressStage.VALIDATE: cast(
+        str, QT_TRANSLATE_NOOP("PreviewJobDialog", "Validate")
+    ),
+    ProgressStage.COMPLETE: cast(
+        str, QT_TRANSLATE_NOOP("PreviewJobDialog", "Complete")
+    ),
+    ProgressStage.CANCELLING: cast(
+        str, QT_TRANSLATE_NOOP("PreviewJobDialog", "Cancelling…")
+    ),
+}
+_AUTO_FIT_ATTEMPT_COPY = cast(
+    str, QT_TRANSLATE_NOOP("PreviewJobDialog", "Auto-fit, attempt %1 of at most %2")
+)
 
-def _stage_copy(stage: str | ProgressStage) -> str:
-    if stage is ProgressStage.PREPARING_MODEL:
-        return QCoreApplication.translate("PreviewJobDialog", "Preparing model")
-    if stage is ProgressStage.DOWNLOADING_MODEL:
-        return QCoreApplication.translate("PreviewJobDialog", "Downloading model")
-    if stage is ProgressStage.SEGMENTATION:
-        return QCoreApplication.translate("PreviewJobDialog", "Segmentation")
-    if stage in {ProgressStage.DECODE, ProgressStage.RENDER_CUT}:
-        return QCoreApplication.translate("PreviewJobDialog", "Decode")
-    if stage == "Validation":
-        return QCoreApplication.translate("PreviewJobDialog", "Validation")
-    if stage == "Post-process":
-        return QCoreApplication.translate("PreviewJobDialog", "Post-process")
-    if stage == "Auto-fit":
-        return QCoreApplication.translate("PreviewJobDialog", "Auto-fit")
-    if stage == "Encode":
-        return QCoreApplication.translate("PreviewJobDialog", "Encode")
-    if stage == "Validate":
-        return QCoreApplication.translate("PreviewJobDialog", "Validate")
-    if stage == "Complete":
-        return QCoreApplication.translate("PreviewJobDialog", "Complete")
-    return stage
+
+def _stage_copy(
+    stage: ProgressStage, attempt: int | None = None, maximum: int | None = None
+) -> str:
+    if stage is ProgressStage.AUTO_FIT and attempt is not None and maximum is not None:
+        return (
+            QCoreApplication.translate("PreviewJobDialog", _AUTO_FIT_ATTEMPT_COPY)
+            .replace("%1", str(attempt))
+            .replace("%2", str(maximum))
+        )
+    return QCoreApplication.translate("PreviewJobDialog", _STAGE_COPY[stage])
 
 
 class PreviewJobDialog(QDialog):
@@ -414,11 +454,16 @@ class PreviewJobDialog(QDialog):
         self.provider_notice_label.setText(provider_notice(notice))
         self.provider_notice_label.show()
 
-    def set_stage(self, stage: str | ProgressStage) -> None:
-        self.stage_label.setText(_stage_copy(stage))
+    def set_stage(
+        self,
+        stage: ProgressStage,
+        attempt: int | None = None,
+        maximum: int | None = None,
+    ) -> None:
+        self.stage_label.setText(_stage_copy(stage, attempt, maximum))
 
     def set_progress(self, event: ProgressEvent) -> None:
-        self.set_stage(event.stage)
+        self.set_stage(event.stage, event.attempt, event.maximum)
         self.detail_label.setText(progress_detail(event.detail))
         self._apply_metrics(
             self._progress_presenter.update(
@@ -472,9 +517,7 @@ class PreviewJobDialog(QDialog):
             self.overall_progress_bar.setFormat("")
 
     def set_cancelling(self) -> None:
-        self.stage_label.setText(
-            QCoreApplication.translate("PreviewJobDialog", "Cancelling…")
-        )
+        self.stage_label.setText(_stage_copy(ProgressStage.CANCELLING))
         self.detail_label.setText(
             QCoreApplication.translate(
                 "PreviewJobDialog", "Waiting for the current safe checkpoint…"
