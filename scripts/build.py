@@ -22,6 +22,8 @@ from datetime import UTC, datetime
 from pathlib import Path, PureWindowsPath
 from zipfile import BadZipFile, ZipFile, ZipInfo
 
+from PySide6.QtCore import QLibraryInfo
+
 BUNDLE_IDENTIFIER = "io.github.smb-org.matteloop"
 
 if __package__:
@@ -311,9 +313,11 @@ def prepare_temporary_spec(
         f"\t--include-data-dir={directory.as_posix()}={directory.name}\n"
         for directory in directories
     )
+    qt_translation_args = _qt_translation_file_args()
     content = content.replace(
         marker,
-        f"{marker}{data_dir_args}{wheel_file_args}\n{directml_file_args}",
+        f"{marker}{data_dir_args}{qt_translation_args}"
+        f"{wheel_file_args}\n{directml_file_args}",
         1,
     )
     destination_spec.write_text(content, encoding="utf-8")
@@ -435,6 +439,33 @@ def bundle_media_errors(
             artifact, contract.forbidden_library_fragments
         )
     )
+
+
+def _qt_translation_file_args(
+    languages: tuple[str, ...] = _QT_TRANSLATION_LANGUAGES,
+) -> str:
+    """Copy Qt's own catalogues where the frozen loader looks for them.
+
+    Nuitka ships Qt translations only with QtWebEngine ("Include Qt
+    translations with QtWebEngine if used"), which this application does not
+    use — so dropping --noinclude-qt-translations changed nothing and the
+    bundle went out with Close, Yes and No in English inside a German window.
+    They are named explicitly, the same way the DirectML runtime already is.
+    """
+    source = Path(QLibraryInfo.path(QLibraryInfo.LibraryPath.TranslationsPath))
+    arguments: list[str] = []
+    for language in languages:
+        catalogue = source / f"qtbase_{language}.qm"
+        if not catalogue.is_file():
+            raise ValueError(
+                f"packaging requires Qt catalogue {catalogue} for the "
+                f"{language} interface language"
+            )
+        arguments.append(
+            f"\t--include-data-files={catalogue.as_posix()}="
+            f"PySide6/Qt/translations/{catalogue.name}\n"
+        )
+    return "".join(arguments)
 
 
 def bundle_qt_translation_errors(
