@@ -23,12 +23,12 @@ def test_resource_tracker_interpreter_arguments_are_consumed() -> None:
         "-S",
         "-s",
         "-c",
-        "from multiprocessing.resource_tracker import main;main(7)",
+        "from multiprocessing.resource_tracker import main;main(0)",
     ]
 
-    payload = module._prepare_multiprocessing_payload(argv)
+    descriptor = module._prepare_multiprocessing_payload(argv)
 
-    assert payload == "from multiprocessing.resource_tracker import main;main(7)"
+    assert descriptor == 0
     assert argv == ["matteloop"]
 
 

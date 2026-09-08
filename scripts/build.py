@@ -22,6 +22,7 @@ from datetime import UTC, datetime
 from pathlib import Path, PureWindowsPath
 from zipfile import BadZipFile, ZipFile, ZipInfo
 
+import PySide6
 from PySide6.QtCore import QLibraryInfo
 
 BUNDLE_IDENTIFIER = "io.github.smb-org.matteloop"
@@ -453,6 +454,7 @@ def _qt_translation_file_args(
     They are named explicitly, the same way the DirectML runtime already is.
     """
     source = Path(QLibraryInfo.path(QLibraryInfo.LibraryPath.TranslationsPath))
+    package = Path(PySide6.__file__).resolve().parent
     arguments: list[str] = []
     for language in languages:
         catalogue = source / f"qtbase_{language}.qm"
@@ -461,9 +463,18 @@ def _qt_translation_file_args(
                 f"packaging requires Qt catalogue {catalogue} for the "
                 f"{language} interface language"
             )
+        # The layout differs by platform — PySide6/Qt/translations on macOS,
+        # PySide6/translations on Windows — so derive the destination from the
+        # installation rather than writing one of them down.
+        try:
+            relative = catalogue.resolve().relative_to(package)
+        except ValueError as error:
+            raise ValueError(
+                f"Qt catalogue {catalogue} is outside the PySide6 package"
+            ) from error
         arguments.append(
             f"\t--include-data-files={catalogue.as_posix()}="
-            f"PySide6/Qt/translations/{catalogue.name}\n"
+            f"PySide6/{relative.as_posix()}\n"
         )
     return "".join(arguments)
 
