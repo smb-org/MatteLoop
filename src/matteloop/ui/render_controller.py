@@ -112,6 +112,7 @@ class RenderController(QObject):
         self._active_workspace: CutWorkspace | None = None
         self.transform_restore: Callable[[CutWorkspace], TransformSpec] | None = None
         self.open_cut_key: Callable[[], str | None] | None = None
+        self.confirm_discard_unsaved_transform: Callable[[], bool] | None = None
         self._closed = False
 
     @property
@@ -401,7 +402,8 @@ class RenderController(QObject):
             request = self._transform_for_rebuild(
                 replace(pending.request, rebuild=True), workspace
             )
-            self._resolve_collision(replace(pending, request=request), workspace)
+            if request is not None:
+                self._resolve_collision(replace(pending, request=request), workspace)
         elif choice == "regenerate":
             self._resolve_collision(
                 replace(pending, request=replace(pending.request, regenerate=True)),
@@ -410,10 +412,16 @@ class RenderController(QObject):
 
     def _transform_for_rebuild(
         self, request: RenderRequest, workspace: CutWorkspace
-    ) -> RenderRequest:
+    ) -> RenderRequest | None:
         """Build a rebuild request with the right cut transform, without dispatching."""
         open_key = self.open_cut_key() if self.open_cut_key is not None else None
-        if open_key == workspace.cache_key or self.transform_restore is None:
+        if open_key is not None and open_key != workspace.cache_key:
+            confirm = self.confirm_discard_unsaved_transform
+            if confirm is not None and not confirm():
+                return None
+        if open_key == workspace.cache_key:
+            return replace(request, transform=self._store.state.parameters.transform)
+        if self.transform_restore is None:
             return request
         return replace(request, transform=self.transform_restore(workspace))
 
@@ -453,12 +461,16 @@ class RenderController(QObject):
             return
         try:
             selected = request_for_workspace(value.manifest, request)
-            selected = self._transform_for_rebuild(selected, value.workspace)
+            rebuild_request = self._transform_for_rebuild(selected, value.workspace)
         except (AppError, ValueError, KeyError):
+            return
+        if rebuild_request is None:
             return
         if self._workspace_picker is not None:
             self._workspace_picker.close()
-        self._resolve_collision(_PendingRender(source_id, selected), value.workspace)
+        self._resolve_collision(
+            _PendingRender(source_id, rebuild_request), value.workspace
+        )
 
     def _show_collision(self) -> None:
         if self._collision_dialog is not None or self._collision_request is None:
