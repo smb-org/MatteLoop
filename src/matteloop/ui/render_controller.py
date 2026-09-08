@@ -644,7 +644,9 @@ class RenderController(QObject):
             "Rebuilding from edited cuts" if rebuilding else "Rendering video"
         )
         self._dialog.reset(title)
-        self._dialog.set_stage("Validation" if rebuilding else ProgressStage.DECODE)
+        self._dialog.set_stage(
+            ProgressStage.VALIDATION if rebuilding else ProgressStage.DECODE
+        )
         self._dialog.set_job_details(
             request.segmentation.model_id, request.output.filename
         )

@@ -209,7 +209,7 @@ def run_smoke(work_dir: Path, use_fake_model: bool = True) -> SmokeResult:
 
 def _check_qt_image_runtime() -> tuple[str, tuple[str, ...]]:
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-    from PySide6.QtCore import QBuffer, QByteArray, QIODevice
+    from PySide6.QtCore import QBuffer, QByteArray, QIODevice, QLibraryInfo, QTranslator
     from PySide6.QtGui import QGuiApplication, QImage, QImageWriter
     from PySide6.QtWidgets import QApplication
 
@@ -220,6 +220,7 @@ def _check_qt_image_runtime() -> tuple[str, tuple[str, ...]]:
         platform = QGuiApplication.platformName()
         if not platform:
             raise RuntimeError("Qt did not initialize a platform plugin")
+        _check_qt_standard_button_translation(application, QLibraryInfo, QTranslator)
         formats = tuple(
             sorted(
                 bytes(value.data()).decode("ascii").lower()
@@ -254,6 +255,29 @@ def _check_qt_image_runtime() -> tuple[str, tuple[str, ...]]:
             application.processEvents()
             del application
             gc.collect()
+
+
+def _check_qt_standard_button_translation(
+    application: Any, qlibrary_info: Any, qtranslator: Any
+) -> None:
+    """Require the German Qt catalogue in both source and frozen runtimes."""
+    translations_path = Path(
+        qlibrary_info.path(qlibrary_info.LibraryPath.TranslationsPath)
+    )
+    translator = qtranslator()
+    catalogue = translations_path / "qtbase_de.qm"
+    if not catalogue.is_file() or not translator.load(str(catalogue)):
+        raise RuntimeError(f"Qt German catalogue is missing: {catalogue}")
+    application.installTranslator(translator)
+    try:
+        from PySide6.QtWidgets import QDialogButtonBox
+
+        box = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        button = box.button(QDialogButtonBox.StandardButton.Close)
+        if button is None or button.text() == "Close":
+            raise RuntimeError("Qt German catalogue did not translate Close")
+    finally:
+        application.removeTranslator(translator)
 
 
 def _generate_video_with_pyav(path: Path) -> Path:

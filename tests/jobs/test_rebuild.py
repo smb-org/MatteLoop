@@ -22,6 +22,7 @@ from matteloop.core.specs import (
 )
 from matteloop.core.state import JobKind
 from matteloop.core.timebase import webp_delays
+from matteloop.core.tokens import ProgressStage
 from matteloop.core.webp import validate_webp
 from matteloop.jobs.context import CancellationState, JobContext, ProgressEvent
 from matteloop.jobs.render import (
@@ -518,8 +519,8 @@ def test_rebuild_reports_adjacent_framing_and_encode_overall_stages(tmp_path) ->
         ),
     )
 
-    framing = [event for event in events if event.stage == "Framing"]
-    encode = [event for event in events if event.stage == "Encode"]
+    framing = [event for event in events if event.stage is ProgressStage.FRAMING]
+    encode = [event for event in events if event.stage is ProgressStage.ENCODE]
     assert [event.overall_completed for event in framing] == [1, 2]
     assert [event.overall_completed for event in encode] == [2, 4]
     assert all(event.overall_total == 4 for event in framing + encode)

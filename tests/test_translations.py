@@ -8,6 +8,8 @@ from collections import Counter
 from pathlib import Path
 
 import pytest
+from PySide6.QtCore import QLibraryInfo
+from PySide6.QtWidgets import QDialogButtonBox
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 _PLACEHOLDER = re.compile(r"%(?:n|[0-9]+|s)")
@@ -113,6 +115,95 @@ def test_installing_translators_reaches_the_german_catalogue() -> None:
             QCoreApplication.translate("ActionShelf", "Render Video")
             == "Video rendern"
         )
+    finally:
+        for translator in translators:
+            application.removeTranslator(translator)
+
+
+def test_composed_status_copy_is_translated_from_the_checked_german_qm() -> None:
+    from PySide6.QtCore import QTranslator
+    from PySide6.QtWidgets import QApplication
+
+    from matteloop.ui.copy import presented_status_copy
+
+    application = QApplication.instance() or QApplication([])
+    translator = QTranslator()
+    catalogue = REPOSITORY_ROOT / "resources" / "matteloop_de.qm"
+    assert translator.load(str(catalogue))
+    application.installTranslator(translator)
+    try:
+        assert presented_status_copy(
+            "Settings changed — preview again", "Crop & cleanup"
+        ) == (
+            "Einstellungen geändert — Vorschau erneut anzeigen · "
+            "Zuschnitt und Bereinigung"
+        )
+    finally:
+        application.removeTranslator(translator)
+
+
+def test_render_stages_are_translated_at_the_dialog_boundary() -> None:
+    from PySide6.QtWidgets import QApplication
+
+    from matteloop.core.tokens import ProgressStage
+    from matteloop.ui.i18n import install_translators
+    from matteloop.ui.preview_controller.dialog import _stage_copy
+
+    application = QApplication.instance() or QApplication([])
+    translators = install_translators(application, "de")
+    expected = {
+        ProgressStage.PREPARING_MODEL: "Modell wird vorbereitet",
+        ProgressStage.DOWNLOADING_MODEL: "Modell wird heruntergeladen",
+        ProgressStage.SEGMENTATION: "Segmentierung",
+        ProgressStage.DECODE: "Dekodierung",
+        ProgressStage.RENDER_CUT: "Dekodierung",
+        ProgressStage.FRAMING: "Rahmung",
+        ProgressStage.CUT_PROMOTION: "Schnittbilder übernehmen",
+        ProgressStage.VALIDATION: "Validierung",
+        ProgressStage.POST_PROCESS: "Nachbearbeitung",
+        ProgressStage.AUTO_FIT: "Automatische Anpassung",
+        ProgressStage.ENCODE: "Kodierung",
+        ProgressStage.VALIDATE: "Validierung",
+        ProgressStage.COMPLETE: "Abgeschlossen",
+        ProgressStage.CANCELLING: "Wird abgebrochen…",
+    }
+    try:
+        assert {stage: _stage_copy(stage) for stage in expected} == expected
+        assert _stage_copy(ProgressStage.AUTO_FIT, 3, 12) == (
+            "Automatische Anpassung, Versuch 3 von maximal 12"
+        )
+    finally:
+        for translator in translators:
+            application.removeTranslator(translator)
+
+
+def test_frozen_layout_translates_qt_close_button_from_its_qt_catalogue(
+    tmp_path: Path,
+) -> None:
+    from PySide6.QtWidgets import QApplication
+
+    from matteloop.ui.i18n import install_translators
+
+    application = QApplication.instance() or QApplication([])
+    resources = tmp_path / "resources"
+    resources.mkdir()
+    checked_resources = REPOSITORY_ROOT / "resources"
+    shutil.copy2(checked_resources / "matteloop_de.qm", resources)
+    qt_translations = (
+        tmp_path / "PySide6" / "Qt" / "translations"
+    )
+    qt_translations.mkdir(parents=True)
+    installed_qt = Path(
+        QLibraryInfo.path(QLibraryInfo.LibraryPath.TranslationsPath)
+    )
+    shutil.copy2(installed_qt / "qtbase_de.qm", qt_translations)
+
+    translators = install_translators(application, "de", runtime_root=tmp_path)
+    try:
+        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        button = button_box.button(QDialogButtonBox.StandardButton.Close)
+        assert button is not None
+        assert button.text() == "Schließen"
     finally:
         for translator in translators:
             application.removeTranslator(translator)

@@ -1315,7 +1315,7 @@ def test_render_reports_counted_stages_and_global_frame_units(tmp_path) -> None:
     render_service().render(request(tmp_path), context)
 
     cuts = [event for event in events if event.stage is ProgressStage.RENDER_CUT]
-    encode = [event for event in events if event.stage == "Encode"]
+    encode = [event for event in events if event.stage is ProgressStage.ENCODE]
 
     assert [(event.completed, event.overall_completed) for event in cuts] == [
         (1, 1),
@@ -1328,13 +1328,13 @@ def test_render_reports_counted_stages_and_global_frame_units(tmp_path) -> None:
     counted = [event for event in events if event.overall_completed is not None]
     overall_values = [event.overall_completed for event in counted]
     assert overall_values == sorted(overall_values)
-    framing = [event for event in events if event.stage == "Framing"]
+    framing = [event for event in events if event.stage is ProgressStage.FRAMING]
     assert [event.overall_completed for event in framing] == [3, 4]
     assert counted[-1].overall_completed == counted[-1].overall_total == 6
     assert {event.stage for event in events} >= {
-        "Cut promotion",
-        "Framing",
-        "Validation",
+        ProgressStage.CUT_PROMOTION,
+        ProgressStage.FRAMING,
+        ProgressStage.VALIDATION,
     }
 
 
@@ -1357,8 +1357,8 @@ def test_render_uses_kept_frames_for_the_post_process_and_encode_budget(
         ),
     )
 
-    framing = [event for event in events if event.stage == "Framing"]
-    encode = [event for event in events if event.stage == "Encode"]
+    framing = [event for event in events if event.stage is ProgressStage.FRAMING]
+    encode = [event for event in events if event.stage is ProgressStage.ENCODE]
     assert [(event.completed, event.overall_completed) for event in framing] == [(1, 3)]
     assert [(event.completed, event.overall_completed) for event in encode] == [
         (0, 3),
@@ -1431,9 +1431,11 @@ def test_render_auto_fit_validates_emitted_static_run_count(
 
     assert info.frames == 1
     assert info.duration_ms == 1000
-    auto_fit_events = [event for event in events if event.stage.startswith("Auto-fit")]
-    assert "Auto-fit, attempt 1 of at most 12" in {
-        event.stage for event in auto_fit_events
+    auto_fit_events = [
+        event for event in events if event.stage is ProgressStage.AUTO_FIT
+    ]
+    assert (1, 12) in {
+        (event.attempt, event.maximum) for event in auto_fit_events
     }
     assert all(
         event.overall_completed is None and event.overall_total is None
@@ -1441,7 +1443,7 @@ def test_render_auto_fit_validates_emitted_static_run_count(
     )
     assert all(event.overall_indeterminate for event in auto_fit_events)
     cuts = [event for event in events if event.stage is ProgressStage.RENDER_CUT]
-    framing = [event for event in events if event.stage == "Framing"]
+    framing = [event for event in events if event.stage is ProgressStage.FRAMING]
     assert all(
         event.overall_completed is not None
         and event.overall_total == 6

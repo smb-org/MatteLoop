@@ -4,7 +4,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from matteloop.ui.copy import main_window_copy, presented_copy, source_error_message
+from matteloop.ui.copy import (
+    main_window_copy,
+    presented_accessible_description,
+    presented_copy,
+    presented_status_copy,
+    source_error_message,
+)
 from matteloop.ui.crop_view import render_source_editor
 from matteloop.ui.presentation_model import PresentationModel
 
@@ -53,11 +59,15 @@ def _render_source_and_result(window: MainWindow, model: PresentationModel) -> N
     )
     window.result_canvas.setAccessibleName(presented_copy(model.result_accessible_name))
     window.result_canvas.setAccessibleDescription(
-        presented_copy(model.result_accessible_description)
+        presented_accessible_description(
+            model.result_accessible_category, model.result_accessible_description
+        )
     )
     window.result_canvas.setProperty("status", model.result_status)
     window.result_canvas.setProperty("checkerboard", model.result_checkerboard)
-    status_marker = presented_copy(model.result_status_marker or "")
+    status_marker = presented_status_copy(
+        model.result_status_marker, model.result_status_category
+    )
     window.result_canvas.set_status_marker(
         status_marker or None, model.result_status_icon
     )

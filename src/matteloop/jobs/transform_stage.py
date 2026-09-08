@@ -27,6 +27,7 @@ from matteloop.core.errors import ErrorCode, ValidationError
 from matteloop.core.geometry import FramingPlan, PixelBounds, apply_framing
 from matteloop.core.rgba import RgbaOwnershipTracker
 from matteloop.core.specs import FramingSpec, TransformSpec
+from matteloop.core.tokens import ProgressStage
 from matteloop.core.transform import apply_transform
 from matteloop.jobs.context import JobContext
 from matteloop.jobs.encoding import _map_output_os_error, _output_error
@@ -99,7 +100,7 @@ def stage_encoder_frames(
             )
         )
         context.progress(
-            "Framing",
+            ProgressStage.FRAMING,
             position + 1,
             total=kept_count,
             detail=f"Frame {position + 1} of {kept_count}",

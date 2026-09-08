@@ -37,7 +37,6 @@ extra_args =
 	--macos-app-version=0.2.1
 	--macos-app-name=MatteLoop
 	--macos-signed-app-name=io.github.smb-org.matteloop
-	--noinclude-qt-translations
 	--output-filename=matteloop
 	--include-qt-plugins=platforms,imageformats
 	--include-package=matteloop
