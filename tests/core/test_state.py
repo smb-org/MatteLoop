@@ -502,7 +502,7 @@ def test_job_progress_requires_all_current_identity_tokens(
 ) -> None:
     running = running_preview(job_id="job-1")
 
-    stale = JobStageChanged(job_id, source_id, request_id, "Post-process")
+    stale = JobStageChanged(job_id, source_id, request_id, ProgressStage.POST_PROCESS)
 
     assert reduce(running, stale) is running
 
@@ -512,10 +512,12 @@ def test_matching_job_progress_updates_the_stage() -> None:
 
     progressed = reduce(
         running,
-        JobStageChanged("job-1", SOURCE_ID, "preview-1", "Post-process"),
+        JobStageChanged(
+            "job-1", SOURCE_ID, "preview-1", ProgressStage.POST_PROCESS
+        ),
     )
 
-    assert progressed.job.stage == "Post-process"
+    assert progressed.job.stage is ProgressStage.POST_PROCESS
 
 
 def test_segmentation_stage_token_advances_preparing_preview_without_copy() -> None:
@@ -857,7 +859,7 @@ def test_state_and_nested_job_are_immutable() -> None:
     with pytest.raises(FrozenInstanceError):
         state.source = SourceState.EMPTY  # type: ignore[misc]
     with pytest.raises(FrozenInstanceError):
-        state.job.stage = "Encode"  # type: ignore[misc]
+        state.job.stage = ProgressStage.ENCODE  # type: ignore[misc]
 
 
 def test_loading_a_new_source_resets_the_transform_but_keeps_other_parameters() -> None:

@@ -100,6 +100,7 @@ _CORRECTED_BRANDING_ASSETS = (
 _MEDIA_MANIFEST = Path("packaging/media-stack/manifest.toml")
 _MEDIA_CACHE = Path(".matteloop-build-cache/media-stack")
 _QT_SOURCE_CACHE = Path(".matteloop-build-cache/qt-sources")
+_QT_TRANSLATION_LANGUAGES = ("en", "de")
 
 MediaStackEnsurer = Callable[..., MediaStackArtifacts]
 MediaWheelVerifier = Callable[..., VerificationReport]
@@ -436,6 +437,22 @@ def bundle_media_errors(
     )
 
 
+def bundle_qt_translation_errors(
+    artifact: Path, languages: tuple[str, ...] = _QT_TRANSLATION_LANGUAGES
+) -> tuple[str, ...]:
+    """Require each supported Qt catalogue in the finished native bundle."""
+    errors: list[str] = []
+    for language in languages:
+        matches = tuple(
+            path
+            for path in artifact.rglob(f"qtbase_{language}.qm")
+            if path.is_file()
+        )
+        if not matches:
+            errors.append(f"native bundle is missing Qt catalogue qtbase_{language}.qm")
+    return tuple(errors)
+
+
 def expected_artifact(os_name: str, dist_path: Path = DIST_PATH) -> Path:
     """Return the standalone bundle directory expected from pyside6-deploy."""
     if os_name == "darwin":
@@ -674,13 +691,14 @@ def _finish_native_build(
             )
             return 1
         media_errors = bundle_media_errors(artifact, prepared.target, prepared.contract)
-        if media_errors:
+        qt_translation_errors = bundle_qt_translation_errors(artifact)
+        if media_errors or qt_translation_errors:
             print(
-                "Native bundle media verification failed:",
+                "Native bundle verification failed:",
                 file=sys.stderr,
                 flush=True,
             )
-            for error in media_errors:
+            for error in (*media_errors, *qt_translation_errors):
                 print(f"  - {error}", file=sys.stderr, flush=True)
             return 1
     return _smoke_and_publish_evidence(artifact, prepared, qt_companion, size)

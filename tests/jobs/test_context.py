@@ -7,6 +7,7 @@ import pytest
 
 from matteloop.core.errors import AppError, ErrorCode
 from matteloop.core.state import JobKind
+from matteloop.core.tokens import ProgressStage
 from matteloop.jobs.context import (
     CancellationState,
     ExclusiveJobScheduler,
@@ -32,7 +33,9 @@ def test_context_emits_validated_progress_and_completes_once(tmp_path: Path) -> 
     with scheduler.claim(
         JobKind.RENDER, "j1", workspace=tmp_path, progress_sink=events.append
     ) as context:
-        event = context.progress("decode", 2, total=5, detail="Frame 2 of 5")
+        event = context.progress(
+            ProgressStage.DECODE, 2, total=5, detail="Frame 2 of 5"
+        )
         assert event == events[0]
         assert context.complete()
         assert not context.complete()
@@ -51,7 +54,7 @@ def test_context_emits_optional_overall_frame_counts(tmp_path: Path) -> None:
     )
 
     event = context.progress(
-        "Encode",
+        ProgressStage.ENCODE,
         12,
         total=39,
         overall_completed=51,
@@ -61,6 +64,33 @@ def test_context_emits_optional_overall_frame_counts(tmp_path: Path) -> None:
     assert event == events[0]
     assert (event.completed, event.total) == (12, 39)
     assert (event.overall_completed, event.overall_total) == (51, 78)
+
+
+def test_frame_progress_uses_a_translatable_detail_template(tmp_path: Path) -> None:
+    context = JobContext(
+        "j1",
+        JobKind.RENDER,
+        tmp_path,
+        lambda _event: None,
+        CancellationState(),
+    )
+
+    event = context.frame_progress(ProgressStage.AUTO_FIT, 2, 5)
+
+    assert event.detail == "Frame 2 of 5"
+
+
+def test_context_rejects_untyped_progress_stage_strings(tmp_path: Path) -> None:
+    context = JobContext(
+        "j1",
+        JobKind.RENDER,
+        tmp_path,
+        lambda _event: None,
+        CancellationState(),
+    )
+
+    with pytest.raises(ValueError, match="ProgressStage"):
+        context.progress("Encode", 0)  # type: ignore[arg-type]
 
 
 def test_context_rejects_partial_overall_frame_counts(tmp_path: Path) -> None:
@@ -73,7 +103,7 @@ def test_context_rejects_partial_overall_frame_counts(tmp_path: Path) -> None:
     )
 
     with pytest.raises(ValueError):
-        context.progress("Encode", 1, overall_completed=1)
+        context.progress(ProgressStage.ENCODE, 1, overall_completed=1)
 
 
 @pytest.mark.parametrize(("completed", "total"), [(-1, None), (2, 1), (True, None)])
@@ -83,7 +113,7 @@ def test_progress_rejects_invalid_counts(
     scheduler = ExclusiveJobScheduler()
     with scheduler.claim(JobKind.PREVIEW, "j1", workspace=tmp_path) as context:
         with pytest.raises(ValueError):
-            context.progress("decode", completed, total=total)
+            context.progress(ProgressStage.DECODE, completed, total=total)
 
 
 def test_cancel_is_idempotent_and_only_matching_ack_unlocks(tmp_path: Path) -> None:
@@ -172,7 +202,7 @@ def test_progress_sink_is_reentrant_through_publication_lock(
         CancellationState(),
     )
     holder.append(context)
-    thread = Thread(target=lambda: context.progress("segment", 0))
+    thread = Thread(target=lambda: context.progress(ProgressStage.SEGMENTATION, 0))
     thread.start()
     thread.join(timeout=1)
     assert not thread.is_alive()
@@ -200,7 +230,9 @@ def test_terminal_transition_waits_for_inflight_progress_publication(
         sink,
         CancellationState(),
     )
-    progress_thread = Thread(target=lambda: context.progress("segment", 1))
+    progress_thread = Thread(
+        target=lambda: context.progress(ProgressStage.SEGMENTATION, 1)
+    )
 
     def complete() -> None:
         assert context.complete()
@@ -217,7 +249,7 @@ def test_terminal_transition_waits_for_inflight_progress_publication(
     terminal_thread.join(timeout=1)
     assert observed == ["progress", "terminal"]
     with pytest.raises(RuntimeError, match="terminal"):
-        context.progress("late", 2)
+        context.progress(ProgressStage.DECODE, 2)
 
 
 def test_cancel_ack_rejects_bool_protocol_version(tmp_path: Path) -> None:

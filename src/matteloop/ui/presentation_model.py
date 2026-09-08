@@ -82,7 +82,9 @@ class PresentationModel:
     result_checkerboard: bool
     result_accessible_name: str
     result_accessible_description: str
+    result_accessible_category: str | None
     result_status_marker: str | None
+    result_status_category: str | None
     result_status_icon: str | None
     recovery_visible: bool
     recovery_label: str

@@ -151,9 +151,9 @@ class FakeRenderRuntime(PreviewRuntime):
         for stage in (
             ProgressStage.DECODE,
             ProgressStage.SEGMENTATION,
-            "Post-process",
-            "Encode",
-            "Validate",
+            ProgressStage.POST_PROCESS,
+            ProgressStage.ENCODE,
+            ProgressStage.VALIDATE,
         ):
             context.progress(stage, 0)
         return type("Artifact", (), {"output_path": request.output.path})()
@@ -325,9 +325,9 @@ def test_render_command_writes_default_request_off_gui_thread(tmp_path, qtbot) -
     ] == [
         ProgressStage.DECODE,
         ProgressStage.SEGMENTATION,
-        "Post-process",
-        "Encode",
-        "Validate",
+        ProgressStage.POST_PROCESS,
+        ProgressStage.ENCODE,
+        ProgressStage.VALIDATE,
     ]
     controller.shutdown()
 

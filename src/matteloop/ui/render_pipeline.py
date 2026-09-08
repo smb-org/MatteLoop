@@ -38,7 +38,7 @@ class _StageReporter:
     def __init__(self, context: JobContext) -> None:
         self._context = context
 
-    def report(self, stage: str | ProgressStage) -> None:
+    def report(self, stage: ProgressStage) -> None:
         frame = self._context.frame_context
         if frame is None:
             previous = self._context.last_progress
@@ -120,7 +120,7 @@ class _WorkspaceStagePort:
     def stage(
         self, workspace: CutWorkspace, index: int, image: Image.Image
     ) -> CutFrame:
-        self._reporter.report("Post-process")
+        self._reporter.report(ProgressStage.POST_PROCESS)
         return self._delegate.stage(workspace, index, image)
 
     def read_cut(
@@ -129,7 +129,7 @@ class _WorkspaceStagePort:
         index: int,
         ownership: RgbaOwnershipTracker,
     ) -> Image.Image:
-        self._reporter.report("Post-process")
+        self._reporter.report(ProgressStage.POST_PROCESS)
         return self._delegate.read_cut(workspace, index, ownership)
 
 
@@ -149,7 +149,9 @@ class _EncoderStagePort:
         context: JobContext,
         ownership: RgbaOwnershipTracker,
     ) -> ValidatedCandidate:
-        self._reporter.report("Auto-fit" if max_bytes is not None else "Encode")
+        self._reporter.report(
+            ProgressStage.AUTO_FIT if max_bytes is not None else ProgressStage.ENCODE
+        )
         candidate = self._delegate.encode(
             frame_paths,
             delays_ms,
@@ -159,7 +161,7 @@ class _EncoderStagePort:
             context=context,
             ownership=ownership,
         )
-        self._reporter.report("Validate")
+        self._reporter.report(ProgressStage.VALIDATE)
         return candidate
 
 

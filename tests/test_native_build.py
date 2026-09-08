@@ -19,6 +19,7 @@ from scripts.build import (
     artifact_size_bytes,
     branding_input_errors,
     build_command,
+    bundle_qt_translation_errors,
     expected_artifact,
     prepare_temporary_spec,
     prerequisite_errors,
@@ -794,6 +795,22 @@ def test_bundle_media_gate_aggregates_forbidden_and_gpl_entries(
     assert any("nonfree-codec.dylib" in error for error in errors)
 
 
+def test_finished_bundle_requires_each_supported_qt_catalogue(tmp_path: Path) -> None:
+    artifact = tmp_path / "MatteLoop.app"
+    translations = (
+        artifact / "Contents" / "Resources" / "PySide6" / "Qt" / "translations"
+    )
+    translations.mkdir(parents=True)
+    (translations / "qtbase_en.qm").write_bytes(b"english")
+    (translations / "qtbase_de.qm").write_bytes(b"german")
+
+    assert bundle_qt_translation_errors(artifact) == ()
+    (translations / "qtbase_de.qm").unlink()
+    assert bundle_qt_translation_errors(artifact) == (
+        "native bundle is missing Qt catalogue qtbase_de.qm",
+    )
+
+
 def test_finished_bundle_media_failure_skips_smoke_and_reports_every_entry(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -1063,6 +1080,18 @@ def _stub_native_main(
                 }
             )
         )
+    if artifact.exists():
+        translations = (
+            artifact
+            / "Contents"
+            / "Resources"
+            / "PySide6"
+            / "Qt"
+            / "translations"
+        )
+        translations.mkdir(parents=True, exist_ok=True)
+        for language in ("en", "de"):
+            (translations / f"qtbase_{language}.qm").write_bytes(language.encode())
     commands: list[list[str]] = []
     monkeypatch.setattr(native_build, "ROOT", root)
     monkeypatch.setattr(native_build, "DIST_PATH", root / "dist")
@@ -1285,6 +1314,10 @@ def test_native_build_recovers_a_mislabeled_bundle_end_to_end(
             # anything to the real artifact path.
             real_output.mkdir(parents=True)
             (real_output / "matteloop.exe").write_bytes(b"bundle")
+            translations = real_output / "PySide6" / "Qt" / "translations"
+            translations.mkdir(parents=True)
+            for language in ("en", "de"):
+                (translations / f"qtbase_{language}.qm").write_bytes(language.encode())
         return subprocess.CompletedProcess(command, 0)
 
     monkeypatch.setattr(native_build.subprocess, "run", run)

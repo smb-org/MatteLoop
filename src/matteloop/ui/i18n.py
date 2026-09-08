@@ -114,8 +114,10 @@ def install_translators(
         application.installTranslator(app_translator)
         translators.append(app_translator)
 
-    qt_translations = Path(
-        QLibraryInfo.path(QLibraryInfo.LibraryPath.TranslationsPath)
+    qt_translations = (
+        Path(runtime_root).resolve() / "PySide6" / "Qt" / "translations"
+        if runtime_root is not None
+        else Path(QLibraryInfo.path(QLibraryInfo.LibraryPath.TranslationsPath))
     )
     qt_translator = QTranslator()
     qt_catalogue = qt_translations / f"qtbase_{language}.qm"

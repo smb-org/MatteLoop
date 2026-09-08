@@ -8,6 +8,7 @@ from pathlib import Path
 
 from matteloop.core.errors import AppError, ErrorCode
 from matteloop.core.rgba import RgbaOwnershipTracker
+from matteloop.core.tokens import ProgressStage
 from matteloop.core.webp import EncodeSummary, fit_webp_to_size, validate_webp
 from matteloop.jobs.context import JobContext
 
@@ -72,16 +73,19 @@ def auto_fit_progress(
     context: JobContext, frame_total: int
 ) -> tuple[Callable[[int, int], None], Callable[[int, int], None]]:
     """Build frame and attempt callbacks for an indeterminate auto-fit job."""
-    stage = "Auto-fit"
+    stage = ProgressStage.AUTO_FIT
+    attempt_counts: tuple[int, int] | None = None
 
     def report_attempt(attempt: int, maximum: int) -> None:
-        nonlocal stage
-        stage = f"Auto-fit, attempt {attempt} of at most {maximum}"
+        nonlocal attempt_counts
+        attempt_counts = attempt, maximum
         context.frame_progress(
             stage,
             0,
             frame_total,
             overall_indeterminate=True,
+            attempt=attempt,
+            maximum=maximum,
         )
 
     def report_frame(completed: int, total: int) -> None:
@@ -90,6 +94,8 @@ def auto_fit_progress(
             completed,
             total,
             overall_indeterminate=True,
+            attempt=None if attempt_counts is None else attempt_counts[0],
+            maximum=None if attempt_counts is None else attempt_counts[1],
         )
 
     return report_frame, report_attempt
