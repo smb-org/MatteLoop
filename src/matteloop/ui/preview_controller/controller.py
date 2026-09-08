@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from threading import Thread
 from uuid import uuid4
 
@@ -47,6 +48,12 @@ from matteloop.ui.preview_controller.worker import (
     _PreviewWorker,
 )
 from matteloop.ui.worker_thread import WorkerThread
+
+LOGGER = logging.getLogger(__name__)
+
+# Long enough that a worker released by close() always finishes, short enough
+# that one it cannot release does not hold the application open.
+_SHUTDOWN_JOIN_TIMEOUT_MS = 30_000
 
 
 class PreviewController(QObject):
@@ -152,12 +159,23 @@ class PreviewController(QObject):
                 thread.quit()
             except RuntimeError:
                 self._threads.pop(job_id, None)
+        self._runtime.close()
         for job_id, (thread, _worker) in tuple(self._threads.items()):
             try:
-                thread.wait(5000)
+                # Generous but finite: closing the runtime releases a worker
+                # stalled in segmentation, but one still preparing a model can
+                # sit in a download or a synchronous pipe read that close()
+                # does not interrupt. Waiting forever would trade a five-second
+                # shutdown for one that never ends.
+                if not thread.wait(_SHUTDOWN_JOIN_TIMEOUT_MS):
+                    LOGGER.warning(
+                        "preview worker %s did not finish within %d ms",
+                        job_id,
+                        _SHUTDOWN_JOIN_TIMEOUT_MS,
+                    )
             except RuntimeError:
-                self._threads.pop(job_id, None)
-        self._runtime.close()
+                pass
+            self._threads.pop(job_id, None)
 
     def _start(
         self,

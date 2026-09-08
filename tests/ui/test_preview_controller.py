@@ -4,11 +4,13 @@ from dataclasses import dataclass
 from fractions import Fraction
 from pathlib import Path
 from threading import Event, get_ident
+from time import monotonic
 
 import pytest
 from PIL import Image
 from PySide6.QtCore import QSettings, Qt
 
+import matteloop.ui.preview_controller.controller as controller_module
 from matteloop.core.crop_state import CropChanged
 from matteloop.core.specs import CropSpec
 from matteloop.core.state import (
@@ -122,6 +124,45 @@ class BlockingPreviewRuntime(FakePreviewRuntime):
             Event().wait(0.01)
         context.checkpoint("segmentation")
         raise AssertionError("cancellation checkpoint must raise")
+
+
+class StalledPreviewRuntime(FakePreviewRuntime):
+    def __init__(self) -> None:
+        super().__init__()
+        self.started = Event()
+        self.closed = Event()
+
+    def preview(
+        self, request, playhead: Fraction, context: JobContext
+    ) -> PreviewResult:
+        del request, playhead
+        self.started.set()
+        self.closed.wait()
+        context.checkpoint("segmentation")
+        raise AssertionError("runtime close must release stalled preview")
+
+    def close(self) -> None:
+        self.closed.set()
+
+
+class UnreleasablePreviewRuntime(FakePreviewRuntime):
+    """A worker blocked where close() cannot reach it — a model download."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.started = Event()
+        self.release = Event()
+
+    def preview(
+        self, request, playhead: Fraction, context: JobContext
+    ) -> PreviewResult:
+        del request, playhead, context
+        self.started.set()
+        self.release.wait(10)
+        raise AssertionError("test must release this worker itself")
+
+    def close(self) -> None:
+        return None
 
 
 class RecordingStore(ReducerStore):
@@ -292,6 +333,34 @@ def test_cancel_keeps_modal_dialog_open_until_the_safe_checkpoint(
     assert not dialog.isVisible()
 
 
+def test_shutdown_releases_stalled_preview_and_joins_worker(
+    tmp_path: Path, qtbot
+) -> None:
+    path = tmp_path / "source.mp4"
+    path.write_bytes(b"fixture")
+    runtime = StalledPreviewRuntime()
+    store = RecordingStore()
+    preview_controller = PreviewController(store, runtime=runtime)
+    controller = SourceController(
+        store,
+        source_adapter=FakeSourceAdapter(path),
+        preview_controller=preview_controller,
+    )
+    window = MainWindow(store, controller, _settings())
+    qtbot.addWidget(window)
+
+    controller.dispatch(VideoDropped(path))
+    qtbot.waitUntil(lambda: store.state.source.value == "ready", timeout=5000)
+    controller.dispatch(PreviewFrameRequested())
+    qtbot.waitUntil(runtime.started.is_set, timeout=5000)
+
+    started = monotonic()
+    controller.shutdown()
+
+    assert monotonic() - started < 1
+    assert preview_controller.active_preview_count == 0
+
+
 def test_job_dialog_rejects_user_close_until_terminal_event(qtbot) -> None:
     dialog = PreviewJobDialog()
     qtbot.addWidget(dialog)
@@ -386,3 +455,40 @@ def test_job_dialog_marks_unknown_overall_progress_as_indeterminate(qtbot) -> No
         dialog.overall_progress_bar.minimum(),
         dialog.overall_progress_bar.maximum(),
     ) == (0, 0)
+
+
+def test_shutdown_gives_up_on_a_worker_close_cannot_release(
+    tmp_path: Path, qtbot, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A worker stuck outside segmentation must not hold the application open.
+
+    `runtime.close()` releases a worker stalled in inference; one still
+    downloading a model, or blocked in a synchronous pipe read, it cannot
+    reach. Waiting without a bound would trade a five-second shutdown for one
+    that never ends.
+    """
+    monkeypatch.setattr(controller_module, "_SHUTDOWN_JOIN_TIMEOUT_MS", 50)
+    path = tmp_path / "source.mp4"
+    path.write_bytes(b"fixture")
+    runtime = UnreleasablePreviewRuntime()
+    store = RecordingStore()
+    preview_controller = PreviewController(store, runtime=runtime)
+    controller = SourceController(
+        store,
+        source_adapter=FakeSourceAdapter(path),
+        preview_controller=preview_controller,
+    )
+    window = MainWindow(store, controller, _settings())
+    qtbot.addWidget(window)
+
+    controller.dispatch(VideoDropped(path))
+    qtbot.waitUntil(lambda: store.state.source.value == "ready", timeout=5000)
+    controller.dispatch(PreviewFrameRequested())
+    qtbot.waitUntil(runtime.started.is_set, timeout=5000)
+
+    started = monotonic()
+    try:
+        controller.shutdown()
+        assert monotonic() - started < 2.0
+    finally:
+        runtime.release.set()
