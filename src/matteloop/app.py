@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from matteloop import __version__, application_title
+from matteloop.core.execution_providers import onnxruntime_repair_command
 
 _LOGGER = logging.getLogger(__name__)
 _ONNXRUNTIME_DISTRIBUTIONS = (
@@ -25,7 +26,6 @@ _ONNXRUNTIME_DISTRIBUTIONS = (
     "onnxruntime-gpu",
     "onnxruntime",
 )
-_ONNXRUNTIME_REPAIR_COMMAND = "uv sync --reinstall-package onnxruntime-directml"
 
 
 @dataclass(frozen=True, slots=True)
@@ -147,7 +147,7 @@ def _log_runtime_diagnostics() -> bool:
         _LOGGER.error(
             "ONNX Runtime startup diagnostics failed: %s. Repair with: %s",
             report.failure_reason or "no execution providers were reported",
-            _ONNXRUNTIME_REPAIR_COMMAND,
+            onnxruntime_repair_command(),
         )
     elif report.partial_failure:
         _LOGGER.warning(
@@ -384,7 +384,7 @@ def _run_provider_command() -> int:
     print(
         "ONNX Runtime unusable: "
         f"{report.failure_reason or 'no execution providers were reported'}. "
-        f"Repair with: {_ONNXRUNTIME_REPAIR_COMMAND}"
+        f"Repair with: {onnxruntime_repair_command()}"
     )
     return 1
 

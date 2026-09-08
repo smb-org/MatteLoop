@@ -180,6 +180,41 @@ def test_provider_command_prints_fake_runtime_facts(
     assert "CPUExecutionProvider: CPU" in output
 
 
+@pytest.mark.parametrize(
+    ("platform_name", "repair_distribution"),
+    [
+        ("win32", "onnxruntime-directml"),
+        ("darwin", "onnxruntime"),
+        ("linux", "onnxruntime"),
+    ],
+)
+def test_runtime_repair_advice_matches_the_platform_distribution(
+    platform_name: str,
+    repair_distribution: str,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    import matteloop.app as app
+    from matteloop.ui.copy import runtime_banner_copy
+
+    class BrokenRuntime:
+        def get_device(self) -> str:
+            raise AttributeError("get_device is missing")
+
+        def get_available_providers(self) -> list[str]:
+            raise AttributeError("get_available_providers is missing")
+
+    monkeypatch.setattr(app.sys, "platform", platform_name)
+    monkeypatch.setattr(app, "_onnxruntime_distribution", lambda: ("fake", "1.2"))
+    monkeypatch.setattr(app, "_load_onnxruntime", lambda: BrokenRuntime())
+    monkeypatch.setattr(app, "_video_adapter_diagnostics", lambda: ())
+    expected_command = f"uv sync --reinstall-package {repair_distribution}"
+
+    assert app.main(["--providers"]) == 1
+    assert expected_command in capsys.readouterr().out
+    assert expected_command in runtime_banner_copy()
+
+
 def test_onnxruntime_distribution_falls_back_to_loaded_module_when_metadata_missing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -274,6 +309,7 @@ def test_provider_command_reports_unusable_runtime_and_returns_failure(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     import matteloop.app as app
+    from matteloop.core.execution_providers import onnxruntime_repair_command
 
     class BrokenRuntime:
         def get_device(self) -> str:
@@ -292,7 +328,7 @@ def test_provider_command_reports_unusable_runtime_and_returns_failure(
     assert "ONNX Runtime distribution: fake 1.2" in output
     assert output.splitlines()[-1] == (
         "ONNX Runtime unusable: get_available_providers is missing. "
-        "Repair with: uv sync --reinstall-package onnxruntime-directml"
+        f"Repair with: {onnxruntime_repair_command()}"
     )
 
 
@@ -316,6 +352,7 @@ def test_startup_runtime_diagnostics_log_total_failure_at_error(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
     import matteloop.app as app
+    from matteloop.core.execution_providers import onnxruntime_repair_command
 
     monkeypatch.setattr(app, "_onnxruntime_distribution", lambda: ("fake", "1.2"))
 
@@ -328,7 +365,7 @@ def test_startup_runtime_diagnostics_log_total_failure_at_error(
 
     record = caplog.records[-1]
     assert record.levelno == logging.ERROR
-    assert "uv sync --reinstall-package onnxruntime-directml" in record.message
+    assert onnxruntime_repair_command() in record.message
 
 
 def test_startup_runtime_diagnostics_log_partial_failure_at_warning(

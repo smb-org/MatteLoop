@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from PySide6.QtCore import QCoreApplication
 
+from matteloop.core.execution_providers import onnxruntime_repair_command
+
 
 def model_display_name(model_id: str, fallback: str | None = None) -> str:
     """Translate a model name while keeping the catalog ID as the key."""
@@ -591,9 +593,10 @@ def accessible_field_name(name: str) -> str:
 
 def runtime_banner_copy() -> str:
     """Translate the startup notice for an unusable ONNX Runtime."""
-    return QCoreApplication.translate(
+    message = QCoreApplication.translate(
         "MainWindow",
         "Segmentation is unavailable because ONNX Runtime could not "
         "enumerate any providers. Repair the installation with: "
-        "uv sync --reinstall-package onnxruntime-directml",
+        "%1",
     )
+    return message.replace("%1", onnxruntime_repair_command())

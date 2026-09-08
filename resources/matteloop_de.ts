@@ -38,142 +38,142 @@
 <context>
     <name>Inspector</name>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="527"/>
+        <location filename="../src/matteloop/ui/copy.py" line="529"/>
         <source>Segmentation</source>
         <translation>Segmentierung</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="528"/>
+        <location filename="../src/matteloop/ui/copy.py" line="530"/>
         <source>Time &amp; Sampling</source>
         <translation>Zeit &amp; Abtastung</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="529"/>
+        <location filename="../src/matteloop/ui/copy.py" line="531"/>
         <source>Crop &amp; Cleanup</source>
         <translation>Zuschnitt und Bereinigung</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="530"/>
+        <location filename="../src/matteloop/ui/copy.py" line="532"/>
         <source>Transform</source>
         <translation>Transformation</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="531"/>
+        <location filename="../src/matteloop/ui/copy.py" line="533"/>
         <source>Output</source>
         <translation>Ausgabe</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="532"/>
+        <location filename="../src/matteloop/ui/copy.py" line="534"/>
         <source>Workspace</source>
         <translation>Arbeitsbereich</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="539"/>
-        <location filename="../src/matteloop/ui/copy.py" line="572"/>
-        <location filename="../src/matteloop/ui/copy.py" line="587"/>
+        <location filename="../src/matteloop/ui/copy.py" line="541"/>
+        <location filename="../src/matteloop/ui/copy.py" line="574"/>
+        <location filename="../src/matteloop/ui/copy.py" line="589"/>
         <source>X</source>
         <translation>X</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="540"/>
-        <location filename="../src/matteloop/ui/copy.py" line="573"/>
-        <location filename="../src/matteloop/ui/copy.py" line="588"/>
+        <location filename="../src/matteloop/ui/copy.py" line="542"/>
+        <location filename="../src/matteloop/ui/copy.py" line="575"/>
+        <location filename="../src/matteloop/ui/copy.py" line="590"/>
         <source>Y</source>
         <translation>Y</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="541"/>
-        <location filename="../src/matteloop/ui/copy.py" line="574"/>
-        <location filename="../src/matteloop/ui/copy.py" line="585"/>
+        <location filename="../src/matteloop/ui/copy.py" line="543"/>
+        <location filename="../src/matteloop/ui/copy.py" line="576"/>
+        <location filename="../src/matteloop/ui/copy.py" line="587"/>
         <source>Width</source>
         <translation>Breite</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="542"/>
-        <location filename="../src/matteloop/ui/copy.py" line="575"/>
-        <location filename="../src/matteloop/ui/copy.py" line="586"/>
+        <location filename="../src/matteloop/ui/copy.py" line="544"/>
+        <location filename="../src/matteloop/ui/copy.py" line="577"/>
+        <location filename="../src/matteloop/ui/copy.py" line="588"/>
         <source>Height</source>
         <translation>Höhe</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="549"/>
+        <location filename="../src/matteloop/ui/copy.py" line="551"/>
         <source>Ready</source>
         <translation>Bereit</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="550"/>
+        <location filename="../src/matteloop/ui/copy.py" line="552"/>
         <source>Downloading</source>
         <translation>Wird heruntergeladen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="551"/>
-        <location filename="../src/matteloop/ui/copy.py" line="552"/>
+        <location filename="../src/matteloop/ui/copy.py" line="553"/>
+        <location filename="../src/matteloop/ui/copy.py" line="554"/>
         <source>Not cached</source>
         <translation>Nicht zwischengespeichert</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="558"/>
+        <location filename="../src/matteloop/ui/copy.py" line="560"/>
         <source>Model</source>
         <translation>Modell</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="559"/>
+        <location filename="../src/matteloop/ui/copy.py" line="561"/>
         <location filename="../src/matteloop/ui/inspector.py" line="252"/>
         <source>Edge treatment</source>
         <translation>Kantenbehandlung</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="560"/>
+        <location filename="../src/matteloop/ui/copy.py" line="562"/>
         <location filename="../src/matteloop/ui/inspector.py" line="266"/>
         <source>Output FPS</source>
         <translation>Ausgabe-FPS</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="561"/>
-        <location filename="../src/matteloop/ui/copy.py" line="582"/>
+        <location filename="../src/matteloop/ui/copy.py" line="563"/>
+        <location filename="../src/matteloop/ui/copy.py" line="584"/>
         <source>Start</source>
         <translation>Start</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="562"/>
-        <location filename="../src/matteloop/ui/copy.py" line="583"/>
+        <location filename="../src/matteloop/ui/copy.py" line="564"/>
+        <location filename="../src/matteloop/ui/copy.py" line="585"/>
         <source>End</source>
         <translation>Ende</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="563"/>
-        <location filename="../src/matteloop/ui/copy.py" line="584"/>
+        <location filename="../src/matteloop/ui/copy.py" line="565"/>
+        <location filename="../src/matteloop/ui/copy.py" line="586"/>
         <source>Duration</source>
         <translation>Dauer</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="564"/>
+        <location filename="../src/matteloop/ui/copy.py" line="566"/>
         <source>Alpha threshold</source>
         <translation>Alpha-Schwellenwert</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="565"/>
+        <location filename="../src/matteloop/ui/copy.py" line="567"/>
         <source>Padding</source>
         <translation>Rand</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="566"/>
+        <location filename="../src/matteloop/ui/copy.py" line="568"/>
         <location filename="../src/matteloop/ui/inspector.py" line="307"/>
         <source>Horizontal stretch</source>
         <translation>Horizontale Streckung</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="569"/>
+        <location filename="../src/matteloop/ui/copy.py" line="571"/>
         <source>Directory</source>
         <translation>Ordner</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="570"/>
+        <location filename="../src/matteloop/ui/copy.py" line="572"/>
         <source>Filename</source>
         <translation>Dateiname</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="571"/>
+        <location filename="../src/matteloop/ui/copy.py" line="573"/>
         <source>Maximum size</source>
         <translation>Maximale Größe</translation>
     </message>
@@ -418,220 +418,220 @@
 <context>
     <name>MainWindow</name>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="368"/>
+        <location filename="../src/matteloop/ui/copy.py" line="370"/>
         <source>MatteLoop</source>
         <translation>MatteLoop</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="369"/>
+        <location filename="../src/matteloop/ui/copy.py" line="371"/>
         <source>Couldn’t read this video</source>
         <translation>Dieses Video konnte nicht gelesen werden</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="372"/>
+        <location filename="../src/matteloop/ui/copy.py" line="374"/>
         <source>Video load error</source>
         <translation>Fehler beim Laden des Videos</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="375"/>
+        <location filename="../src/matteloop/ui/copy.py" line="377"/>
         <source>Render complete</source>
         <translation>Rendern abgeschlossen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="376"/>
+        <location filename="../src/matteloop/ui/copy.py" line="378"/>
         <source>Open output</source>
         <translation>Ausgabe öffnen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="377"/>
+        <location filename="../src/matteloop/ui/copy.py" line="379"/>
         <source>Open folder</source>
         <translation>Ordner öffnen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="594"/>
-        <source>Segmentation is unavailable because ONNX Runtime could not enumerate any providers. Repair the installation with: uv sync --reinstall-package onnxruntime-directml</source>
-        <translation>Segmentierung ist nicht verfügbar, weil ONNX Runtime keine Provider auflisten konnte. Reparieren Sie die Installation mit: uv sync --reinstall-package onnxruntime-directml</translation>
+        <location filename="../src/matteloop/ui/copy.py" line="596"/>
+        <source>Segmentation is unavailable because ONNX Runtime could not enumerate any providers. Repair the installation with: %1</source>
+        <translation>Segmentierung ist nicht verfügbar, weil ONNX Runtime keine Provider auflisten konnte. Reparieren Sie die Installation mit: %1</translation>
     </message>
 </context>
 <context>
     <name>ModelCopy</name>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="11"/>
+        <location filename="../src/matteloop/ui/copy.py" line="13"/>
         <source>U²-Net</source>
         <translation>U²-Net</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="12"/>
+        <location filename="../src/matteloop/ui/copy.py" line="14"/>
         <source>U²-Net P</source>
         <translation>U²-Net P</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="13"/>
+        <location filename="../src/matteloop/ui/copy.py" line="15"/>
         <source>U²-Net Human Segmentation</source>
         <translation>U²-Net Human Segmentation</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="16"/>
+        <location filename="../src/matteloop/ui/copy.py" line="18"/>
         <source>U²-Net Cloth Segmentation</source>
         <translation>U²-Net Cloth Segmentation</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="19"/>
+        <location filename="../src/matteloop/ui/copy.py" line="21"/>
         <source>Silueta</source>
         <translation>Silueta</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="20"/>
+        <location filename="../src/matteloop/ui/copy.py" line="22"/>
         <source>IS-Net General Use</source>
         <translation>IS-Net General Use</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="23"/>
+        <location filename="../src/matteloop/ui/copy.py" line="25"/>
         <source>IS-Net Anime</source>
         <translation>IS-Net Anime</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="24"/>
+        <location filename="../src/matteloop/ui/copy.py" line="26"/>
         <source>BiRefNet General</source>
         <translation>BiRefNet General</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="25"/>
+        <location filename="../src/matteloop/ui/copy.py" line="27"/>
         <source>BiRefNet General Lite</source>
         <translation>BiRefNet General Lite</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="28"/>
+        <location filename="../src/matteloop/ui/copy.py" line="30"/>
         <source>BiRefNet Portrait</source>
         <translation>BiRefNet Portrait</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="31"/>
+        <location filename="../src/matteloop/ui/copy.py" line="33"/>
         <source>BiRefNet DIS</source>
         <translation>BiRefNet DIS</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="32"/>
+        <location filename="../src/matteloop/ui/copy.py" line="34"/>
         <source>BiRefNet HRSOD</source>
         <translation>BiRefNet HRSOD</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="33"/>
+        <location filename="../src/matteloop/ui/copy.py" line="35"/>
         <source>BiRefNet COD</source>
         <translation>BiRefNet COD</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="34"/>
+        <location filename="../src/matteloop/ui/copy.py" line="36"/>
         <source>BiRefNet Massive</source>
         <translation>BiRefNet Massive</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="35"/>
+        <location filename="../src/matteloop/ui/copy.py" line="37"/>
         <source>BRIA RMBG 2.0</source>
         <translation>BRIA RMBG 2.0</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="43"/>
+        <location filename="../src/matteloop/ui/copy.py" line="45"/>
         <source>General-purpose foreground extraction.</source>
         <translation>Allgemeine Freistellung von Vordergrundobjekten.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="46"/>
+        <location filename="../src/matteloop/ui/copy.py" line="48"/>
         <source>Small, faster general-purpose foreground extraction.</source>
         <translation>Kleinere, schnellere allgemeine Freistellung von Vordergrundobjekten.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="49"/>
+        <location filename="../src/matteloop/ui/copy.py" line="51"/>
         <source>Human-focused foreground extraction.</source>
         <translation>Auf Personen ausgerichtete Vordergrundfreistellung.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="52"/>
+        <location filename="../src/matteloop/ui/copy.py" line="54"/>
         <source>Clothing-focused segmentation.</source>
         <translation>Auf Kleidung ausgerichtete Segmentierung.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="55"/>
+        <location filename="../src/matteloop/ui/copy.py" line="57"/>
         <source>Compact general-purpose foreground extraction.</source>
         <translation>Kompakte allgemeine Freistellung von Vordergrundobjekten.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="58"/>
+        <location filename="../src/matteloop/ui/copy.py" line="60"/>
         <source>General salient-object segmentation.</source>
         <translation>Allgemeine Segmentierung auffälliger Objekte.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="61"/>
+        <location filename="../src/matteloop/ui/copy.py" line="63"/>
         <source>Anime and illustration foreground extraction.</source>
         <translation>Freistellung von Vordergrundobjekten in Anime und Illustrationen.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="64"/>
+        <location filename="../src/matteloop/ui/copy.py" line="66"/>
         <source>High-quality general foreground extraction.</source>
         <translation>Hochwertige allgemeine Freistellung von Vordergrundobjekten.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="67"/>
+        <location filename="../src/matteloop/ui/copy.py" line="69"/>
         <source>Smaller BiRefNet general foreground extraction.</source>
         <translation>Kleinere allgemeine BiRefNet-Freistellung von Vordergrundobjekten.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="70"/>
+        <location filename="../src/matteloop/ui/copy.py" line="72"/>
         <source>High-quality portrait and hair foreground extraction.</source>
         <translation>Hochwertige Freistellung von Porträts und Haaren.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="73"/>
+        <location filename="../src/matteloop/ui/copy.py" line="75"/>
         <source>Dichotomous image segmentation.</source>
         <translation>Dichotome Bildsegmentierung.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="76"/>
+        <location filename="../src/matteloop/ui/copy.py" line="78"/>
         <source>High-resolution salient-object detection.</source>
         <translation>Erkennung auffälliger Objekte in hoher Auflösung.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="79"/>
+        <location filename="../src/matteloop/ui/copy.py" line="81"/>
         <source>Camouflaged-object detection.</source>
         <translation>Erkennung getarnter Objekte.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="82"/>
+        <location filename="../src/matteloop/ui/copy.py" line="84"/>
         <source>Broad high-capacity foreground extraction.</source>
         <translation>Leistungsstarke, breit einsetzbare Vordergrundfreistellung.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="85"/>
+        <location filename="../src/matteloop/ui/copy.py" line="87"/>
         <source>High-quality general background removal.</source>
         <translation>Hochwertige allgemeine Hintergrundentfernung.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="95"/>
+        <location filename="../src/matteloop/ui/copy.py" line="97"/>
         <source>Model terms are provided by the upstream U²-Net project; review them before redistribution.</source>
         <translation>Die Modellbedingungen stammen vom U²-Net-Projekt; prüfen Sie sie vor der Weitergabe.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="101"/>
+        <location filename="../src/matteloop/ui/copy.py" line="103"/>
         <source>Review the Silueta model&apos;s upstream terms before redistribution.</source>
         <translation>Prüfen Sie die Bedingungen des Silueta-Projekts vor der Weitergabe.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="106"/>
+        <location filename="../src/matteloop/ui/copy.py" line="108"/>
         <source>Review the IS-Net model&apos;s upstream terms before redistribution.</source>
         <translation>Prüfen Sie die Bedingungen des IS-Net-Projekts vor der Weitergabe.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="111"/>
+        <location filename="../src/matteloop/ui/copy.py" line="113"/>
         <source>Review the IS-Net Anime model&apos;s upstream terms before redistribution.</source>
         <translation>Prüfen Sie die Bedingungen des IS-Net-Anime-Projekts vor der Weitergabe.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="116"/>
+        <location filename="../src/matteloop/ui/copy.py" line="118"/>
         <source>Review the BiRefNet model&apos;s upstream terms before redistribution or commercial use.</source>
         <translation>Prüfen Sie die Bedingungen des BiRefNet-Projekts vor der Weitergabe oder kommerziellen Nutzung.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="122"/>
+        <location filename="../src/matteloop/ui/copy.py" line="124"/>
         <source>BRIA RMBG 2.0 has model-specific license terms; commercial use requires checking and satisfying BRIA&apos;s current license.</source>
         <translation>Für BRIA RMBG 2.0 gelten modellspezifische Lizenzbedingungen; für die kommerzielle Nutzung müssen Sie die aktuelle BRIA-Lizenz prüfen und einhalten.</translation>
     </message>
@@ -1031,168 +1031,168 @@ Freed %s.</source>
 <context>
     <name>Presenter</name>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="278"/>
+        <location filename="../src/matteloop/ui/copy.py" line="280"/>
         <source>Preview this frame to inspect the cutout</source>
         <translation>Vorschau dieses Bildes anzeigen, um die Freistellung zu prüfen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="281"/>
+        <location filename="../src/matteloop/ui/copy.py" line="283"/>
         <source>Reading video…</source>
         <translation>Video wird gelesen…</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="282"/>
+        <location filename="../src/matteloop/ui/copy.py" line="284"/>
         <source>This video could not be read. Open another video.</source>
         <translation>Dieses Video konnte nicht gelesen werden. Öffnen Sie ein anderes Video.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="285"/>
-        <location filename="../src/matteloop/ui/copy.py" line="357"/>
+        <location filename="../src/matteloop/ui/copy.py" line="287"/>
+        <location filename="../src/matteloop/ui/copy.py" line="359"/>
         <source>Preview failed</source>
         <translation>Vorschau fehlgeschlagen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="286"/>
+        <location filename="../src/matteloop/ui/copy.py" line="288"/>
         <source>retry Preview Frame</source>
         <translation>Vorschau anzeigen wiederholen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="289"/>
+        <location filename="../src/matteloop/ui/copy.py" line="291"/>
         <source>Current preview — previewing selected frame</source>
         <translation>Aktuelle Vorschau — ausgewähltes Bild wird angezeigt</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="292"/>
+        <location filename="../src/matteloop/ui/copy.py" line="294"/>
         <source>Previewing selected frame</source>
         <translation>Ausgewähltes Bild wird in der Vorschau angezeigt</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="295"/>
+        <location filename="../src/matteloop/ui/copy.py" line="297"/>
         <source>Current preview</source>
         <translation>Aktuelle Vorschau</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="296"/>
+        <location filename="../src/matteloop/ui/copy.py" line="298"/>
         <source>preview again</source>
         <translation>Vorschau erneut anzeigen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="297"/>
+        <location filename="../src/matteloop/ui/copy.py" line="299"/>
         <source>Settings changed — preview again</source>
         <translation>Einstellungen geändert — Vorschau erneut anzeigen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="300"/>
+        <location filename="../src/matteloop/ui/copy.py" line="302"/>
         <source>Download required</source>
         <translation>Download erforderlich</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="303"/>
+        <location filename="../src/matteloop/ui/copy.py" line="305"/>
         <source>Model preview — rebuild uses edited cut frames</source>
         <translation>Modellvorschau — der Neuaufbau verwendet bearbeitete Schnittbilder</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="306"/>
+        <location filename="../src/matteloop/ui/copy.py" line="308"/>
         <source>Edited cuts changed</source>
         <translation>Bearbeitete Schnitte geändert</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="309"/>
+        <location filename="../src/matteloop/ui/copy.py" line="311"/>
         <source>Download &amp; Preview</source>
         <translation>Herunterladen &amp; Vorschau</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="312"/>
+        <location filename="../src/matteloop/ui/copy.py" line="314"/>
         <source>Preview Frame</source>
         <translation>Vorschau anzeigen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="313"/>
+        <location filename="../src/matteloop/ui/copy.py" line="315"/>
         <source>Open another video</source>
         <translation>Anderes Video öffnen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="316"/>
+        <location filename="../src/matteloop/ui/copy.py" line="318"/>
         <source>Drop a video here</source>
         <translation>Legen Sie hier ein Video ab</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="319"/>
+        <location filename="../src/matteloop/ui/copy.py" line="321"/>
         <source>Background-removed result</source>
         <translation>Freigestelltes Ergebnis</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="322"/>
+        <location filename="../src/matteloop/ui/copy.py" line="324"/>
         <source>Retry Rebuild</source>
         <translation>Neuaufbau wiederholen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="323"/>
+        <location filename="../src/matteloop/ui/copy.py" line="325"/>
         <source>Rebuild from edited cuts</source>
         <translation>Aus bearbeiteten Schnitten neu aufbauen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="326"/>
+        <location filename="../src/matteloop/ui/copy.py" line="328"/>
         <source>Render complete</source>
         <translation>Rendern abgeschlossen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="327"/>
+        <location filename="../src/matteloop/ui/copy.py" line="329"/>
         <source>Previous result</source>
         <translation>Vorheriges Ergebnis</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="338"/>
+        <location filename="../src/matteloop/ui/copy.py" line="340"/>
         <source>Preview failed: %s</source>
         <translation>Vorschau fehlgeschlagen: %s</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="341"/>
+        <location filename="../src/matteloop/ui/copy.py" line="343"/>
         <source>Preview failed — %s</source>
         <translation>Vorschau fehlgeschlagen — %s</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="347"/>
+        <location filename="../src/matteloop/ui/copy.py" line="349"/>
         <source>Segmentation</source>
         <translation>Segmentierung</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="348"/>
+        <location filename="../src/matteloop/ui/copy.py" line="350"/>
         <source>Compute acceleration</source>
         <translation>Beschleunigung</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="351"/>
+        <location filename="../src/matteloop/ui/copy.py" line="353"/>
         <source>Sampling</source>
         <translation>Abtastung</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="352"/>
+        <location filename="../src/matteloop/ui/copy.py" line="354"/>
         <source>Crop &amp; cleanup</source>
         <translation>Zuschnitt und Bereinigung</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="353"/>
+        <location filename="../src/matteloop/ui/copy.py" line="355"/>
         <source>Crop</source>
         <translation>Zuschnitt</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="354"/>
+        <location filename="../src/matteloop/ui/copy.py" line="356"/>
         <source>Framing</source>
         <translation>Rahmung</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="355"/>
+        <location filename="../src/matteloop/ui/copy.py" line="357"/>
         <source>Playhead</source>
         <translation>Abspielposition</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="356"/>
+        <location filename="../src/matteloop/ui/copy.py" line="358"/>
         <source>Export range</source>
         <translation>Exportbereich</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="358"/>
+        <location filename="../src/matteloop/ui/copy.py" line="360"/>
         <source>Edited cuts</source>
         <translation>bearbeitete Schnitte</translation>
     </message>
@@ -1218,12 +1218,12 @@ Freed %s.</source>
 <context>
     <name>PreviewJobDialog</name>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="473"/>
+        <location filename="../src/matteloop/ui/copy.py" line="475"/>
         <source>Rebuilding from edited cuts</source>
         <translation>Aus bearbeiteten Schnitten wird neu aufgebaut</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="476"/>
+        <location filename="../src/matteloop/ui/copy.py" line="478"/>
         <source>Rendering video</source>
         <translation>Video wird gerendert</translation>
     </message>
@@ -1562,47 +1562,47 @@ Freed %s.</source>
 <context>
     <name>ProgressCopy</name>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="238"/>
+        <location filename="../src/matteloop/ui/copy.py" line="240"/>
         <source>Promoting cut frames</source>
         <translation>Schnittbilder werden freigegeben</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="241"/>
+        <location filename="../src/matteloop/ui/copy.py" line="243"/>
         <source>Validating cut set</source>
         <translation>Schnittset wird validiert</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="244"/>
+        <location filename="../src/matteloop/ui/copy.py" line="246"/>
         <source>Validating cut snapshot</source>
         <translation>Schnitt-Snapshot wird validiert</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="247"/>
+        <location filename="../src/matteloop/ui/copy.py" line="249"/>
         <source>Validating encoded output</source>
         <translation>Kodierte Ausgabe wird validiert</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="250"/>
+        <location filename="../src/matteloop/ui/copy.py" line="252"/>
         <source>Starting segmentation session</source>
         <translation>Segmentierungssitzung wird gestartet</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="253"/>
+        <location filename="../src/matteloop/ui/copy.py" line="255"/>
         <source>Using cached model weights</source>
         <translation>Zwischengespeicherte Modellgewichte werden verwendet</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="256"/>
+        <location filename="../src/matteloop/ui/copy.py" line="258"/>
         <source>Reusing prepared session</source>
         <translation>Vorbereitete Sitzung wird wiederverwendet</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="264"/>
+        <location filename="../src/matteloop/ui/copy.py" line="266"/>
         <source>Frame %1 of %2</source>
         <translation>Frame %1 von %2</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="269"/>
+        <location filename="../src/matteloop/ui/copy.py" line="271"/>
         <source>Cut frame %1 of %2</source>
         <translation>Schnittbild %1 von %2</translation>
     </message>
@@ -1610,118 +1610,118 @@ Freed %s.</source>
 <context>
     <name>ProviderCopy</name>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="134"/>
-        <location filename="../src/matteloop/ui/copy.py" line="148"/>
+        <location filename="../src/matteloop/ui/copy.py" line="136"/>
+        <location filename="../src/matteloop/ui/copy.py" line="150"/>
         <source>CPU</source>
         <translation>CPU</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="135"/>
+        <location filename="../src/matteloop/ui/copy.py" line="137"/>
         <source>Core ML</source>
         <translation>Core ML</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="138"/>
+        <location filename="../src/matteloop/ui/copy.py" line="140"/>
         <source>CUDA</source>
         <translation>CUDA</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="139"/>
+        <location filename="../src/matteloop/ui/copy.py" line="141"/>
         <source>ROCm</source>
         <translation>ROCm</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="140"/>
+        <location filename="../src/matteloop/ui/copy.py" line="142"/>
         <source>MIGraphX</source>
         <translation>MIGraphX</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="143"/>
+        <location filename="../src/matteloop/ui/copy.py" line="145"/>
         <source>DirectML</source>
         <translation>DirectML</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="149"/>
+        <location filename="../src/matteloop/ui/copy.py" line="151"/>
         <source>Apple CoreML</source>
         <translation>Apple CoreML</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="152"/>
+        <location filename="../src/matteloop/ui/copy.py" line="154"/>
         <source>NVIDIA CUDA</source>
         <translation>NVIDIA CUDA</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="155"/>
+        <location filename="../src/matteloop/ui/copy.py" line="157"/>
         <source>AMD ROCm</source>
         <translation>AMD ROCm</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="156"/>
+        <location filename="../src/matteloop/ui/copy.py" line="158"/>
         <source>AMD MIGraphX</source>
         <translation>AMD MIGraphX</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="159"/>
+        <location filename="../src/matteloop/ui/copy.py" line="161"/>
         <source>GPU over DirectML</source>
         <translation>GPU über DirectML</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="164"/>
+        <location filename="../src/matteloop/ui/copy.py" line="166"/>
         <source>Apple CoreML – experimental</source>
         <translation>Apple CoreML – experimentell</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="167"/>
+        <location filename="../src/matteloop/ui/copy.py" line="169"/>
         <source>CPU – recommended</source>
         <translation>CPU – empfohlen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="170"/>
+        <location filename="../src/matteloop/ui/copy.py" line="172"/>
         <source>Apple CoreML – recommended</source>
         <translation>Apple CoreML – empfohlen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="173"/>
+        <location filename="../src/matteloop/ui/copy.py" line="175"/>
         <source>NVIDIA CUDA – recommended</source>
         <translation>NVIDIA CUDA – empfohlen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="176"/>
+        <location filename="../src/matteloop/ui/copy.py" line="178"/>
         <source>AMD ROCm – recommended</source>
         <translation>AMD ROCm – empfohlen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="179"/>
+        <location filename="../src/matteloop/ui/copy.py" line="181"/>
         <source>AMD MIGraphX – recommended</source>
         <translation>AMD MIGraphX – empfohlen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="182"/>
+        <location filename="../src/matteloop/ui/copy.py" line="184"/>
         <source>GPU over DirectML – recommended</source>
         <translation>GPU über DirectML – empfohlen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="194"/>
+        <location filename="../src/matteloop/ui/copy.py" line="196"/>
         <source>Apple CoreML could not load this model. Processing continues on the CPU.</source>
         <translation>Apple CoreML konnte dieses Modell nicht laden. Die Verarbeitung wird auf der CPU fortgesetzt.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="202"/>
+        <location filename="../src/matteloop/ui/copy.py" line="204"/>
         <source>NVIDIA CUDA could not load this model. Processing continues on the CPU.</source>
         <translation>NVIDIA CUDA konnte dieses Modell nicht laden. Die Verarbeitung wird auf der CPU fortgesetzt.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="210"/>
+        <location filename="../src/matteloop/ui/copy.py" line="212"/>
         <source>AMD ROCm could not load this model. Processing continues on the CPU.</source>
         <translation>AMD ROCm konnte dieses Modell nicht laden. Die Verarbeitung wird auf der CPU fortgesetzt.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="218"/>
+        <location filename="../src/matteloop/ui/copy.py" line="220"/>
         <source>AMD MIGraphX could not load this model. Processing continues on the CPU.</source>
         <translation>AMD MIGraphX konnte dieses Modell nicht laden. Die Verarbeitung wird auf der CPU fortgesetzt.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="226"/>
+        <location filename="../src/matteloop/ui/copy.py" line="228"/>
         <source>GPU over DirectML could not load this model. Processing continues on the CPU.</source>
         <translation>GPU over DirectML konnte dieses Modell nicht laden. Die Verarbeitung wird auf der CPU fortgesetzt.</translation>
     </message>
@@ -1729,92 +1729,92 @@ Freed %s.</source>
 <context>
     <name>RenderController</name>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="391"/>
+        <location filename="../src/matteloop/ui/copy.py" line="393"/>
         <source>Preview recommended</source>
         <translation>Vorschau empfohlen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="394"/>
+        <location filename="../src/matteloop/ui/copy.py" line="396"/>
         <source>Preview this frame before rendering?</source>
         <translation>Vorschau dieses Bildes vor dem Rendern anzeigen?</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="398"/>
+        <location filename="../src/matteloop/ui/copy.py" line="400"/>
         <source>A preview lets you verify the cutout before processing the whole video.</source>
         <translation>Mit einer Vorschau können Sie die Freistellung prüfen, bevor das gesamte Video verarbeitet wird.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="404"/>
+        <location filename="../src/matteloop/ui/copy.py" line="406"/>
         <source>Preview first</source>
         <translation>Zuerst Vorschau anzeigen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="407"/>
+        <location filename="../src/matteloop/ui/copy.py" line="409"/>
         <source>Render anyway</source>
         <translation>Trotzdem rendern</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="410"/>
+        <location filename="../src/matteloop/ui/copy.py" line="412"/>
         <source>Cancel</source>
         <translation>Abbrechen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="411"/>
+        <location filename="../src/matteloop/ui/copy.py" line="413"/>
         <source>Matching cut set found</source>
         <translation>Passendes Schnittset gefunden</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="415"/>
+        <location filename="../src/matteloop/ui/copy.py" line="417"/>
         <source>A validated cut set matches the current source and settings.</source>
         <translation>Ein validiertes Schnittset passt zur aktuellen Quelle und den Einstellungen.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="424"/>
+        <location filename="../src/matteloop/ui/copy.py" line="426"/>
         <source>Rebuild reuses the cuts and only reruns framing and encoding. Regenerate removes backgrounds again for every selected frame.</source>
         <translation>Der Neuaufbau verwendet die Schnitte wieder und führt nur Framing und Kodierung erneut aus. Die erneute Generierung entfernt die Hintergründe für jedes ausgewählte Bild erneut.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="430"/>
+        <location filename="../src/matteloop/ui/copy.py" line="432"/>
         <source>Reuse cuts and rebuild</source>
         <translation>Schnitte wiederverwenden und neu aufbauen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="433"/>
+        <location filename="../src/matteloop/ui/copy.py" line="435"/>
         <source>Regenerate backgrounds</source>
         <translation>Hintergründe neu entfernen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="448"/>
+        <location filename="../src/matteloop/ui/copy.py" line="450"/>
         <source>Output already exists</source>
         <translation>Ausgabe ist bereits vorhanden</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="451"/>
+        <location filename="../src/matteloop/ui/copy.py" line="453"/>
         <source>%s already exists.</source>
         <translation>%s ist bereits vorhanden.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="454"/>
+        <location filename="../src/matteloop/ui/copy.py" line="456"/>
         <source>Choose how to handle the existing output.</source>
         <translation>Wählen Sie, wie mit der vorhandenen Ausgabe verfahren werden soll.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="457"/>
+        <location filename="../src/matteloop/ui/copy.py" line="459"/>
         <source>Replace</source>
         <translation>Ersetzen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="458"/>
+        <location filename="../src/matteloop/ui/copy.py" line="460"/>
         <source>Choose another name</source>
         <translation>Anderen Namen auswählen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="461"/>
+        <location filename="../src/matteloop/ui/copy.py" line="463"/>
         <source>Choose output name</source>
         <translation>Ausgabenamen auswählen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="464"/>
+        <location filename="../src/matteloop/ui/copy.py" line="466"/>
         <source>WebP files (*.webp)</source>
         <translation>WebP-Dateien (*.webp)</translation>
     </message>
@@ -1970,57 +1970,57 @@ Freed %s.</source>
 <context>
     <name>SourceErrors</name>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="485"/>
+        <location filename="../src/matteloop/ui/copy.py" line="487"/>
         <source>Open a video stored on this Mac.</source>
         <translation>Öffnen Sie ein auf diesem Mac gespeichertes Video.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="488"/>
+        <location filename="../src/matteloop/ui/copy.py" line="490"/>
         <source>Open a video file that can be opened and read.</source>
         <translation>Öffnen Sie eine Videodatei, die geöffnet und gelesen werden kann.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="491"/>
+        <location filename="../src/matteloop/ui/copy.py" line="493"/>
         <source>Open a file that contains a video track.</source>
         <translation>Öffnen Sie eine Datei mit einer Videospur.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="495"/>
+        <location filename="../src/matteloop/ui/copy.py" line="497"/>
         <source>Open another video file; this one appears damaged.</source>
         <translation>Öffnen Sie eine andere Videodatei; diese scheint beschädigt zu sein.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="499"/>
+        <location filename="../src/matteloop/ui/copy.py" line="501"/>
         <source>Open a video with a positive duration.</source>
         <translation>Öffnen Sie ein Video mit positiver Dauer.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="502"/>
+        <location filename="../src/matteloop/ui/copy.py" line="504"/>
         <source>Convert to 8-bit SDR and try again.</source>
         <translation>Konvertieren Sie das Video in 8-Bit-SDR und versuchen Sie es erneut.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="505"/>
+        <location filename="../src/matteloop/ui/copy.py" line="507"/>
         <source>Resize to between 8×8 and 3840×2160.</source>
         <translation>Ändern Sie die Größe auf einen Wert zwischen 8×8 und 3840×2160.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="508"/>
+        <location filename="../src/matteloop/ui/copy.py" line="510"/>
         <source>Convert the video to 60 fps or less.</source>
         <translation>Konvertieren Sie das Video auf höchstens 60 Bilder/s.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="511"/>
+        <location filename="../src/matteloop/ui/copy.py" line="513"/>
         <source>Open a video under 10 minutes.</source>
         <translation>Öffnen Sie ein Video mit weniger als 10 Minuten Dauer.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="514"/>
+        <location filename="../src/matteloop/ui/copy.py" line="516"/>
         <source>Open an MP4, MOV, WebM, or MKV video.</source>
         <translation>Öffnen Sie ein MP4-, MOV-, WebM- oder MKV-Video.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="517"/>
+        <location filename="../src/matteloop/ui/copy.py" line="519"/>
         <source>This video could not be read. Open another video.</source>
         <translation>Dieses Video konnte nicht gelesen werden. Öffnen Sie ein anderes Video.</translation>
     </message>

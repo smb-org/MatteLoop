@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import platform
+import sys
 from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import TypeGuard
@@ -25,6 +26,16 @@ ALLOWED_EXECUTION_PROVIDERS = (
     DML_EXECUTION_PROVIDER,
 )
 _ALLOWED = frozenset(ALLOWED_EXECUTION_PROVIDERS)
+
+
+def onnxruntime_repair_command(*, platform_name: str | None = None) -> str:
+    """Return the repair command for the runtime installed on a platform."""
+    distribution = (
+        "onnxruntime-directml"
+        if (platform_name or sys.platform) == "win32"
+        else "onnxruntime"
+    )
+    return f"uv sync --reinstall-package {distribution}"
 
 
 @dataclass(frozen=True, slots=True)
