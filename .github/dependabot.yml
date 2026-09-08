@@ -4,3 +4,6 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    # The default of five hid three outdated actions behind the ones it
+    # happened to report first.
+    open-pull-requests-limit: 10
