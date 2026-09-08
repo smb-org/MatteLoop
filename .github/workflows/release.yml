@@ -134,7 +134,7 @@
         {
           "name": "Save media build stack cache",
           "if": "always() && steps.media-stack-cache.outputs.cache-hit != 'true'",
-          "uses": "actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae",
+          "uses": "actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
           "with": {
             "path": ".matteloop-build-cache/media-stack",
             "key": "media-stack-${{ runner.os }}-${{ matrix.target }}-${{ hashFiles('packaging/media-stack/manifest.toml', 'packaging/media-stack/tools.in', 'packaging/media-stack/tools.lock', 'scripts/media_stack/**/*.py', 'scripts/build_media_stack.py', 'scripts/verify_media_stack.py') }}"
@@ -143,7 +143,7 @@
         {
           "name": "Save Nuitka compile cache",
           "if": "always()",
-          "uses": "actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae",
+          "uses": "actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
           "with": {
             "path": "~/.cache/Nuitka\n~/Library/Caches/Nuitka\n~\\AppData\\Local\\Nuitka\\Nuitka\\Cache",
             "key": "nuitka-${{ runner.os }}-${{ matrix.target }}-${{ github.sha }}"
