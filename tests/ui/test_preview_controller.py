@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from fractions import Fraction
 from pathlib import Path
 from threading import Event, get_ident
+from time import monotonic
 
 import pytest
 from PIL import Image
@@ -122,6 +123,25 @@ class BlockingPreviewRuntime(FakePreviewRuntime):
             Event().wait(0.01)
         context.checkpoint("segmentation")
         raise AssertionError("cancellation checkpoint must raise")
+
+
+class StalledPreviewRuntime(FakePreviewRuntime):
+    def __init__(self) -> None:
+        super().__init__()
+        self.started = Event()
+        self.closed = Event()
+
+    def preview(
+        self, request, playhead: Fraction, context: JobContext
+    ) -> PreviewResult:
+        del request, playhead
+        self.started.set()
+        self.closed.wait()
+        context.checkpoint("segmentation")
+        raise AssertionError("runtime close must release stalled preview")
+
+    def close(self) -> None:
+        self.closed.set()
 
 
 class RecordingStore(ReducerStore):
@@ -290,6 +310,34 @@ def test_cancel_keeps_modal_dialog_open_until_the_safe_checkpoint(
 
     qtbot.waitUntil(lambda: store.state.job.phase.value == "idle", timeout=5000)
     assert not dialog.isVisible()
+
+
+def test_shutdown_releases_stalled_preview_and_joins_worker(
+    tmp_path: Path, qtbot
+) -> None:
+    path = tmp_path / "source.mp4"
+    path.write_bytes(b"fixture")
+    runtime = StalledPreviewRuntime()
+    store = RecordingStore()
+    preview_controller = PreviewController(store, runtime=runtime)
+    controller = SourceController(
+        store,
+        source_adapter=FakeSourceAdapter(path),
+        preview_controller=preview_controller,
+    )
+    window = MainWindow(store, controller, _settings())
+    qtbot.addWidget(window)
+
+    controller.dispatch(VideoDropped(path))
+    qtbot.waitUntil(lambda: store.state.source.value == "ready", timeout=5000)
+    controller.dispatch(PreviewFrameRequested())
+    qtbot.waitUntil(runtime.started.is_set, timeout=5000)
+
+    started = monotonic()
+    controller.shutdown()
+
+    assert monotonic() - started < 1
+    assert preview_controller.active_preview_count == 0
 
 
 def test_job_dialog_rejects_user_close_until_terminal_event(qtbot) -> None:

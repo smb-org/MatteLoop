@@ -152,12 +152,12 @@ class PreviewController(QObject):
                 thread.quit()
             except RuntimeError:
                 self._threads.pop(job_id, None)
+        self._runtime.close()
         for job_id, (thread, _worker) in tuple(self._threads.items()):
             try:
-                thread.wait(5000)
+                thread.wait()
             except RuntimeError:
                 self._threads.pop(job_id, None)
-        self._runtime.close()
 
     def _start(
         self,
