@@ -82,7 +82,7 @@
         {
           "name": "Configure MSVC amd64",
           "if": "runner.os == 'Windows'",
-          "uses": "ilammy/msvc-dev-cmd@a102174a2b586eec2ea151a69e6fd14404a8ce7c",
+          "uses": "ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756",
           "with": {
             "arch": "amd64"
           }
