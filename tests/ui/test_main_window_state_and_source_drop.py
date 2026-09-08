@@ -405,6 +405,8 @@ def test_render_complete_banner_names_artifact_with_full_accessible_path(
 
 
 def test_unusable_runtime_banner_explains_segmentation_repair(qtbot) -> None:
+    from matteloop.core.execution_providers import onnxruntime_repair_command
+
     settings = QSettings(
         QSettings.IniFormat, QSettings.UserScope, "matteloop-review", "runtime"
     )
@@ -421,10 +423,7 @@ def test_unusable_runtime_banner_explains_segmentation_repair(qtbot) -> None:
     assert value.runtime_container.isVisible()
     assert "ONNX Runtime" in value.runtime_banner.text()
     assert "Segmentation is unavailable" in value.runtime_banner.text()
-    assert (
-        "uv sync --reinstall-package onnxruntime-directml"
-        in value.runtime_banner.text()
-    )
+    assert onnxruntime_repair_command() in value.runtime_banner.text()
     assert value.runtime_banner.accessibleName() == value.runtime_banner.text()
 
 

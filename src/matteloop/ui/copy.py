@@ -6,6 +6,8 @@ from typing import cast
 
 from PySide6.QtCore import QT_TRANSLATE_NOOP, QCoreApplication
 
+from matteloop.core.execution_providers import onnxruntime_repair_command
+
 _PRESENTED_STATUS_TEMPLATE = cast(
     str, QT_TRANSLATE_NOOP("Presenter", "%1 · %2")
 )
@@ -633,9 +635,10 @@ def accessible_field_name(name: str) -> str:
 
 def runtime_banner_copy() -> str:
     """Translate the startup notice for an unusable ONNX Runtime."""
-    return QCoreApplication.translate(
+    message = QCoreApplication.translate(
         "MainWindow",
         "Segmentation is unavailable because ONNX Runtime could not "
         "enumerate any providers. Repair the installation with: "
-        "uv sync --reinstall-package onnxruntime-directml",
+        "%1",
     )
+    return message.replace("%1", onnxruntime_repair_command())
