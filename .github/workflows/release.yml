@@ -64,12 +64,12 @@
       "steps": [
         {
           "name": "Checkout",
-          "uses": "actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683"
+          "uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1"
         },
         {
           "name": "Install uv and Python",
           "id": "setup-uv",
-          "uses": "astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9",
+          "uses": "astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d",
           "with": {
             "enable-cache": false,
             "python-version": "3.13",
@@ -84,7 +84,7 @@
         {
           "name": "Configure MSVC amd64",
           "if": "runner.os == 'Windows'",
-          "uses": "ilammy/msvc-dev-cmd@a102174a2b586eec2ea151a69e6fd14404a8ce7c",
+          "uses": "ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756",
           "with": {
             "arch": "amd64"
           }
@@ -92,7 +92,7 @@
         {
           "name": "Install MSYS2 media build tools",
           "if": "runner.os == 'Windows'",
-          "uses": "msys2/setup-msys2@fb197b72ce45fb24f17bf3f807a388985654d1f2",
+          "uses": "msys2/setup-msys2@66cd2cce69caa17b53920067426061ca1de3a884",
           "with": {
             "msystem": "MSYS",
             "path-type": "inherit",
@@ -102,7 +102,7 @@
         {
           "name": "Restore media build stack cache",
           "id": "media-stack-cache",
-          "uses": "actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae",
+          "uses": "actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
           "with": {
             "path": ".matteloop-build-cache/media-stack",
             "key": "media-stack-${{ runner.os }}-${{ matrix.target }}-${{ hashFiles('packaging/media-stack/manifest.toml', 'packaging/media-stack/tools.in', 'packaging/media-stack/tools.lock', 'scripts/media_stack/**/*.py', 'scripts/build_media_stack.py', 'scripts/verify_media_stack.py') }}"
@@ -114,7 +114,7 @@
         },
         {
           "name": "Restore Nuitka compile cache",
-          "uses": "actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae",
+          "uses": "actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
           "with": {
             "path": "~/.cache/Nuitka\n~/Library/Caches/Nuitka\n~\\AppData\\Local\\Nuitka\\Nuitka\\Cache",
             "key": "nuitka-${{ runner.os }}-${{ matrix.target }}-${{ github.sha }}",
@@ -134,7 +134,7 @@
         {
           "name": "Save media build stack cache",
           "if": "always() && steps.media-stack-cache.outputs.cache-hit != 'true'",
-          "uses": "actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae",
+          "uses": "actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
           "with": {
             "path": ".matteloop-build-cache/media-stack",
             "key": "media-stack-${{ runner.os }}-${{ matrix.target }}-${{ hashFiles('packaging/media-stack/manifest.toml', 'packaging/media-stack/tools.in', 'packaging/media-stack/tools.lock', 'scripts/media_stack/**/*.py', 'scripts/build_media_stack.py', 'scripts/verify_media_stack.py') }}"
@@ -143,7 +143,7 @@
         {
           "name": "Save Nuitka compile cache",
           "if": "always()",
-          "uses": "actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae",
+          "uses": "actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
           "with": {
             "path": "~/.cache/Nuitka\n~/Library/Caches/Nuitka\n~\\AppData\\Local\\Nuitka\\Nuitka\\Cache",
             "key": "nuitka-${{ runner.os }}-${{ matrix.target }}-${{ github.sha }}"
@@ -157,7 +157,7 @@
         {
           "name": "Upload retained media-stack staging on failure",
           "if": "failure()",
-          "uses": "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+          "uses": "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
           "with": {
             "name": "media-stack-staging-${{ matrix.target }}",
             "path": "build-failure-diagnostics",
@@ -168,7 +168,7 @@
           "name": "Upload unsigned bundle",
           "id": "upload",
           "if": "runner.os == 'Windows'",
-          "uses": "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+          "uses": "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
           "with": {
             "name": "MatteLoop-unsigned-${{ matrix.target }}",
             "path": "dist",
@@ -179,7 +179,7 @@
         {
           "name": "Upload macOS application archive",
           "if": "runner.os == 'macOS'",
-          "uses": "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+          "uses": "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
           "with": {
             "name": "MatteLoop-unsigned-${{ matrix.target }}",
             "path": "dist/MatteLoop-${{ matrix.target }}.zip\ndist/MatteLoop-*-sources-*",
@@ -198,7 +198,7 @@
       "steps": [
         {
           "name": "Download unsigned bundles",
-          "uses": "actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0",
+          "uses": "actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
           "with": {
             "path": "bundles",
             "pattern": "MatteLoop-unsigned-*"

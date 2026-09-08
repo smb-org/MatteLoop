@@ -4,6 +4,7 @@ import configparser
 import importlib.util
 import json
 import os
+import re
 import shlex
 import shutil
 import socket
@@ -670,18 +671,19 @@ def test_release_workflow_builds_on_dispatch_tags_and_media_stack_changes() -> N
 
     msvc = next(step for step in steps if step["name"] == "Configure MSVC amd64")
     assert msvc["if"] == "runner.os == 'Windows'"
-    assert msvc["uses"] == (
-        "ilammy/msvc-dev-cmd@a102174a2b586eec2ea151a69e6fd14404a8ce7c"
-    )
+    # The commit is dependabot's to move; that it is a full SHA is ours.
+    assert re.fullmatch(
+        r"ilammy/msvc-dev-cmd@[0-9a-f]{40}", msvc["uses"]
+    ), msvc["uses"]
     assert msvc["with"] == {"arch": "amd64"}
 
     msys2 = next(
         step for step in steps if step["name"] == "Install MSYS2 media build tools"
     )
     assert msys2["if"] == "runner.os == 'Windows'"
-    assert msys2["uses"] == (
-        "msys2/setup-msys2@fb197b72ce45fb24f17bf3f807a388985654d1f2"
-    )
+    assert re.fullmatch(
+        r"msys2/setup-msys2@[0-9a-f]{40}", msys2["uses"]
+    ), msys2["uses"]
     assert msys2["with"] == {
         "msystem": "MSYS",
         "path-type": "inherit",
@@ -699,9 +701,9 @@ def test_release_workflow_builds_on_dispatch_tags_and_media_stack_changes() -> N
         step for step in steps if step["name"] == "Restore media build stack cache"
     )
     assert restore["id"] == "media-stack-cache"
-    assert restore["uses"] == (
-        "actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae"
-    )
+    assert re.fullmatch(
+        r"actions/cache/restore@[0-9a-f]{40}", restore["uses"]
+    ), restore["uses"]
     assert restore["with"] == {
         "path": ".matteloop-build-cache/media-stack",
         "key": cache_key,
@@ -721,7 +723,9 @@ def test_release_workflow_builds_on_dispatch_tags_and_media_stack_changes() -> N
     assert save["if"] == (
         "always() && steps.media-stack-cache.outputs.cache-hit != 'true'"
     )
-    assert save["uses"] == "actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae"
+    assert re.fullmatch(
+        r"actions/cache/save@[0-9a-f]{40}", save["uses"]
+    ), save["uses"]
     assert save["with"] == {
         "path": ".matteloop-build-cache/media-stack",
         "key": cache_key,
