@@ -16,6 +16,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from fractions import Fraction
 from pathlib import Path
+from threading import Event
 
 import pytest
 from PySide6.QtCore import Qt
@@ -90,6 +91,21 @@ class _MatchedCutRuntime(PreviewRuntime):
 
     def close(self) -> None:
         return
+
+
+class _DelayedMatchedCutRuntime(_MatchedCutRuntime):
+    """Hold the reuse probe open while the inspector receives an edit."""
+
+    def __init__(self, workspace: CutWorkspace) -> None:
+        super().__init__(workspace)
+        self.probe_started = Event()
+        self.release_probe = Event()
+
+    def find_matching_workspace(self, request, context):
+        del request, context
+        self.probe_started.set()
+        assert self.release_probe.wait(5)
+        return self.workspace
 
 
 def _previewed_state(path: Path) -> AppState:
@@ -188,13 +204,32 @@ def test_rebuilding_the_open_cut_keeps_unsaved_inspector_edits(
     controller.shutdown()
 
 
-def test_rebuilding_a_different_cut_restores_that_cuts_stored_transform(
+def test_rebuilding_the_open_cut_uses_edits_made_during_the_reuse_probe(
     tmp_path, qtbot
 ) -> None:
-    """Keeping live edits is scoped to the open cut: a match on some other
-    cut set restores that set's sidecar, so the rebuild cannot overwrite it
-    with a transform belonging to the cut on screen.
-    """
+    workspace = _promoted_cut(tmp_path, "a")
+    store_transform(workspace, TransformSpec(first_frame=1), [])
+    runtime = _DelayedMatchedCutRuntime(workspace)
+    store, controller = _controller(tmp_path, runtime)
+    controller.render_controller.open_cut_key = lambda: workspace.cache_key
+
+    controller.dispatch(RenderVideoRequested())
+    qtbot.waitUntil(runtime.probe_started.is_set, timeout=5000)
+
+    live = TransformSpec(crop=CropSpec(12, 12, 24, 24))
+    store.dispatch(TransformChanged(live))
+    runtime.release_probe.set()
+    _rebuild_from_reuse_dialog(controller, qtbot)
+
+    qtbot.waitUntil(lambda: len(runtime.rebuild_requests) == 1, timeout=5000)
+    assert runtime.rebuild_requests[0].transform == live
+    controller.shutdown()
+
+
+def test_declining_a_different_cut_keeps_unsaved_transform(
+    tmp_path, qtbot
+) -> None:
+    """A different cut cannot replace the open cut without confirmation."""
     opened = _promoted_cut(tmp_path, "a")
     matched = _promoted_cut(tmp_path, "b")
     stored = TransformSpec(first_frame=2)
@@ -202,13 +237,22 @@ def test_rebuilding_a_different_cut_restores_that_cuts_stored_transform(
     runtime = _MatchedCutRuntime(matched)
     store, controller = _controller(tmp_path, runtime)
     controller.render_controller.open_cut_key = lambda: opened.cache_key
-    store.dispatch(TransformChanged(TransformSpec(crop=CropSpec(4, 4, 32, 32))))
+    live = TransformSpec(crop=CropSpec(4, 4, 32, 32))
+    store.dispatch(TransformChanged(live))
+    confirmations: list[bool] = []
+
+    def decline() -> bool:
+        confirmations.append(True)
+        return False
+
+    controller.render_controller.confirm_discard_unsaved_transform = decline
 
     controller.dispatch(RenderVideoRequested())
     _rebuild_from_reuse_dialog(controller, qtbot)
 
-    qtbot.waitUntil(lambda: len(runtime.rebuild_requests) == 1, timeout=5000)
-    assert runtime.rebuild_requests[0].transform == stored
+    assert confirmations == [True]
+    assert store.state.parameters.transform == live
+    assert not runtime.rebuild_requests
     controller.shutdown()
 
 
