@@ -119,7 +119,9 @@ class RecordingRunner:
                 python.parent.mkdir(parents=True)
                 python.write_text("", encoding="utf-8")
         elif command[:2] == ("uv", "pip"):
-            self._materialize_tool_licences(Path(command[4]), command[5:])
+            tool_python = Path(command[command.index("--python") + 1])
+            lock_path = Path(command[command.index("--requirements") + 1])
+            self._materialize_tool_licences(tool_python, lock_path)
         elif stage == "pyav":
             option = "--outdir" if "--outdir" in command else "--dist-dir"
             wheel_name = WHEEL_NAME if option == "--outdir" else WINDOWS_WHEEL_NAME
@@ -154,7 +156,7 @@ class RecordingRunner:
 
     @staticmethod
     def _materialize_tool_licences(
-        tool_python: Path, requirements: Sequence[str]
+        tool_python: Path, lock_path: Path
     ) -> None:
         environment = tool_python.parents[1]
         site_packages = (
@@ -167,9 +169,10 @@ class RecordingRunner:
             ("setuptools-84.0.0", "LICENSE"),
             ("wheel-0.48.0", "LICENSE.txt"),
         ]
-        if "delocate==0.13.0" in requirements:
+        lock = lock_path.read_text(encoding="utf-8")
+        if "delocate==0.13.0" in lock:
             packages.append(("delocate-0.13.0", "LICENSE"))
-        if "delvewheel==1.13.0" in requirements:
+        if "delvewheel==1.13.0" in lock:
             packages.append(("delvewheel-1.13.0", "LICENSE"))
         for package, filename in packages:
             licence = site_packages / f"{package}.dist-info" / "licenses" / filename
@@ -401,7 +404,7 @@ def test_cache_hit_rejects_compliance_bytes_outside_the_bound_artifact_set(
     assert "verify" not in runner.stage_names
 
 
-def test_tool_environment_installs_only_the_target_specific_manifest_pins(
+def test_tool_environment_installs_the_hashed_target_tool_lock(
     tmp_path: Path,
 ) -> None:
     runner = RecordingRunner()
@@ -417,14 +420,39 @@ def test_tool_environment_installs_only_the_target_specific_manifest_pins(
         if command[:3] == ("uv", "pip", "install")
     )
     assert venv[2:4] == ("--python", sys.executable)
-    assert install[3] == "--python"
-    assert install[5:] == (
+    assert install == (
+        "uv",
+        "pip",
+        "install",
+        "--require-hashes",
+        "--python",
+        str(Path(venv[-1]) / "bin" / "python"),
+        "--requirements",
+        str(ROOT / "packaging" / "media-stack" / "tools.lock"),
+    )
+
+
+def test_tool_lock_contains_hashes_for_direct_and_transitive_requirements() -> None:
+    lock = (ROOT / "packaging" / "media-stack" / "tools.lock").read_text(
+        encoding="utf-8"
+    )
+
+    assert "build==1.6.0" in lock
+    assert "packaging==26.3" in lock
+    assert "pyproject-hooks==1.2.0" in lock
+    for requirement in (
         "build==1.6.0",
         "setuptools==84.0.0",
-        "Cython==3.3.0",
+        "cython==3.3.0",
         "wheel==0.48.0",
         "delocate==0.13.0",
-    )
+        "delvewheel==1.13.0",
+        "packaging==26.3",
+        "pyproject-hooks==1.2.0",
+    ):
+        start = lock.index(requirement)
+        end = lock.find("\n    # via", start)
+        assert "--hash=sha256:" in lock[start:end]
 
 
 def test_macos_repair_inherits_environment_with_staged_libraries_first(
@@ -480,7 +508,7 @@ def test_media_builder_revision_invalidates_prior_repair_evidence(
         machine=MACOS.machine,
         python_tag=MACOS.python_tag,
         deployment_target=MACOS.deployment_target,
-        builder_revision=2,
+        builder_revision=3,
     )
 
     assert artifacts.identity == expected
@@ -499,8 +527,11 @@ def test_windows_build_uses_delvewheel_and_archives_its_licence(
         for command, _kwargs in runner.calls
         if command[:3] == ("uv", "pip", "install")
     )
-    assert install[-1] == "delvewheel==1.13.0"
-    assert "delocate==0.13.0" not in install
+    assert install[3] == "--require-hashes"
+    assert install[-1] == str(ROOT / "packaging" / "media-stack" / "tools.lock")
+    lock = Path(install[-1]).read_text(encoding="utf-8")
+    assert "delvewheel==1.13.0 ; sys_platform == 'win32'" in lock
+    assert "delocate==0.13.0 ; sys_platform == 'darwin'" in lock
     assert artifacts.wheel.name == WINDOWS_WHEEL_NAME
     assert "windows-x64" in artifacts.compliance_archive.name
     with tarfile.open(artifacts.compliance_archive) as archive:

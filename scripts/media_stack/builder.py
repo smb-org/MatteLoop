@@ -226,8 +226,17 @@ def _detect_build_target(
 def _ensure_tool_environment(context: _BuildContext) -> None:
     environment = context.tool_python.parents[1]
     marker = environment / ".matteloop-media-tools.json"
+    lock_path = context.root / "packaging" / "media-stack" / "tools.lock"
     requirements = _tool_requirements(context)
-    expected = _canonical_json({"requirements": requirements})
+    try:
+        lock_sha256 = _sha256(lock_path)
+    except OSError as error:
+        raise MediaStackBuildError(
+            "tools", ("read-lock", str(lock_path)), 1, context.staging
+        ) from error
+    expected = _canonical_json(
+        {"lock_sha256": lock_sha256, "requirements": requirements}
+    )
     if context.tool_python.is_file() and marker.is_file():
         if marker.read_text(encoding="utf-8") == expected:
             return
@@ -241,7 +250,16 @@ def _ensure_tool_environment(context: _BuildContext) -> None:
     _run_command(
         context,
         "tools",
-        ("uv", "pip", "install", "--python", str(context.tool_python), *requirements),
+        (
+            "uv",
+            "pip",
+            "install",
+            "--require-hashes",
+            "--python",
+            str(context.tool_python),
+            "--requirements",
+            str(lock_path),
+        ),
     )
     if not context.tool_python.is_file():
         raise MediaStackBuildError("tools", ("uv", "venv"), 1, context.staging)

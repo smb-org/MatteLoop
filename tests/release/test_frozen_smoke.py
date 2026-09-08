@@ -618,6 +618,8 @@ def test_release_workflow_builds_on_dispatch_tags_and_media_stack_changes() -> N
         "branches": ["main"],
         "paths": [
             "packaging/media-stack/manifest.toml",
+            "packaging/media-stack/tools.in",
+            "packaging/media-stack/tools.lock",
             "scripts/media_stack/**",
             "scripts/build_media_stack.py",
             "scripts/verify_media_stack.py",
@@ -689,6 +691,7 @@ def test_release_workflow_builds_on_dispatch_tags_and_media_stack_changes() -> N
     cache_key = (
         "media-stack-${{ runner.os }}-${{ matrix.target }}-"
         "${{ hashFiles('packaging/media-stack/manifest.toml', "
+        "'packaging/media-stack/tools.in', 'packaging/media-stack/tools.lock', "
         "'scripts/media_stack/**/*.py', 'scripts/build_media_stack.py', "
         "'scripts/verify_media_stack.py') }}"
     )
