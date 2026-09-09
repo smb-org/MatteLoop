@@ -150,7 +150,7 @@ class PreviewController(QObject):
             return
         self._start(job_id, source_id, request_id, inputs)
 
-    def shutdown(self) -> None:
+    def shutdown(self) -> bool:
         self._closed = True
         for context in tuple(self._contexts.values()):
             context.request_cancel()
@@ -160,6 +160,7 @@ class PreviewController(QObject):
             except RuntimeError:
                 self._threads.pop(job_id, None)
         self._runtime.close()
+        complete = True
         for job_id, (thread, _worker) in tuple(self._threads.items()):
             try:
                 # Generous but finite: closing the runtime releases a worker
@@ -168,14 +169,16 @@ class PreviewController(QObject):
                 # does not interrupt. Waiting forever would trade a five-second
                 # shutdown for one that never ends.
                 if not thread.wait(_SHUTDOWN_JOIN_TIMEOUT_MS):
+                    complete = False
                     LOGGER.warning(
                         "preview worker %s did not finish within %d ms",
                         job_id,
                         _SHUTDOWN_JOIN_TIMEOUT_MS,
                     )
             except RuntimeError:
-                pass
+                complete = False
             self._threads.pop(job_id, None)
+        return complete
 
     def _start(
         self,

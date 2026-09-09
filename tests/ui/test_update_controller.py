@@ -5,9 +5,11 @@ import json
 import os
 import sys
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from fractions import Fraction
 from pathlib import Path, PureWindowsPath
+from threading import Event
 from types import ModuleType
 
 import pytest
@@ -28,6 +30,7 @@ from matteloop.ui.store import ReducerStore
 from matteloop.ui.update_controller import (
     UpdateController,
     _create_update_manager,
+    _install_root_is_writable,
     _locator_config,
     _pending_update,
 )
@@ -155,12 +158,17 @@ class _Reader:
         self.result = result
         self.calls = 0
         self.requests: list[tuple[str, str | None]] = []
+        self.cancellations: list[Callable[[], bool] | None] = []
 
     def check(
-        self, channel: str = "stable", current_version: str | None = None
+        self,
+        channel: str = "stable",
+        current_version: str | None = None,
+        cancelled: Callable[[], bool] | None = None,
     ) -> UpdateResult:
         self.calls += 1
         self.requests.append((channel, current_version))
+        self.cancellations.append(cancelled)
         return self.result
 
 
@@ -190,6 +198,7 @@ def _controller(
     manager: _Manager | None = None,
     store: ReducerStore | None = None,
     transport: FakeTransport | None = None,
+    source_shutdown_complete: Callable[[], bool] | None = None,
 ) -> tuple[MainWindow, UpdateController, _Reader]:
     if store is None:
         store = ReducerStore(AppState())
@@ -198,7 +207,12 @@ def _controller(
     window.show()
     reader = _Reader(result)
     controller = UpdateController(
-        window, settings, reader, manager=manager, transport=transport
+        window,
+        settings,
+        reader,
+        manager=manager,
+        transport=transport,
+        source_shutdown_complete=source_shutdown_complete,
     )
     return window, controller, reader
 
@@ -309,7 +323,9 @@ def test_startup_check_off_suppresses_offer_and_arrow(monkeypatch, qtbot) -> Non
     assert not window.action_shelf.update_button.isVisible()
 
 
-def test_turning_startup_check_off_before_start_hides_pending_offer(qtbot) -> None:
+def test_turning_startup_check_off_before_start_keeps_pending_install_available(
+    qtbot,
+) -> None:
     settings = _settings("startup-off-before-start")
     manager = _Manager(pending=_UpdateInfo(_Asset("0.4.0")))
     window, controller, _ = _controller(
@@ -323,7 +339,10 @@ def test_turning_startup_check_off_before_start_hides_pending_offer(qtbot) -> No
     controller.start()
 
     assert not window.update_dialog.isVisible()
-    assert not window.action_shelf.update_button.isVisible()
+    assert window.action_shelf.update_button.isVisible()
+    assert window.update_dialog.install_button.isEnabled()
+    window.action_shelf.update_button.click()
+    assert window.update_dialog.isVisible()
 
 
 def test_available_update_shows_versioned_offer(qtbot) -> None:
@@ -452,6 +471,29 @@ def test_startup_check_runs_in_a_frozen_runtime_when_enabled(
     del window
 
 
+def test_startup_timer_rechecks_the_startup_preference(
+    monkeypatch, qtbot
+) -> None:
+    settings = _settings("startup-timer-recheck")
+    settings.setValue("updates/check_on_startup", True)
+    window, controller, reader = _controller(
+        qtbot, settings, UpdateResult(UpdateOutcome.NONE)
+    )
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    scheduled: list[Callable[[], None]] = []
+    monkeypatch.setattr(
+        "matteloop.ui.update_controller.QTimer.singleShot",
+        lambda _delay, callback: scheduled.append(callback),
+    )
+
+    controller.start()
+    settings.setValue("updates/check_on_startup", False)
+    scheduled[0]()
+
+    assert reader.calls == 0
+    del window
+
+
 def test_manual_check_works_when_running_from_source(qtbot) -> None:
     settings = _settings("manual-source")
     window, controller, reader = _controller(
@@ -463,6 +505,57 @@ def test_manual_check_works_when_running_from_source(qtbot) -> None:
 
     assert reader.calls == 1
     del window
+
+
+def test_shutdown_cancels_and_joins_an_inflight_update_check(qtbot) -> None:
+    class _BlockingReader:
+        def __init__(self) -> None:
+            self.started = Event()
+            self.cancelled = Event()
+
+        def check(
+            self,
+            _channel: str = "stable",
+            _current_version: str | None = None,
+            cancelled: Callable[[], bool] | None = None,
+        ) -> UpdateResult:
+            self.started.set()
+            assert cancelled is not None
+            while not cancelled():
+                time.sleep(0.01)
+            self.cancelled.set()
+            return UpdateResult(UpdateOutcome.FAILED)
+
+    settings = _settings("check-cancelled")
+    window = _window(qtbot, settings)
+    reader = _BlockingReader()
+    controller = UpdateController(window, settings, reader)
+
+    controller.check_now()
+    qtbot.waitUntil(reader.started.is_set)
+
+    assert controller.shutdown()
+    qtbot.waitUntil(lambda: not controller.check_in_progress)
+    assert reader.cancelled.is_set()
+
+
+def test_manual_check_shows_an_update_when_startup_checks_are_disabled(qtbot) -> None:
+    settings = _settings("manual-startup-off")
+    settings.setValue("updates/check_on_startup", False)
+    window, controller, reader = _controller(
+        qtbot,
+        settings,
+        UpdateResult(UpdateOutcome.UPDATE, "0.4.0"),
+    )
+
+    controller.check_now()
+    qtbot.waitUntil(lambda: not controller.check_in_progress)
+
+    assert reader.calls == 1
+    assert window.update_dialog.isVisible()
+    assert window.update_dialog.message_label.text() == (
+        "MatteLoop 0.4.0 is available."
+    )
 
 
 def test_open_releases_page_uses_the_release_url(monkeypatch, qtbot) -> None:
@@ -515,6 +608,22 @@ def test_download_progress_reaches_the_offer_and_finishes_ready(
         "MatteLoop 0.4.0 is ready to install."
     )
     assert window.update_dialog.install_button.isVisible()
+
+
+def test_download_progress_does_not_reopen_a_dismissed_offer(qtbot) -> None:
+    window, controller, _ = _controller(
+        qtbot,
+        _settings("download-progress-dismissed"),
+        UpdateResult(UpdateOutcome.NONE),
+    )
+
+    controller._available_version = "0.4.0"
+    controller._show_downloading("0.4.0", 0)
+    window.update_dialog.close()
+    controller._download_progress(1, 2)
+
+    assert not window.update_dialog.isVisible()
+    assert window.action_shelf.update_button.isVisible()
 
 
 def test_failed_download_offers_try_again(monkeypatch, qtbot, tmp_path: Path) -> None:
@@ -735,7 +844,7 @@ def test_about_to_quit_arms_once_and_only_for_a_pending_install(qtbot) -> None:
 
 
 def test_about_to_quit_refuses_install_when_root_becomes_unwritable(
-    monkeypatch, qtbot
+    monkeypatch, qtbot, caplog
 ) -> None:
     info = _UpdateInfo(_Asset("0.4.0"))
     manager = _Manager(pending=info)
@@ -747,15 +856,37 @@ def test_about_to_quit_refuses_install_when_root_becomes_unwritable(
         manager=manager,
     )
 
-    monkeypatch.setattr(os, "access", lambda _path, _mode: False)
     controller.install_and_restart()
-    controller.arm_pending_install()
+    monkeypatch.setattr(os, "access", lambda _path, _mode: False)
+    with caplog.at_level("WARNING"):
+        controller.arm_pending_install()
 
     assert manager.apply_calls == []
-    assert window.update_dialog.message_label.text() == (
-        "MatteLoop cannot update itself from this location."
+    assert controller._ready_update is info
+    assert "install location is not writable" in caplog.text
+
+
+def test_about_to_quit_refuses_install_after_incomplete_shutdown(
+    monkeypatch, qtbot, caplog
+) -> None:
+    info = _UpdateInfo(_Asset("0.4.0"))
+    manager = _Manager(pending=info)
+    monkeypatch.setattr(os, "access", lambda _path, _mode: True)
+    window, controller, _ = _controller(
+        qtbot,
+        _settings("arm-install-incomplete-shutdown"),
+        UpdateResult(UpdateOutcome.NONE),
+        manager=manager,
+        source_shutdown_complete=lambda: False,
     )
-    assert window.update_dialog.open_releases_button.isVisible()
+
+    controller.install_and_restart()
+    with caplog.at_level("WARNING"):
+        controller.arm_pending_install()
+
+    assert manager.apply_calls == []
+    assert controller._ready_update is info
+    assert "application work did not stop during shutdown" in caplog.text
 
 
 def test_install_refuses_before_closing_when_root_is_unwritable(
@@ -830,6 +961,39 @@ def test_non_writable_install_uses_releases_page(monkeypatch, qtbot) -> None:
 
     assert window.update_dialog.open_releases_button.isVisible()
     assert not window.update_dialog.download_button.isVisible()
+
+
+def test_windows_writability_probes_the_install_directory(
+    monkeypatch, tmp_path: Path
+) -> None:
+    root = tmp_path / "MatteLoop"
+    executable = root / "current" / "matteloop.exe"
+    executable.parent.mkdir(parents=True)
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setattr(os, "access", lambda _path, _mode: False)
+
+    assert _install_root_is_writable(executable)
+
+
+def test_macos_writability_checks_the_bundle_and_its_parent(
+    monkeypatch, tmp_path: Path
+) -> None:
+    bundle = tmp_path / "MatteLoop.app"
+    executable = bundle / "Contents" / "MacOS" / "matteloop"
+    monkeypatch.setattr(sys, "platform", "darwin")
+    checked: list[Path] = []
+
+    def access(path: object, _mode: int) -> bool:
+        checked.append(Path(path))
+        return True
+
+    monkeypatch.setattr(os, "access", access)
+
+    assert _install_root_is_writable(executable)
+    assert checked == [bundle, tmp_path]
+
+    monkeypatch.setattr(os, "access", lambda path, _mode: Path(path) == bundle)
+    assert not _install_root_is_writable(executable)
 
 
 def test_repository_environment_overrides_the_explicit_velopack_source(

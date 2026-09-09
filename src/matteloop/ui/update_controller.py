@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import logging
-import os
 import sys
+from collections.abc import Callable
 from pathlib import Path, PurePath, PureWindowsPath
 from threading import Event
 from typing import TYPE_CHECKING, Any, Protocol, cast
@@ -27,6 +27,13 @@ from matteloop.paths import cache_subdirectory
 from matteloop.ui.i18n import display_locale
 from matteloop.ui.ports import StateStore
 from matteloop.ui.preferences import load_check_on_startup, load_update_channel
+from matteloop.ui.update_paths import (
+    _advisory_update_capability,
+    _install_root_is_writable,
+    _is_frozen_runtime,
+    _physical_executable_path,
+    _update_version,
+)
 from matteloop.ui.worker_thread import WorkerThread
 from matteloop.updates import (
     UpdateDownloadCancelled,
@@ -47,7 +54,10 @@ _DOWNLOAD_SHUTDOWN_TIMEOUT_MS = 5000
 
 class UpdateReader(Protocol):
     def check(
-        self, channel: str = "stable", current_version: str | None = None
+        self,
+        channel: str = "stable",
+        current_version: str | None = None,
+        cancelled: Callable[[], bool] | None = None,
     ) -> UpdateResult: ...
 
 
@@ -73,18 +83,26 @@ class _UpdateWorker(QObject):
         reader: UpdateReader,
         channel: str,
         current_version: str | None,
+        cancellation: Event,
     ) -> None:
         super().__init__()
         self._reader = reader
         self._channel = channel
         self._current_version = current_version
+        self._cancellation = cancellation
 
     def run(self) -> None:
         try:
-            result = self._reader.check(self._channel, self._current_version)
+            result = self._reader.check(
+                self._channel,
+                self._current_version,
+                self._cancellation.is_set,
+            )
         except Exception as error:
             _LOGGER.info("Update check failed: %s", error)
             result = UpdateResult(UpdateOutcome.FAILED)
+        if self._cancellation.is_set():
+            return
         self.result.emit(result)
 
 
@@ -148,6 +166,7 @@ class UpdateController(QObject):
         manager: UpdateManager | None = None,
         store: StateStore | None = None,
         transport: DownloadTransport | None = None,
+        source_shutdown_complete: Callable[[], bool] | None = None,
     ) -> None:
         super().__init__(parent if parent is not None else window)
         self._window = window
@@ -160,8 +179,10 @@ class UpdateController(QObject):
         )
         self._manager = manager if manager is not None else _create_update_manager()
         self._transport = transport
+        self._source_shutdown_complete = source_shutdown_complete
         self._self_update_advisable = _advisory_update_capability(self._manager)
         self._check_thread: QThread | None = None
+        self._check_cancellation: Event | None = None
         self._download_thread: WorkerThread | None = None
         self._download_worker: _DownloadWorker | None = None
         self._download_cancellation: Event | None = None
@@ -177,6 +198,7 @@ class UpdateController(QObject):
         self._ready_update: object | None = _pending_update(self._manager)
         self._pending_install: object | None = None
         self._apply_armed = False
+        self._shutdown_complete = True
         self._store_unsubscribe = self._store.subscribe(self._state_changed)
         self._connect_widgets()
         self._restore_pending_update()
@@ -236,6 +258,12 @@ class UpdateController(QObject):
 
     @Slot()
     def _startup_check(self) -> None:
+        self._updates_enabled = load_check_on_startup(self._settings)
+        if not self._updates_enabled:
+            self._startup_offer_pending = False
+            self._refresh_update_button()
+            self._refresh_install_button()
+            return
         self._start_check(startup=True)
 
     def _start_check(self, *, startup: bool) -> None:
@@ -246,13 +274,16 @@ class UpdateController(QObject):
             self._set_status(
                 QCoreApplication.translate("SettingsDialog", "Checking for updates…")
             )
+        cancellation = Event()
         worker = _UpdateWorker(
             self._reader,
             load_update_channel(self._settings),
             _current_update_version(self._manager),
+            cancellation,
         )
         thread = WorkerThread(worker, self)
         self._check_thread = thread
+        self._check_cancellation = cancellation
         worker.result.connect(self._check_finished)
         thread.finished.connect(self._check_thread_finished)
         thread.start()
@@ -308,6 +339,7 @@ class UpdateController(QObject):
     @Slot()
     def _check_thread_finished(self) -> None:
         self._check_thread = None
+        self._check_cancellation = None
 
     @Slot()
     def start_download(self) -> None:
@@ -342,7 +374,20 @@ class UpdateController(QObject):
         thread.start()
 
     @Slot()
-    def cancel_download(self) -> None:
+    def _cancel_check(self) -> bool:
+        if self._check_cancellation is not None:
+            self._check_cancellation.set()
+        thread = self._check_thread
+        if thread is None:
+            return True
+        thread.quit()
+        if not thread.wait(_DOWNLOAD_SHUTDOWN_TIMEOUT_MS):
+            _LOGGER.warning("MatteLoop update check did not stop after cancel")
+            return False
+        return True
+
+    @Slot()
+    def cancel_download(self) -> bool:
         """Request cancellation and let the transport observe the flag."""
         if self._download_cancellation is not None:
             self._download_cancellation.set()
@@ -351,6 +396,8 @@ class UpdateController(QObject):
             thread.quit()
             if not thread.wait(_DOWNLOAD_SHUTDOWN_TIMEOUT_MS):
                 _LOGGER.warning("MatteLoop update download did not stop after cancel")
+                return False
+        return True
 
     @Slot()
     def _download_button_clicked(self) -> None:
@@ -365,7 +412,9 @@ class UpdateController(QObject):
             return
         percent = 0 if total <= 0 else min(100, max(0, completed * 100 // total))
         self._download_percent = percent
-        self._show_downloading(self._available_version, percent)
+        self._show_downloading(
+            self._available_version, percent, show_dialog=False
+        )
 
     @Slot(object)
     def _download_succeeded(self, update: object) -> None:
@@ -424,8 +473,25 @@ class UpdateController(QObject):
         pending, self._pending_install = self._pending_install, None
         if pending is None or self._manager is None or self._apply_armed:
             return
+        if not self._shutdown_complete:
+            _LOGGER.warning(
+                "MatteLoop update was not armed: update work did not stop "
+                "during shutdown"
+            )
+            return
+        if (
+            self._source_shutdown_complete is not None
+            and not self._source_shutdown_complete()
+        ):
+            _LOGGER.warning(
+                "MatteLoop update was not armed: application work did not stop "
+                "during shutdown"
+            )
+            return
         if not _install_root_is_writable(_physical_executable_path()):
-            self._show_install_failed()
+            _LOGGER.warning(
+                "MatteLoop update was not armed: install location is not writable"
+            )
             return
         self._apply_armed = True
         try:
@@ -435,9 +501,12 @@ class UpdateController(QObject):
             _LOGGER.warning("MatteLoop update could not be armed: %s", error)
 
     @Slot()
-    def shutdown(self) -> None:
-        """Cancel an update download and wait briefly for its worker to stop."""
-        self.cancel_download()
+    def shutdown(self) -> bool:
+        """Cancel update work and wait briefly for its workers to stop."""
+        check_complete = self._cancel_check()
+        download_complete = self.cancel_download()
+        self._shutdown_complete = check_complete and download_complete
+        return self._shutdown_complete
 
     @Slot()
     def dismiss_offer(self) -> None:
@@ -448,7 +517,7 @@ class UpdateController(QObject):
     @Slot()
     def show_offer(self) -> None:
         """Reopen the current update offer from the action-shelf arrow."""
-        if not self._updates_enabled or not self._is_job_idle():
+        if not self._is_job_idle():
             return
         if self._offer_state == "available":
             self._show_available(
@@ -479,8 +548,7 @@ class UpdateController(QObject):
 
     def _refresh_install_button(self) -> None:
         enabled = (
-            self._updates_enabled
-            and self._ready_update is not None
+            self._ready_update is not None
             and self._store.state.job.phase is JobState.IDLE
         )
         self._window.update_dialog.install_button.setEnabled(enabled)
@@ -488,9 +556,13 @@ class UpdateController(QObject):
     def _show_available(self, message: str, *, show_dialog: bool = True) -> None:
         self._set_offer(message, "available", show_dialog=show_dialog)
 
-    def _show_downloading(self, version: str, percent: int) -> None:
+    def _show_downloading(
+        self, version: str, percent: int, *, show_dialog: bool = True
+    ) -> None:
         self._set_offer(
-            self._downloading_message(version, percent), "downloading"
+            self._downloading_message(version, percent),
+            "downloading",
+            show_dialog=show_dialog,
         )
 
     def _show_ready(self, version: str, *, show_dialog: bool = True) -> None:
@@ -532,7 +604,7 @@ class UpdateController(QObject):
         else:
             dialog.show_failed_actions()
         self._refresh_update_button()
-        if show_dialog and self._updates_enabled:
+        if show_dialog:
             self._show_offer_dialog()
         self._refresh_install_button()
 
@@ -573,8 +645,7 @@ class UpdateController(QObject):
 
     def _refresh_update_button(self) -> None:
         self._window.action_shelf.update_button.setVisible(
-            self._updates_enabled
-            and self._offer_state in ("available", "downloading", "ready", "failed")
+            self._offer_state in ("available", "downloading", "ready", "failed")
             and not self._window.update_dialog.isVisible()
         )
 
@@ -582,7 +653,6 @@ class UpdateController(QObject):
         self._updates_enabled = enabled
         if not enabled:
             self._startup_offer_pending = False
-            self._window.update_dialog.hide()
         self._refresh_update_button()
         self._refresh_install_button()
 
@@ -646,26 +716,6 @@ def _pending_update(manager: UpdateManager | None) -> object | None:
     except Exception as error:
         _LOGGER.warning("MatteLoop pending update could not be read: %s", error)
         return None
-
-
-def _physical_executable_path() -> PurePath:
-    """Resolve aliases before deriving the install root for advisory checks."""
-    reported: PurePath = Path(sys.executable)
-    return (
-        reported.resolve()
-        if _is_frozen_runtime() and isinstance(reported, Path)
-        else reported
-    )
-
-
-def _install_root(executable: PurePath) -> PurePath:
-    if sys.platform == "darwin":
-        for parent in (executable, *executable.parents):
-            if parent.name.endswith(".app"):
-                return parent
-    if executable.parent.name.lower() == "current":
-        return executable.parent.parent
-    return executable.parent
 
 
 def _locator_config(executable: PurePath, config_type: Any) -> Any:
@@ -735,28 +785,6 @@ def _remove_package(package: Path) -> None:
         _LOGGER.info("Could not remove failed update package %s: %s", package, error)
 
 
-def _advisory_update_capability(manager: UpdateManager | None) -> bool:
-    """Select download only when the few known replacement blockers are absent."""
-    if manager is None:
-        return False
-    executable = _physical_executable_path()
-    if "/AppTranslocation/" in executable.as_posix():
-        return False
-    return _install_root_is_writable(executable)
-
-
-def _install_root_is_writable(executable: PurePath) -> bool:
-    return os.access(_install_root(executable), os.W_OK)
-
-
-def _update_version(update: object | None, fallback: str | None) -> str | None:
-    if update is None:
-        return fallback
-    asset = getattr(update, "TargetFullRelease", update)
-    version = getattr(asset, "Version", fallback)
-    return version if isinstance(version, str) else fallback
-
-
 def _current_update_version(manager: UpdateManager | None) -> str | None:
     """Use Velopack's version when available, not the numeric bundle version."""
     if manager is None:
@@ -767,7 +795,3 @@ def _current_update_version(manager: UpdateManager | None) -> str | None:
         _LOGGER.info("Velopack current version could not be read: %s", error)
         return None
     return version if isinstance(version, str) else None
-
-
-def _is_frozen_runtime() -> bool:
-    return getattr(sys, "frozen", False) or globals().get("__compiled__") is not None

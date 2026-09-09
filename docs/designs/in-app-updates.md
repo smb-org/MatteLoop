@@ -155,8 +155,8 @@ away:
 - *"Wait for exit" is a 60 s wait that continues on timeout.* On Windows the
   helper then force-stops every process running from the install root. A
   worker that outlived the bounded shutdown waits can be killed. This is a gate
-  requirement (A4, B6); the only acceptable outcome is that the helper defers
-  or refuses. **Two MatteLoop instances from one installation are not
+  requirement (A4, B6); the only acceptable outcome is that MatteLoop refuses
+  to arm the helper. **Two MatteLoop instances from one installation are not
   supported** — the README says so — so the second-instance case is out of the
   gate and no single-instance mechanism is designed.
 - *No signing without an identity.* `vpk` adds `UpdateMac` and `sq.version` to
@@ -242,6 +242,10 @@ that is deleted; a package exists in the packages directory only after its
 SHA-256 matched. The download keeps running if a job starts; it is I/O and
 touches neither the segmentation process nor the work directory.
 
+The release check uses the same cancellation path. On quit, its worker is
+cancelled, its thread is asked to quit, and the thread is joined before the
+application can arm an install.
+
 **Install.** *Install and restart* checks `store.state.job.phase is
 JobState.IDLE` (the button is also disabled otherwise, refreshed from a store
 subscription as `SettingsDialog.load` refreshes the provider picker), records
@@ -254,6 +258,11 @@ cancels at the transform prompt arms nothing: after `close()` returns with the
 window still visible, the pending info is dropped and the dialog returns to
 *Ready*. A *Ready* state is rebuilt at the next launch from
 `get_update_pending_restart()`, so *Later* loses nothing.
+
+The source controller reports whether all of its bounded worker waits finished,
+and the update controller reports the same for its check and download. The
+helper is armed only when both reports are complete; an incomplete shutdown
+refuses to arm and leaves the downloaded package pending for the next launch.
 
 What this does **not** guarantee, and the gate must measure: that the helper
 waits for a worker that outlives the bounded shutdown (Decision 1). The
@@ -285,11 +294,14 @@ checks reduce the chance of reaching that prompt (a root that is unwritable
 before the download is caught). Immediately before the quit path arms the
 helper, the controller repeats the same install-root writability check. If the
 root is no longer writable, it does not arm the helper and shows *Failed* with
-"MatteLoop cannot update itself from this location." and *Open releases page*;
-this closes the permission-change gap between download and quit without adding
-other pre-flight machinery. The prompt cannot be prevented entirely from
-inside the application: permissions may change after that re-check, or the
-helper may encounter a permission the check does not model.
+"MatteLoop cannot update itself from this location." and *Open releases page*
+when the user requests the install. During `aboutToQuit`, the event loop is no
+longer available for that presentation, so the controller logs a warning
+instead, leaves the package pending, and lets the next launch present the
+state. This closes the permission-change gap between download and quit without
+adding other pre-flight machinery. The prompt cannot be prevented entirely
+from inside the application: permissions may change after that re-check, or
+the helper may encounter a permission the check does not model.
 
 A translocated install therefore offers the browser rather than updating
 itself, and that is a deliberate simplification. #77 measured that the
@@ -577,10 +589,11 @@ downloads and would be conspicuously untrue of a `.nupkg`. Before Phase 2
 ships a package, both change to:
 
 > MatteLoop publishes each application and update package with access to its
-> matching source companions at
-> `https://github.com/smb-org/MatteLoop/releases/tag/v<version>`. The media and
-> Qt source archives and checksums are separate downloads; they are not required
-> to run or update the application. Packages retain the applicable licence
+> matching source companions on the releases page:
+> `https://github.com/smb-org/MatteLoop/releases`. Open the release matching your
+> package's version to find them. The media and Qt source archives and checksums
+> are separate downloads; they are not required to run or update the application.
+> Packages retain the applicable licence
 > notices and library-replacement instructions. Redistribution must preserve the
 > applicable licences and provide the required corresponding source through a
 > permitted method. For network distribution under GPLv3 §6(d), source may be
@@ -696,8 +709,8 @@ not the full Velopack apply.
   Decision 2 as first written; the accepted residual case and its arming
   re-check are recorded below.
 - A4. **Work at quit.** Quit for install with a worker blocked the way the
-  #111 harness blocks one. **Requirement: the helper defers or refuses;
-  nothing is killed.**
+  #111 harness blocks one. **Requirement: MatteLoop refuses to arm the helper;
+  the package stays pending and nothing is killed.**
 - A5. **Network.** Offline mid-download: A stays usable, the next launch shows
   no pending package. Behind an interception proxy: **measured and answered
   on the first run** — the SDK's own network path fails with `UnknownIssuer`
@@ -708,10 +721,11 @@ not the full Velopack apply.
   *Open releases page*, not a crash and not a failed swap.
 - Record `PackagesDir`.
 
-*Stage A passes* when A1 and A2 succeed exactly as written and A4 shows
-deferral or refusal; A3, A5 and A6 are recorded, not scored. If A2 fails, or
-A4 fails on 1.2.0 and a newer Velopack in reach does not fix it, stop at
-Phase 1 on both platforms.
+*Stage A passes* when A1 and A2 succeed exactly as written and the scored A4
+shutdown-incomplete case refuses to arm the helper while retaining the pending
+package. A3, A5 and A6 are recorded, not scored. If A2 fails, or A4 fails on
+1.2.0 and a newer Velopack in reach does not fix it, stop at Phase 1 on both
+platforms.
 
 *Status after the first run (2026-09-09).* Stage 0 passed on the `macos-15`
 runner. A1 passed: the packed bundle runs and its smoke test passes inside the
@@ -740,11 +754,14 @@ machine:
 - B5. **Hooks.** `Setup.exe` first run and the post-update relaunch pass
   through `App().run()` without `argparse` seeing `--veloapp-*`.
 - B6. **Work at quit** as A4 — this is the platform whose helper force-stops
-  processes in the install root.
+  processes in the install root. The scored pass condition is the same:
+  MatteLoop refuses to arm the helper when shutdown is incomplete, retaining
+  the pending package.
 - B7. **Failed swap** as A3, by holding a file under `current\` open.
 
 *Stage B passes* when B1, B2, B3 and B5 succeed, B4 preserves the weights and
-B6 shows deferral or refusal; B7 is recorded. Nothing about the framework is
+the scored B6 shutdown-incomplete case refuses to arm the helper while
+retaining the pending package. B7 is recorded. Nothing about the framework is
 "final" before both stages are done, and nothing Windows-related is public
 before Stage A is.
 
@@ -783,9 +800,9 @@ behaviour proves nothing, and no test is written to pretend otherwise.
 
 - Stage 0 fails on the `macos-15` runner — the renamed-in bundle does not
   execute (#77). The branch applies.
-- Stage A fails: A2 does not update through the real feed, or A4 kills a
-  stalled worker and no Velopack version in reach passes it. Stop at Phase 1
-  on both platforms; Windows is never started.
+- Stage A fails: A2 does not update through the real feed, or A4 does not
+  refuse to arm with a stalled worker and no Velopack version in reach passes
+  it. Stop at Phase 1 on both platforms; Windows is never started.
 - B7 shows a window on Windows larger than the two renames A3 measured on
   macOS — for instance a half-copied `current\` that launches and misbehaves.
   The accepted failure mode is "nothing launches, reinstall"; a bundle that
@@ -843,8 +860,10 @@ at A3. This decision has two conditions:
 1. The existing advisory writability check remains before the download, making
    the case rarer.
 2. When `aboutToQuit` arms the install, the controller repeats that same
-   writability check; if it fails, the helper is not armed and the Failed state
-   offers *Open releases page* for a manual install.
+   writability check; if it fails, the helper is not armed, the controller logs
+   a warning because the event loop is already gone, and the pending package is
+   left for the next launch to present. The pre-check remains the user-facing
+   *Open releases page* path for a manual install.
 
 The prompt cannot be prevented entirely from inside the application, because a
 permission can change after the arming check or fall outside what the check

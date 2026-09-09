@@ -254,13 +254,17 @@ def _full_asset(feed: object, version: str) -> dict[str, object]:
     raise ValueError(f"Velopack feed contains no full package for {version}")
 
 
-def _read_response(response: DownloadResponse) -> bytes:
+def _read_response(
+    response: DownloadResponse, cancelled: CancellationCheck | None = None
+) -> bytes:
     chunks: list[bytes] = []
     total = 0
     while total <= _MAX_RESPONSE_BYTES:
         chunk = response.read(_MAX_RESPONSE_BYTES + 1 - total)
         if type(chunk) is not bytes:
             raise OSError("update transport returned a non-bytes chunk")
+        if cancelled is not None:
+            _raise_if_cancelled(cancelled)
         if not chunk:
             return b"".join(chunks)
         chunks.append(chunk)
@@ -297,17 +301,19 @@ class GitHubUpdateReader:
         self,
         channel: str = "stable",
         current_version: str | None = None,
+        cancelled: CancellationCheck | None = None,
     ) -> UpdateResult:
         """Return whether GitHub advertises a newer compatible version."""
+        cancellation = cancelled or (lambda: False)
         response: DownloadResponse | None = None
         result = UpdateResult(UpdateOutcome.FAILED)
         try:
             response = self._transport.open(
                 _release_api_url(channel),
-                lambda: False,
+                cancellation,
                 headers=_REQUEST_HEADERS,
             )
-            payload = json.loads(_read_response(response))
+            payload = json.loads(_read_response(response, cancellation))
             selected = _select_release(payload, channel)
             if selected is None:
                 result = UpdateResult(UpdateOutcome.NONE)

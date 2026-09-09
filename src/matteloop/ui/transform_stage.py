@@ -258,21 +258,24 @@ class TransformStageController(QObject):
         self._current_generation = next(self._generations)
         self._set_facts(None)
 
-    def shutdown(self) -> None:
+    def shutdown(self) -> bool:
         if self._unsubscribe is not None:
             unsubscribe, self._unsubscribe = self._unsubscribe, None
             unsubscribe()
         # Join the frame loader before close_session() clears _frame_thread
         # via _sync_player_frames's own (non-waiting) cancel.
-        self._cancel_frame_load(wait=True)
+        frame_complete = self._cancel_frame_load(wait=True)
         self.close_session()
-        self._join_worker(wait=True)
+        facts_complete = self._join_worker(wait=True)
+        complete = frame_complete and facts_complete
         for thread, _worker in self._retiring:
             try:
-                thread.wait(5000)  # bounded: a deadlocked retiree can't hang shutdown
+                if not thread.wait(5000):
+                    complete = False
             except RuntimeError:
-                pass
+                complete = False
         self._retiring.clear()
+        return complete
 
     @property
     def session(self) -> CutSession | None:
@@ -502,32 +505,33 @@ class TransformStageController(QObject):
         self.facts_changed.emit(facts)
         self._sync_player_frames(immediate=True)
 
-    def _join_worker(self, *, wait: bool = False) -> None:
+    def _join_worker(self, *, wait: bool = False) -> bool:
         """Detach the current facts worker/thread -- see ``_retire``."""
         if self._facts_cancel_event is not None:
             self._facts_cancel_event.set()
             self._facts_cancel_event = None
         thread, self._thread = self._thread, None
         worker, self._worker = self._worker, None
-        self._retire(thread, worker, wait=wait)
+        return self._retire(thread, worker, wait=wait)
 
     def _retire(
         self, thread: QThread | None, worker: QObject | None, *, wait: bool
-    ) -> None:
+    ) -> bool:
         """Quit *thread*; wait bounded if *wait*, else retire the pair (a
         drop before it starts/finishes risks the SIGSEGV this guards
         against). Also prunes retirees that have finished."""
         self._retiring = [p for p in self._retiring if not _thread_is_finished(p[0])]
         if thread is None:
-            return
+            return True
         try:
             thread.quit()
             if wait:
-                thread.wait(5000)
+                return bool(thread.wait(5000))
             elif worker is not None:
                 self._retiring.append((thread, worker))
         except RuntimeError:
-            pass
+            return False
+        return True
 
     # -- Stage C: the player's frame loader -------------------------------
 
@@ -614,7 +618,7 @@ class TransformStageController(QObject):
         if self._player_canvas is not None:
             self._player_canvas.set_status_marker(str(message))
 
-    def _cancel_frame_load(self, *, wait: bool = False) -> None:
+    def _cancel_frame_load(self, *, wait: bool = False) -> bool:
         """Stop the in-flight frame load, if any, without blocking on it.
 
         The worker checks ``_frame_cancel_event`` between frames (E23), so
@@ -631,7 +635,7 @@ class TransformStageController(QObject):
             self._frame_cancel_event = None
         thread, self._frame_thread = self._frame_thread, None
         worker, self._frame_worker = self._frame_worker, None
-        self._retire(thread, worker, wait=wait)
+        return self._retire(thread, worker, wait=wait)
 
 
 def _framing_from_parameters(parameters: ParameterState) -> FramingSpec:

@@ -52,6 +52,7 @@ class _Transport:
         self.response = response
         self.failure = failure
         self.calls: list[tuple[str, Mapping[str, str] | None]] = []
+        self.cancellations: list[Callable[[], bool]] = []
 
     def open(
         self,
@@ -60,6 +61,7 @@ class _Transport:
         *,
         headers: Mapping[str, str] | None = None,
     ) -> _Response:
+        self.cancellations.append(_cancelled)
         self.calls.append((url, headers))
         if self.failure is not None:
             raise self.failure
@@ -279,6 +281,17 @@ def test_http_error_is_reported_as_failed() -> None:
     )
 
     assert reader.check().outcome is UpdateOutcome.FAILED
+
+
+def test_update_check_passes_its_cancellation_callback_to_transport() -> None:
+    reader, transport, _ = _reader(b'{"tag_name":"v0.4.0"}')
+    cancelled = Event()
+
+    assert reader.check(cancelled=cancelled.is_set).outcome is UpdateOutcome.UPDATE
+    assert len(transport.cancellations) == 1
+    assert not transport.cancellations[0]()
+    cancelled.set()
+    assert transport.cancellations[0]()
 
 
 def test_repository_environment_overrides_the_notice_feed(monkeypatch) -> None:

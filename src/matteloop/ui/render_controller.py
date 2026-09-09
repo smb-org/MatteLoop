@@ -158,8 +158,9 @@ class RenderController(QObject):
         elif isinstance(command, OpenOutputFolderRequested):
             self._open_output_folder()
 
-    def shutdown(self) -> None:
+    def shutdown(self) -> bool:
         self._closed = True
+        complete = True
         if self._dialog is not None:
             # Destroyed here, not by a later GC pass -- see the module docstring.
             dialog, self._dialog = self._dialog, None
@@ -193,14 +194,19 @@ class RenderController(QObject):
                 self._threads.pop(job_id, None)
         if self._probe_thread is not None:
             try:
-                self._probe_thread.wait(5000)
+                if not self._probe_thread.wait(5000):
+                    complete = False
             except RuntimeError:
                 self._probe_thread = None
+                complete = False
         for job_id, (thread, _worker) in tuple(self._threads.items()):
             try:
-                thread.wait(5000)
+                if not thread.wait(5000):
+                    complete = False
             except RuntimeError:
                 self._threads.pop(job_id, None)
+                complete = False
+        return complete
 
     def _request_render(self) -> None:
         state = self._store.state

@@ -174,6 +174,38 @@ def test_shutdown_waits_for_an_inflight_load_before_returning(qtbot) -> None:
     assert controller.active_load_count == 0
 
 
+def test_shutdown_reports_when_a_load_outlives_its_bounded_wait(
+    monkeypatch, qtbot
+) -> None:
+    path = Path("/tmp/shutdown-timeout.mp4")
+
+    class StalledAdapter:
+        def __init__(self) -> None:
+            self.started = Event()
+            self.release = Event()
+
+        def load(self, _path: Path, _request_id: int) -> SourceLoadResult:
+            self.started.set()
+            self.release.wait(5)
+            return SourceLoadResult(object(), Image.new("RGBA", (2, 2), "red"))
+
+    monkeypatch.setattr(
+        "matteloop.ui.controller._THREAD_SHUTDOWN_TIMEOUT_MS", 25
+    )
+    adapter = StalledAdapter()
+    controller = SourceController(
+        ReducerStore(), source_adapter=adapter, parent=QApplication.instance()
+    )
+    controller.dispatch(VideoDropped(path))
+    qtbot.waitUntil(adapter.started.is_set, timeout=1000)
+
+    assert not controller.shutdown()
+    assert not controller.shutdown_complete
+
+    adapter.release.set()
+    qtbot.waitUntil(lambda: controller.active_load_count == 0, timeout=1000)
+
+
 def test_source_load_failure_is_an_app_error_with_recovery_focus(qtbot) -> None:
     path = Path("/tmp/broken.mp4")
     error = AppError(

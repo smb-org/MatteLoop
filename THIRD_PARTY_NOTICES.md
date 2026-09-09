@@ -9,10 +9,11 @@ This file documents both the source distribution and the delivered native
 build contract.
 
 MatteLoop publishes each application and update package with access to its
-matching source companions at
-`https://github.com/smb-org/MatteLoop/releases/tag/v<version>`. The media and
-Qt source archives and checksums are separate downloads; they are not required
-to run or update the application. Packages retain the applicable licence
+matching source companions on the releases page:
+`https://github.com/smb-org/MatteLoop/releases`. Open the release matching your
+package's version to find them. The media and Qt source archives and checksums
+are separate downloads; they are not required to run or update the application.
+Packages retain the applicable licence
 notices and library-replacement instructions. Redistribution must preserve the
 applicable licences and provide the required corresponding source through a
 permitted method. For network distribution under GPLv3 §6(d), source may be on
@@ -118,10 +119,11 @@ the application artifact, while an artifact-set JSON in the build cache binds
 all media evidence by digest and identity.
 
 MatteLoop publishes each application and update package with access to its
-matching source companions at
-`https://github.com/smb-org/MatteLoop/releases/tag/v<version>`. The media and
-Qt source archives and checksums are separate downloads; they are not required
-to run or update the application. Packages retain the applicable licence
+matching source companions on the releases page:
+`https://github.com/smb-org/MatteLoop/releases`. Open the release matching your
+package's version to find them. The media and Qt source archives and checksums
+are separate downloads; they are not required to run or update the application.
+Packages retain the applicable licence
 notices and library-replacement instructions. Redistribution must preserve the
 applicable licences and provide the required corresponding source through a
 permitted method. For network distribution under GPLv3 §6(d), source may be on
