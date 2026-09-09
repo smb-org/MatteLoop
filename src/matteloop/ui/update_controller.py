@@ -535,6 +535,11 @@ def _install_root(executable: PurePath) -> PurePath:
 def _locator_config(executable: PurePath, config_type: Any) -> Any:
     """Describe this installation's layout instead of letting Velopack guess."""
     packages = cache_subdirectory("updates")
+    # Velopack probes the directory by writing into it, and silently falls back
+    # to its own location when that fails — including when the directory simply
+    # does not exist yet. It would then look for the package somewhere this
+    # application never writes.
+    packages.mkdir(parents=True, exist_ok=True)
     if sys.platform == "darwin":
         root = executable.parents[2]
         return config_type(

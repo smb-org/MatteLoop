@@ -680,6 +680,9 @@ def test_windows_locator_uses_the_current_directory_and_portable_marker(
     assert locator.CurrentBinaryDir == root / "current"
     assert locator.PackagesDir == tmp_path / "updates"
     assert locator.IsPortable is False
+    # Velopack probes the directory by writing into it and silently falls back
+    # to its own when that fails, so it has to exist before the manager sees it.
+    assert locator.PackagesDir.is_dir()
 
 
 def test_startup_sweep_keeps_only_the_pending_package(
