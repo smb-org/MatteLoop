@@ -2506,6 +2506,11 @@ Freed %s.</source>
         <translation>Das Update konnte nicht heruntergeladen werden.</translation>
     </message>
     <message>
+        <location filename="../src/matteloop/ui/update_controller.py" line="441"/>
+        <source>Cancel</source>
+        <translation>Abbrechen</translation>
+    </message>
+    <message>
         <location filename="../src/matteloop/ui/update_controller.py" line="364"/>
         <source>Try again</source>
         <translation>Erneut versuchen</translation>

@@ -114,19 +114,22 @@ def _configure_application_identity(application: Any) -> None:
 def _start_update_controller(
     window: Any, settings: Any, application: Any, store: Any
 ) -> None:
-    """Wire the update controller, including the arming slot run at quit."""
+    """Wire the update controller, including its bounded quit path."""
     from matteloop.ui.download_transport import QtNetworkDownloadTransport
     from matteloop.ui.update_controller import UpdateController
     from matteloop.updates import GitHubUpdateReader
 
+    transport = QtNetworkDownloadTransport()
     update_controller = UpdateController(
         window,
         settings,
-        GitHubUpdateReader(QtNetworkDownloadTransport()),
+        GitHubUpdateReader(transport),
         parent=application,
         store=store,
+        transport=transport,
     )
     update_controller.start()
+    application.aboutToQuit.connect(update_controller.shutdown)
     application.aboutToQuit.connect(update_controller.arm_pending_install)
 
 

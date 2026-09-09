@@ -1,12 +1,22 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Callable, Mapping
+from pathlib import Path
+from threading import Event
+
+import pytest
 
 from matteloop.jobs.models.download import DownloadHttpError
 from matteloop.updates import (
     GITHUB_LATEST_RELEASE_URL,
     GitHubUpdateReader,
+    UpdateDownloadCancelled,
     UpdateOutcome,
+    download_update,
+    update_feed_url,
+    update_package_url,
 )
 
 
@@ -52,6 +62,89 @@ class _Transport:
             raise self.failure
         assert self.response is not None
         return self.response
+
+
+class _DownloadResponse:
+    def __init__(
+        self, body: bytes, *, on_read: Callable[[], None] | None = None
+    ) -> None:
+        self.body = body
+        self.on_read = on_read
+        self.read_once = False
+        self.headers: Mapping[str, str] = {}
+        self.closed = False
+
+    def read(self, _size: int) -> bytes:
+        if self.read_once:
+            return b""
+        self.read_once = True
+        if self.on_read is not None:
+            self.on_read()
+        return self.body
+
+    def close(self) -> None:
+        self.closed = True
+
+
+class _DownloadTransport:
+    def __init__(
+        self, responses: Mapping[str, _DownloadResponse | BaseException]
+    ) -> None:
+        self.responses = dict(responses)
+        self.calls: list[str] = []
+
+    def open(
+        self,
+        url: str,
+        _cancelled: Callable[[], bool],
+        *,
+        headers: Mapping[str, str] | None = None,
+    ) -> _DownloadResponse:
+        del headers
+        self.calls.append(url)
+        response = self.responses[url]
+        if isinstance(response, BaseException):
+            raise response
+        return response
+
+
+def _package_fixture(
+    package: bytes = b"nupkg-content",
+    *,
+    version: str = "0.4.0",
+    package_response: _DownloadResponse | BaseException | None = None,
+) -> tuple[_DownloadTransport, str]:
+    filename = "io.github.smb-org.matteloop-0.4.0-osx-arm64-full.nupkg"
+    feed = json.dumps(
+        {
+            "Assets": [
+                {
+                    "Version": version,
+                    "Type": "Delta",
+                    "FileName": "old.delta.nupkg",
+                    "SHA256": "wrong",
+                    "Size": 1,
+                },
+                {
+                    "Version": version,
+                    "Type": "Full",
+                    "FileName": filename,
+                    "SHA256": hashlib.sha256(package).hexdigest().upper(),
+                    "Size": len(package),
+                },
+            ]
+        }
+    ).encode()
+    return (
+        _DownloadTransport(
+            {
+                update_feed_url(version, platform="darwin"): _DownloadResponse(feed),
+                update_package_url(version, filename): package_response
+                or _DownloadResponse(package),
+            }
+        ),
+        filename,
+    )
 
 
 def _reader(body: bytes) -> tuple[GitHubUpdateReader, _Transport, _Response]:
@@ -139,3 +232,88 @@ def test_a_failing_close_keeps_the_outcome_read_from_the_body() -> None:
 
     assert result.outcome is UpdateOutcome.UPDATE
     assert result.version == "0.4.0"
+
+
+def test_update_download_selects_the_full_asset_and_verifies_case_insensitive_sha256(
+    tmp_path: Path,
+) -> None:
+    transport, filename = _package_fixture()
+    progress: list[tuple[int, int]] = []
+
+    target = download_update(
+        transport,
+        "0.4.0",
+        tmp_path,
+        lambda completed, total: progress.append((completed, total)),
+        lambda: False,
+        platform="darwin",
+    )
+
+    assert target == tmp_path / filename
+    assert target.read_bytes() == b"nupkg-content"
+    assert not (tmp_path / f"{filename}.part").exists()
+    assert progress[-1] == (len(b"nupkg-content"), len(b"nupkg-content"))
+
+
+def test_update_download_checksum_mismatch_removes_the_part_file(
+    tmp_path: Path,
+) -> None:
+    transport, filename = _package_fixture(
+        package_response=_DownloadResponse(b"different-content")
+    )
+    feed_url = update_feed_url("0.4.0", platform="darwin")
+    package_url = update_package_url("0.4.0", filename)
+    body = json.loads(transport.responses[feed_url].body)
+    body["Assets"][1]["SHA256"] = hashlib.sha256(b"nupkg-content").hexdigest()
+    transport.responses[feed_url] = _DownloadResponse(json.dumps(body).encode())
+
+    with pytest.raises(ValueError, match="SHA256"):
+        download_update(
+            transport,
+            "0.4.0",
+            tmp_path,
+            lambda _completed, _total: None,
+            lambda: False,
+            platform="darwin",
+        )
+
+    assert not (tmp_path / filename).exists()
+    assert not (tmp_path / f"{filename}.part").exists()
+    assert transport.calls == [feed_url, package_url]
+
+
+def test_update_download_cancellation_removes_the_part_file(tmp_path: Path) -> None:
+    cancellation = Event()
+    transport, filename = _package_fixture(
+        package_response=_DownloadResponse(b"nupkg-content", on_read=cancellation.set)
+    )
+
+    with pytest.raises(UpdateDownloadCancelled):
+        download_update(
+            transport,
+            "0.4.0",
+            tmp_path,
+            lambda _completed, _total: None,
+            cancellation.is_set,
+            platform="darwin",
+        )
+
+    assert not (tmp_path / filename).exists()
+    assert not (tmp_path / f"{filename}.part").exists()
+
+
+def test_update_download_transport_error_removes_the_part_file(tmp_path: Path) -> None:
+    transport, filename = _package_fixture(package_response=OSError("offline"))
+
+    with pytest.raises(OSError, match="offline"):
+        download_update(
+            transport,
+            "0.4.0",
+            tmp_path,
+            lambda _completed, _total: None,
+            lambda: False,
+            platform="darwin",
+        )
+
+    assert not (tmp_path / filename).exists()
+    assert not list(tmp_path.glob("*.part"))

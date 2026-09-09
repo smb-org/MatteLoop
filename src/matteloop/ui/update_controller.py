@@ -5,9 +5,9 @@ from __future__ import annotations
 import logging
 import os
 import sys
-from pathlib import Path
-from threading import Thread
-from typing import TYPE_CHECKING, Protocol, cast
+from pathlib import Path, PurePath, PureWindowsPath
+from threading import Event
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from PySide6.QtCore import (
     QCoreApplication,
@@ -22,12 +22,16 @@ from PySide6.QtCore import (
 from PySide6.QtGui import QDesktopServices
 
 from matteloop.core.state import AppState, JobState
+from matteloop.jobs.models.download import DownloadTransport
+from matteloop.paths import cache_subdirectory
 from matteloop.ui.ports import StateStore
 from matteloop.ui.preferences import load_check_on_startup
 from matteloop.ui.worker_thread import WorkerThread
 from matteloop.updates import (
+    UpdateDownloadCancelled,
     UpdateOutcome,
     UpdateResult,
+    download_update,
     releases_url,
     update_repository_url,
 )
@@ -37,6 +41,7 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 _STARTUP_DELAY_MS = 3000
+_DOWNLOAD_SHUTDOWN_TIMEOUT_MS = 5000
 
 
 class UpdateReader(Protocol):
@@ -44,14 +49,6 @@ class UpdateReader(Protocol):
 
 
 class UpdateManager(Protocol):
-    def check_for_updates(self) -> object | None: ...
-
-    def download_updates(
-        self,
-        update: object,
-        progress_callback: object | None = None,
-    ) -> None: ...
-
     def get_update_pending_restart(self) -> object | None: ...
 
     def wait_exit_then_apply_updates(
@@ -83,21 +80,47 @@ class _DownloadWorker(QObject):
     progress = Signal(int, int)
     succeeded = Signal(object)
     failed = Signal(object)
+    cancelled = Signal()
 
-    def __init__(self, manager: UpdateManager) -> None:
+    def __init__(
+        self,
+        transport: DownloadTransport,
+        manager: UpdateManager,
+        version: str,
+        cancellation: Event,
+    ) -> None:
         super().__init__()
+        self._transport = transport
         self._manager = manager
+        self._version = version
+        self._cancellation = cancellation
 
     def run(self) -> None:
+        package: Path | None = None
         try:
-            update = self._manager.check_for_updates()
-            if update is None:
-                raise RuntimeError("Velopack returned no update to download")
-            self._manager.download_updates(update, self.progress.emit)
+            package = download_update(
+                self._transport,
+                self._version,
+                cache_subdirectory("updates"),
+                self.progress.emit,
+                self._cancellation.is_set,
+                platform=sys.platform,
+            )
+            pending = self._manager.get_update_pending_restart()
+            if _update_version(pending, None) != self._version:
+                _remove_package(package)
+                raise RuntimeError(
+                    "Velopack did not report the downloaded package as pending"
+                )
         except Exception as error:
-            self.failed.emit(error)
+            if isinstance(error, UpdateDownloadCancelled):
+                self.cancelled.emit()
+            else:
+                if package is not None:
+                    _remove_package(package)
+                self.failed.emit(error)
         else:
-            self.succeeded.emit(update)
+            self.succeeded.emit(pending)
 
 
 class UpdateController(QObject):
@@ -112,6 +135,7 @@ class UpdateController(QObject):
         *,
         manager: UpdateManager | None = None,
         store: StateStore | None = None,
+        transport: DownloadTransport | None = None,
     ) -> None:
         super().__init__(parent if parent is not None else window)
         self._window = window
@@ -123,10 +147,12 @@ class UpdateController(QObject):
             else cast(StateStore, getattr(window, "_store"))
         )
         self._manager = manager if manager is not None else _create_update_manager()
+        self._transport = transport
         self._self_update_advisable = _advisory_update_capability(self._manager)
         self._check_thread: QThread | None = None
-        self._download_thread: Thread | None = None
+        self._download_thread: WorkerThread | None = None
         self._download_worker: _DownloadWorker | None = None
+        self._download_cancellation: Event | None = None
         self._startup_scheduled = False
         self._startup_check_active = False
         self._banner_dismissed = False
@@ -137,7 +163,7 @@ class UpdateController(QObject):
         self._store_unsubscribe = self._store.subscribe(self._state_changed)
         preferences = window.action_shelf.preferences_dialog
         preferences.check_for_updates_button.clicked.connect(self.check_now)
-        window.update_download_button.clicked.connect(self.start_download)
+        window.update_download_button.clicked.connect(self._download_button_clicked)
         window.update_install_button.clicked.connect(self.install_and_restart)
         window.update_open_releases_button.clicked.connect(self.open_releases_page)
         window.update_not_now_button.clicked.connect(self.dismiss_banner)
@@ -235,10 +261,14 @@ class UpdateController(QObject):
 
     @Slot()
     def start_download(self) -> None:
-        """Download the SDK payload only after the user asks for it."""
+        """Download the update package only after the user asks for it."""
         if self.check_in_progress:
             return
-        if self._manager is None or not self._self_update_advisable:
+        if (
+            self._manager is None
+            or self._transport is None
+            or not self._self_update_advisable
+        ):
             self.open_releases_page()
             return
         version = self._available_version
@@ -246,18 +276,38 @@ class UpdateController(QObject):
             return
         self._banner_dismissed = False
         self._show_downloading(version, 0)
-        worker = _DownloadWorker(self._manager)
-        self._download_worker = worker
-        thread = Thread(
-            target=worker.run,
-            name="matteloop-update-download",
-            daemon=True,
+        cancellation = Event()
+        worker = _DownloadWorker(
+            self._transport, self._manager, version, cancellation
         )
+        self._download_worker = worker
+        self._download_cancellation = cancellation
+        thread = WorkerThread(worker, self)
         self._download_thread = thread
         worker.progress.connect(self._download_progress)
         worker.succeeded.connect(self._download_succeeded)
         worker.failed.connect(self._download_failed)
+        worker.cancelled.connect(self._download_cancelled)
+        thread.finished.connect(self._download_thread_finished)
         thread.start()
+
+    @Slot()
+    def cancel_download(self) -> None:
+        """Request cancellation and let the transport observe the flag."""
+        if self._download_cancellation is not None:
+            self._download_cancellation.set()
+        thread = self._download_thread
+        if thread is not None:
+            thread.quit()
+            if not thread.wait(_DOWNLOAD_SHUTDOWN_TIMEOUT_MS):
+                _LOGGER.warning("MatteLoop update download did not stop after cancel")
+
+    @Slot()
+    def _download_button_clicked(self) -> None:
+        if self.download_in_progress:
+            self.cancel_download()
+        else:
+            self.start_download()
 
     @Slot(int, int)
     def _download_progress(self, completed: int, total: int) -> None:
@@ -268,21 +318,36 @@ class UpdateController(QObject):
 
     @Slot(object)
     def _download_succeeded(self, update: object) -> None:
-        self._download_thread = None
-        self._download_worker = None
         self._ready_update = update
         self._available_version = _update_version(update, self._available_version)
         if self._available_version:
             self._set_status(self._ready_message(self._available_version))
             self._show_ready(self._available_version)
+        self._finish_download_thread()
 
     @Slot(object)
     def _download_failed(self, error: object) -> None:
-        self._download_thread = None
-        self._download_worker = None
         _LOGGER.info("Update download failed: %s", error)
         self._ready_update = None
         self._show_failed()
+        self._finish_download_thread()
+
+    @Slot()
+    def _download_cancelled(self) -> None:
+        if self._available_version:
+            self._show_available(self._available_message(self._available_version))
+        self._finish_download_thread()
+
+    def _finish_download_thread(self) -> None:
+        thread = self._download_thread
+        if thread is not None:
+            thread.quit()
+
+    @Slot()
+    def _download_thread_finished(self) -> None:
+        self._download_thread = None
+        self._download_worker = None
+        self._download_cancellation = None
 
     @Slot()
     def install_and_restart(self) -> None:
@@ -311,6 +376,11 @@ class UpdateController(QObject):
             self._manager.wait_exit_then_apply_updates(pending, False, True)
         except Exception as error:
             _LOGGER.warning("MatteLoop update could not be armed: %s", error)
+
+    @Slot()
+    def shutdown(self) -> None:
+        """Cancel an update download and wait briefly for its worker to stop."""
+        self.cancel_download()
 
     @Slot()
     def dismiss_banner(self) -> None:
@@ -355,7 +425,8 @@ class UpdateController(QObject):
         self._window.update_banner.setAccessibleDescription(message)
         self._window.update_container.show()
         self._window.update_download_button.setVisible(
-            (state == "available" and self._self_update_advisable)
+            state == "downloading"
+            or (state == "available" and self._self_update_advisable)
             or state == "failed"
         )
         self._window.update_open_releases_button.setVisible(
@@ -365,7 +436,9 @@ class UpdateController(QObject):
         self._window.update_not_now_button.setVisible(state == "available")
         self._window.update_install_button.setVisible(state == "ready")
         self._window.update_later_button.setVisible(state == "ready")
-        if state == "failed":
+        if state == "downloading":
+            download_copy = QCoreApplication.translate("UpdateBanner", "Cancel")
+        elif state == "failed":
             download_copy = QCoreApplication.translate("UpdateBanner", "Try again")
         else:
             download_copy = QCoreApplication.translate(
@@ -410,14 +483,17 @@ class UpdateController(QObject):
 
 
 def _create_update_manager() -> UpdateManager | None:
-    """Construct the SDK once; an unavailable install takes the browser path."""
+    """Construct Velopack with the bundle paths this project owns."""
     try:
-        from velopack import GithubSource
         from velopack import UpdateManager as VelopackUpdateManager
+        from velopack import VelopackLocatorConfig
 
+        locator = _locator_config(_physical_executable_path(), VelopackLocatorConfig)
+        if not locator.UpdateExePath.exists() or not locator.ManifestPath.exists():
+            return None
         return cast(
             UpdateManager,
-            VelopackUpdateManager(GithubSource(update_repository_url())),
+            VelopackUpdateManager(update_repository_url(), locator=locator),
         )
     except Exception as error:
         _LOGGER.warning("MatteLoop self-update unavailable: %s", error)
@@ -428,19 +504,25 @@ def _pending_update(manager: UpdateManager | None) -> object | None:
     if manager is None:
         return None
     try:
-        return manager.get_update_pending_restart()
+        pending = manager.get_update_pending_restart()
+        _sweep_packages(pending)
+        return pending
     except Exception as error:
         _LOGGER.warning("MatteLoop pending update could not be read: %s", error)
         return None
 
 
-def _physical_executable_path() -> Path:
+def _physical_executable_path() -> PurePath:
     """Resolve aliases before deriving the install root for advisory checks."""
-    reported = Path(sys.executable)
-    return reported.resolve() if _is_frozen_runtime() else reported
+    reported: PurePath = Path(sys.executable)
+    return (
+        reported.resolve()
+        if _is_frozen_runtime() and isinstance(reported, Path)
+        else reported
+    )
 
 
-def _install_root(executable: Path) -> Path:
+def _install_root(executable: PurePath) -> PurePath:
     if sys.platform == "darwin":
         for parent in (executable, *executable.parents):
             if parent.name.endswith(".app"):
@@ -448,6 +530,66 @@ def _install_root(executable: Path) -> Path:
     if executable.parent.name.lower() == "current":
         return executable.parent.parent
     return executable.parent
+
+
+def _locator_config(executable: PurePath, config_type: Any) -> Any:
+    if sys.platform == "darwin":
+        root = executable.parents[2]
+        update_exe = root / "Contents" / "MacOS" / "UpdateMac"
+        manifest = root / "Contents" / "Resources" / "sq.version"
+        current = root / "Contents" / "MacOS"
+        portable = False
+    elif sys.platform == "win32":
+        windows_executable = executable
+        if not isinstance(windows_executable, (Path, PureWindowsPath)):
+            windows_executable = PureWindowsPath(str(executable))
+        current = windows_executable.parent
+        root = current.parent
+        update_exe = root / "Update.exe"
+        manifest = current / "sq.version"
+        portable = Path(root / ".portable").exists()
+    else:
+        raise RuntimeError("Velopack updates are only supported on macOS and Windows")
+    return config_type(
+        root,
+        update_exe,
+        cache_subdirectory("updates"),
+        manifest,
+        current,
+        portable,
+    )
+
+
+def _sweep_packages(pending: object | None) -> None:
+    directory = cache_subdirectory("updates")
+    if not directory.exists():
+        return
+    pending_filename = _update_filename(pending)
+    for pattern in ("*.nupkg", "*.nupkg.part"):
+        for package in directory.glob(pattern):
+            if package.name == pending_filename:
+                continue
+            try:
+                package.unlink()
+            except OSError as error:
+                _LOGGER.info(
+                    "Could not remove stale update package %s: %s", package, error
+                )
+
+
+def _update_filename(update: object | None) -> str | None:
+    if update is None:
+        return None
+    asset = getattr(update, "TargetFullRelease", update)
+    filename = getattr(asset, "FileName", None)
+    return filename if isinstance(filename, str) else None
+
+
+def _remove_package(package: Path) -> None:
+    try:
+        package.unlink(missing_ok=True)
+    except OSError as error:
+        _LOGGER.info("Could not remove failed update package %s: %s", package, error)
 
 
 def _advisory_update_capability(manager: UpdateManager | None) -> bool:

@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 import sys
-import threading
+import time
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from fractions import Fraction
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from types import ModuleType
 
 from PySide6.QtCore import QSettings, QUrl
@@ -22,8 +25,18 @@ from matteloop.core.state import (
 )
 from matteloop.ui.main_window import MainWindow
 from matteloop.ui.store import ReducerStore
-from matteloop.ui.update_controller import UpdateController, _create_update_manager
-from matteloop.updates import UpdateOutcome, UpdateResult
+from matteloop.ui.update_controller import (
+    UpdateController,
+    _create_update_manager,
+    _locator_config,
+    _pending_update,
+)
+from matteloop.updates import (
+    UpdateOutcome,
+    UpdateResult,
+    update_feed_url,
+    update_package_url,
+)
 
 
 @dataclass(frozen=True)
@@ -37,6 +50,7 @@ class _Metadata:
 @dataclass(frozen=True)
 class _Asset:
     Version: str
+    FileName: str = "matteloop-update.nupkg"
 
 
 @dataclass(frozen=True)
@@ -50,32 +64,18 @@ class _Manager:
         update: object | None = None,
         *,
         pending: object | None = None,
-        download_error: BaseException | None = None,
-        block_download: bool = False,
+        pending_values: list[object | None] | None = None,
     ) -> None:
-        self.update = update
+        del update
         self.pending = pending
-        self.download_error = download_error
-        self.block_download = block_download
-        self.progress_seen = threading.Event()
-        self.release_download = threading.Event()
-        self.download_calls: list[object] = []
+        self.pending_values = pending_values
+        self.pending_calls = 0
         self.apply_calls: list[tuple[object, bool, bool]] = []
 
-    def check_for_updates(self) -> object | None:
-        return self.update
-
-    def download_updates(self, update: object, progress_callback: object) -> None:
-        self.download_calls.append(update)
-        if self.download_error is not None:
-            raise self.download_error
-        assert callable(progress_callback)
-        progress_callback(37, 100)
-        self.progress_seen.set()
-        if self.block_download:
-            self.release_download.wait(2)
-
     def get_update_pending_restart(self) -> object | None:
+        self.pending_calls += 1
+        if self.pending_values is not None:
+            return self.pending_values.pop(0)
         return self.pending
 
     def wait_exit_then_apply_updates(
@@ -87,6 +87,84 @@ class _Manager:
     ) -> None:
         del restart_args
         self.apply_calls.append((update, silent, restart))
+
+
+class _Response:
+    def __init__(
+        self, body: bytes, *, on_read: Callable[[], None] | None = None
+    ) -> None:
+        self.body = body
+        self.on_read = on_read
+        self.read_once = False
+        self.headers: Mapping[str, str] = {}
+        self.closed = False
+
+    def read(self, _size: int) -> bytes:
+        if self.read_once:
+            return b""
+        self.read_once = True
+        if self.on_read is not None:
+            self.on_read()
+        return self.body
+
+    def close(self) -> None:
+        self.closed = True
+
+
+class _Transport:
+    def __init__(self, responses: Mapping[str, _Response | BaseException]) -> None:
+        self.responses = dict(responses)
+        self.calls: list[str] = []
+
+    def open(
+        self,
+        url: str,
+        _cancelled: Callable[[], bool],
+        *,
+        headers: Mapping[str, str] | None = None,
+    ) -> _Response:
+        del headers
+        self.calls.append(url)
+        response = self.responses[url]
+        if isinstance(response, BaseException):
+            raise response
+        return response
+
+
+def _download_transport(
+    version: str = "0.4.0",
+    package: bytes = b"package",
+    *,
+    package_response: _Response | BaseException | None = None,
+) -> tuple[_Transport, _Asset]:
+    asset = _Asset(
+        version,
+        "io.github.smb-org.matteloop-0.4.0-osx-arm64-full.nupkg",
+    )
+    feed = json.dumps(
+        {
+            "Assets": [
+                {
+                    "Version": version,
+                    "Type": "Full",
+                    "FileName": asset.FileName,
+                    "SHA256": hashlib.sha256(package).hexdigest().upper(),
+                    "Size": len(package),
+                }
+            ]
+        }
+    ).encode()
+    return (
+        _Transport(
+            {
+                update_feed_url(version, platform="darwin"): _Response(feed),
+                update_package_url(version, asset.FileName): (
+                    package_response or _Response(package)
+                ),
+            }
+        ),
+        asset,
+    )
 
 
 class _Services:
@@ -132,6 +210,7 @@ def _controller(
     *,
     manager: _Manager | None = None,
     store: ReducerStore | None = None,
+    transport: _Transport | None = None,
 ) -> tuple[MainWindow, UpdateController, _Reader]:
     if store is None:
         store = ReducerStore(AppState())
@@ -139,7 +218,9 @@ def _controller(
     qtbot.addWidget(window)
     window.show()
     reader = _Reader(result)
-    controller = UpdateController(window, settings, reader, manager=manager)
+    controller = UpdateController(
+        window, settings, reader, manager=manager, transport=transport
+    )
     return window, controller, reader
 
 
@@ -280,40 +361,51 @@ def test_open_releases_page_uses_the_release_url(monkeypatch, qtbot) -> None:
     del window
 
 
-def test_download_progress_reaches_the_banner_and_finishes_ready(qtbot) -> None:
-    info = _UpdateInfo(_Asset("0.4.0"))
-    manager = _Manager(info, block_download=True)
+def test_download_progress_reaches_the_banner_and_finishes_ready(
+    monkeypatch, qtbot, tmp_path: Path
+) -> None:
+    transport, asset = _download_transport()
+    transport.responses[update_package_url("0.4.0", asset.FileName)] = _Response(
+        b"package", on_read=lambda: time.sleep(0.25)
+    )
+    info = _UpdateInfo(asset)
+    manager = _Manager(pending_values=[None, info])
+    monkeypatch.setattr(
+        "matteloop.ui.update_controller.cache_subdirectory", lambda *_: tmp_path
+    )
     window, controller, _ = _controller(
         qtbot,
         _settings("download-progress"),
         UpdateResult(UpdateOutcome.UPDATE, "0.4.0"),
         manager=manager,
+        transport=transport,
     )
 
     controller.check_now()
     qtbot.waitUntil(lambda: not controller.check_in_progress)
     window.update_download_button.click()
-    qtbot.waitUntil(manager.progress_seen.is_set)
     qtbot.waitUntil(
-        lambda: window.update_banner.text()
-        == "Downloading MatteLoop 0.4.0 (37 %)…"
+        lambda: window.update_banner.text() == "Downloading MatteLoop 0.4.0 (0 %)…"
     )
-
-    manager.release_download.set()
     qtbot.waitUntil(lambda: not controller.download_in_progress)
 
     assert window.update_banner.text() == "MatteLoop 0.4.0 is ready to install."
     assert window.update_install_button.isVisible()
 
 
-def test_failed_download_offers_try_again(qtbot) -> None:
-    info = _UpdateInfo(_Asset("0.4.0"))
-    manager = _Manager(info, download_error=OSError("offline"))
+def test_failed_download_offers_try_again(monkeypatch, qtbot, tmp_path: Path) -> None:
+    transport, asset = _download_transport(package_response=OSError("offline"))
+    info = _UpdateInfo(asset)
+    manager = _Manager(pending_values=[None, info])
+    monkeypatch.setattr(
+        "matteloop.ui.update_controller.cache_subdirectory", lambda *_: tmp_path
+    )
     window, controller, _ = _controller(
         qtbot,
         _settings("download-failed"),
         UpdateResult(UpdateOutcome.UPDATE, "0.4.0"),
         manager=manager,
+        transport=transport,
     )
 
     controller.check_now()
@@ -326,13 +418,22 @@ def test_failed_download_offers_try_again(qtbot) -> None:
     assert window.update_open_releases_button.isVisible()
 
 
-def test_none_from_sdk_check_is_a_failed_download(qtbot) -> None:
-    manager = _Manager(None)
+def test_self_check_rejecting_the_package_offers_try_again(
+    monkeypatch, qtbot, tmp_path: Path
+) -> None:
+    transport, asset = _download_transport()
+    manager = _Manager(
+        pending_values=[None, _UpdateInfo(_Asset("0.3.9", asset.FileName))]
+    )
+    monkeypatch.setattr(
+        "matteloop.ui.update_controller.cache_subdirectory", lambda *_: tmp_path
+    )
     window, controller, _ = _controller(
         qtbot,
         _settings("download-none"),
         UpdateResult(UpdateOutcome.UPDATE, "0.4.0"),
         manager=manager,
+        transport=transport,
     )
 
     controller.check_now()
@@ -341,6 +442,39 @@ def test_none_from_sdk_check_is_a_failed_download(qtbot) -> None:
     qtbot.waitUntil(lambda: not controller.download_in_progress)
 
     assert window.update_banner.text() == "The update couldn’t be downloaded."
+    assert not list(tmp_path.glob("*.nupkg"))
+
+
+def test_cancel_stops_the_transport_and_leaves_no_package(
+    monkeypatch, qtbot, tmp_path: Path
+) -> None:
+    transport, asset = _download_transport()
+    transport.responses[update_package_url("0.4.0", asset.FileName)] = _Response(
+        b"package", on_read=lambda: time.sleep(0.25)
+    )
+    manager = _Manager(pending_values=[None, _UpdateInfo(asset)])
+    monkeypatch.setattr(
+        "matteloop.ui.update_controller.cache_subdirectory", lambda *_: tmp_path
+    )
+    window, controller, _ = _controller(
+        qtbot,
+        _settings("download-cancelled"),
+        UpdateResult(UpdateOutcome.UPDATE, "0.4.0"),
+        manager=manager,
+        transport=transport,
+    )
+
+    controller.check_now()
+    qtbot.waitUntil(lambda: not controller.check_in_progress)
+    window.update_download_button.click()
+    qtbot.waitUntil(
+        lambda: window.update_banner.text() == "Downloading MatteLoop 0.4.0 (0 %)…"
+    )
+    window.update_download_button.click()
+    qtbot.waitUntil(lambda: not controller.download_in_progress)
+
+    assert window.update_banner.text() == "MatteLoop 0.4.0 is available."
+    assert not list(tmp_path.glob("*.nupkg"))
 
 
 def _ready_store(tmp_path: Path) -> ReducerStore:
@@ -454,18 +588,104 @@ def test_non_writable_install_uses_releases_page(monkeypatch, qtbot) -> None:
     assert not window.update_download_button.isVisible()
 
 
-def test_repository_environment_overrides_the_velopack_source(monkeypatch) -> None:
+def test_repository_environment_overrides_the_explicit_velopack_source(
+    monkeypatch, tmp_path: Path
+) -> None:
+    bundle = tmp_path / "MatteLoop.app"
+    executable = bundle / "Contents" / "MacOS" / "MatteLoop"
+    (bundle / "Contents" / "MacOS").mkdir(parents=True)
+    (bundle / "Contents" / "Resources").mkdir()
+    (bundle / "Contents" / "MacOS" / "UpdateMac").touch()
+    (bundle / "Contents" / "Resources" / "sq.version").touch()
+
     class _FakeSdkManager:
-        def __init__(self, source: object) -> None:
+        def __init__(self, source: object, *, locator: object) -> None:
             self.source = source
+            self.locator = locator
+
+    class _FakeLocator:
+        def __init__(self, *values: object) -> None:
+            (
+                self.RootAppDir,
+                self.UpdateExePath,
+                self.PackagesDir,
+                self.ManifestPath,
+                self.CurrentBinaryDir,
+                self.IsPortable,
+            ) = values
 
     fake_velopack = ModuleType("velopack")
-    fake_velopack.GithubSource = lambda url: url  # type: ignore[attr-defined]
+    fake_velopack.VelopackLocatorConfig = _FakeLocator  # type: ignore[attr-defined]
     fake_velopack.UpdateManager = _FakeSdkManager  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "velopack", fake_velopack)
     monkeypatch.setenv("MATTELOOP_UPDATE_REPO", "qualification/MatteLoop")
+    monkeypatch.setattr(sys, "platform", "darwin")
+    monkeypatch.setattr(sys, "executable", str(executable))
+    monkeypatch.setattr(
+        "matteloop.ui.update_controller.cache_subdirectory",
+        lambda *_: tmp_path / "cache" / "updates",
+    )
 
     manager = _create_update_manager()
 
     assert isinstance(manager, _FakeSdkManager)
     assert manager.source == "https://github.com/qualification/MatteLoop"
+    assert manager.locator.RootAppDir == bundle
+    assert manager.locator.UpdateExePath == bundle / "Contents" / "MacOS" / "UpdateMac"
+    assert manager.locator.ManifestPath == (
+        bundle / "Contents" / "Resources" / "sq.version"
+    )
+    assert manager.locator.PackagesDir == tmp_path / "cache" / "updates"
+
+
+def test_windows_locator_uses_the_current_directory_and_portable_marker(
+    monkeypatch, tmp_path: Path
+) -> None:
+    class _FakeLocator:
+        def __init__(self, *values: object) -> None:
+            (
+                self.RootAppDir,
+                self.UpdateExePath,
+                self.PackagesDir,
+                self.ManifestPath,
+                self.CurrentBinaryDir,
+                self.IsPortable,
+            ) = values
+
+    root = PureWindowsPath(r"C:\Users\tester\AppData\Local\io.github.smb-org.matteloop")
+    executable = root / "current" / "matteloop.exe"
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setattr(
+        "matteloop.ui.update_controller.cache_subdirectory",
+        lambda *_: tmp_path / "updates",
+    )
+
+    locator = _locator_config(executable, _FakeLocator)
+
+    assert locator.RootAppDir == root
+    assert locator.UpdateExePath == root / "Update.exe"
+    assert locator.ManifestPath == root / "current" / "sq.version"
+    assert locator.CurrentBinaryDir == root / "current"
+    assert locator.PackagesDir == tmp_path / "updates"
+    assert locator.IsPortable is False
+
+
+def test_startup_sweep_keeps_only_the_pending_package(
+    monkeypatch, tmp_path: Path
+) -> None:
+    pending = _UpdateInfo(
+        _Asset("0.4.0", "io.github.smb-org.matteloop-0.4.0-osx-arm64-full.nupkg")
+    )
+    kept = tmp_path / pending.TargetFullRelease.FileName
+    stale = tmp_path / "io.github.smb-org.matteloop-0.3.9-osx-arm64-full.nupkg"
+    partial = tmp_path / f"{kept.name}.part"
+    for path in (kept, stale, partial):
+        path.write_bytes(b"package")
+    monkeypatch.setattr(
+        "matteloop.ui.update_controller.cache_subdirectory", lambda *_: tmp_path
+    )
+
+    assert _pending_update(_Manager(pending=pending)) is pending
+    assert kept.exists()
+    assert not stale.exists()
+    assert not partial.exists()
