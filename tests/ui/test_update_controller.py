@@ -11,6 +11,7 @@ from fractions import Fraction
 from pathlib import Path, PureWindowsPath
 from types import ModuleType
 
+import pytest
 from PySide6.QtCore import QSettings, QUrl
 from PySide6.QtGui import QDesktopServices
 
@@ -129,6 +130,17 @@ class _Transport:
         if isinstance(response, BaseException):
             raise response
         return response
+
+
+@pytest.fixture(autouse=True)
+def _supported_platform(monkeypatch) -> None:
+    """Pin the runtime platform: the feed channel is derived from it.
+
+    Without this the suite passes on macOS and fails on Linux, because the
+    controller asks for the channel of the host it runs on while these
+    fixtures describe the macOS one.
+    """
+    monkeypatch.setattr(sys, "platform", "darwin")
 
 
 def _download_transport(

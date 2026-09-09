@@ -41,9 +41,19 @@ class UpdateDownloadCancelled(Exception):
     """The user stopped an in-progress update download."""
 
 
+class UnsupportedUpdatePlatform(Exception):
+    """No update channel is published for the platform in use."""
+
+
 def update_channel(platform: str) -> str:
     """Return the Velopack feed channel for a supported runtime platform."""
-    return _OSX_CHANNEL if platform == "darwin" else _WINDOWS_CHANNEL
+    if platform == "darwin":
+        return _OSX_CHANNEL
+    if platform == "win32":
+        return _WINDOWS_CHANNEL
+    raise UnsupportedUpdatePlatform(
+        f"MatteLoop publishes no update channel for {platform}"
+    )
 
 
 def update_feed_url(version: str, *, platform: str) -> str:

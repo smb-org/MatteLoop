@@ -317,3 +317,15 @@ def test_update_download_transport_error_removes_the_part_file(tmp_path: Path) -
 
     assert not (tmp_path / filename).exists()
     assert not list(tmp_path.glob("*.part"))
+
+
+def test_channel_refuses_a_platform_with_no_published_channel() -> None:
+    """A dev machine must not be offered another platform's packages."""
+    import pytest
+
+    from matteloop.updates import UnsupportedUpdatePlatform, update_channel
+
+    assert update_channel("darwin") == "osx-arm64"
+    assert update_channel("win32") == "win-x64"
+    with pytest.raises(UnsupportedUpdatePlatform):
+        update_channel("linux")

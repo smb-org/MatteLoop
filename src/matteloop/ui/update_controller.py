@@ -327,7 +327,7 @@ class UpdateController(QObject):
 
     @Slot(object)
     def _download_failed(self, error: object) -> None:
-        _LOGGER.info("Update download failed: %s", error)
+        _LOGGER.warning("Update download failed: %s", error)
         self._ready_update = None
         self._show_failed()
         self._finish_download_thread()
@@ -533,31 +533,33 @@ def _install_root(executable: PurePath) -> PurePath:
 
 
 def _locator_config(executable: PurePath, config_type: Any) -> Any:
+    """Describe this installation's layout instead of letting Velopack guess."""
+    packages = cache_subdirectory("updates")
     if sys.platform == "darwin":
         root = executable.parents[2]
-        update_exe = root / "Contents" / "MacOS" / "UpdateMac"
-        manifest = root / "Contents" / "Resources" / "sq.version"
-        current = root / "Contents" / "MacOS"
-        portable = False
-    elif sys.platform == "win32":
+        return config_type(
+            root,
+            root / "Contents" / "MacOS" / "UpdateMac",
+            packages,
+            root / "Contents" / "Resources" / "sq.version",
+            root / "Contents" / "MacOS",
+            False,
+        )
+    if sys.platform == "win32":
         windows_executable = executable
         if not isinstance(windows_executable, (Path, PureWindowsPath)):
             windows_executable = PureWindowsPath(str(executable))
         current = windows_executable.parent
-        root = current.parent
-        update_exe = root / "Update.exe"
-        manifest = current / "sq.version"
-        portable = Path(root / ".portable").exists()
-    else:
-        raise RuntimeError("Velopack updates are only supported on macOS and Windows")
-    return config_type(
-        root,
-        update_exe,
-        cache_subdirectory("updates"),
-        manifest,
-        current,
-        portable,
-    )
+        windows_root = current.parent
+        return config_type(
+            windows_root,
+            windows_root / "Update.exe",
+            packages,
+            current / "sq.version",
+            current,
+            Path(windows_root / ".portable").exists(),
+        )
+    raise RuntimeError("Velopack updates are only supported on macOS and Windows")
 
 
 def _sweep_packages(pending: object | None) -> None:
