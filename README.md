@@ -84,10 +84,12 @@ other component and its licence.
 ## Getting it
 
 Native builds for macOS 15+ arm64 and Windows x64 are published on the
-[releases page](https://github.com/smb-org/MatteLoop/releases). They are unsigned:
-Windows warns through SmartScreen, and macOS needs a right-click Open the first
-time. Linux artifacts are deferred, and the current native qualification covers
-macOS 15+ arm64 only.
+[releases page](https://github.com/smb-org/MatteLoop/releases). They are
+unsigned by decision: Windows warns through SmartScreen, so choose **More
+info**, then **Run anyway**; macOS refuses the first launch, so open **System
+Settings → Privacy & Security**, find the message naming MatteLoop, and choose
+**Open Anyway**. Linux artifacts are deferred, and the current native
+qualification covers macOS 15+ arm64 only.
 
 ## Run from source
 
