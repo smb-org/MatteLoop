@@ -77,7 +77,6 @@ class GitHubUpdateReader:
                     response.close()
                 except Exception as error:
                     _LOGGER.info("GitHub update response close failed: %s", error)
-                    result = UpdateResult(UpdateOutcome.FAILED)
         return result
 
 

@@ -115,3 +115,17 @@ def test_http_error_is_reported_as_failed() -> None:
     )
 
     assert reader.check().outcome is UpdateOutcome.FAILED
+
+
+def test_a_failing_close_keeps_the_outcome_read_from_the_body() -> None:
+    class _UnclosableResponse(_Response):
+        def close(self) -> None:
+            raise OSError("connection reset while closing")
+
+    response = _UnclosableResponse(b'{"tag_name":"v0.4.0"}')
+    reader = GitHubUpdateReader(_Transport(response))
+
+    result = reader.check()
+
+    assert result.outcome is UpdateOutcome.UPDATE
+    assert result.version == "0.4.0"
