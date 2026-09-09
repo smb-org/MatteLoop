@@ -117,6 +117,16 @@ def test_http_error_is_reported_as_failed() -> None:
     assert reader.check().outcome is UpdateOutcome.FAILED
 
 
+def test_repository_environment_overrides_the_notice_feed(monkeypatch) -> None:
+    monkeypatch.setenv("MATTELOOP_UPDATE_REPO", "qualification/MatteLoop")
+    reader, transport, _ = _reader(b'{"tag_name":"v0.4.0"}')
+
+    assert reader.check().outcome is UpdateOutcome.UPDATE
+    assert transport.calls[0][0] == (
+        "https://api.github.com/repos/qualification/MatteLoop/releases/latest"
+    )
+
+
 def test_a_failing_close_keeps_the_outcome_read_from_the_body() -> None:
     class _UnclosableResponse(_Response):
         def close(self) -> None:

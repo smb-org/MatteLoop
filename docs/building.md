@@ -68,6 +68,11 @@ application and its matching source archives. The feed must never move to
 another host unless those source archives and checksums move with it too, with
 clear directions beside the binaries.
 
+For qualification builds, set `MATTELOOP_UPDATE_REPO` to a GitHub
+`owner/repository` slug. The same value selects the notice feed, the Velopack
+download source, and the releases-page link. When unset, MatteLoop uses
+`smb-org/MatteLoop`.
+
 ## ONNX Runtime distribution trap
 
 The `onnxruntime` and `onnxruntime-directml` distributions both install the

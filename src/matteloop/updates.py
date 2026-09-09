@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 from dataclasses import dataclass
 from enum import Enum
@@ -18,10 +19,32 @@ GITHUB_LATEST_RELEASE_URL = (
     "https://api.github.com/repos/smb-org/MatteLoop/releases/latest"
 )
 GITHUB_RELEASES_URL = "https://github.com/smb-org/MatteLoop/releases"
+_DEFAULT_UPDATE_REPOSITORY = "smb-org/MatteLoop"
+_UPDATE_REPOSITORY_ENV = "MATTELOOP_UPDATE_REPO"
 _REQUEST_HEADERS = {
     "Accept": "application/vnd.github+json",
     "User-Agent": "MatteLoop",
 }
+
+
+def update_repository() -> str:
+    """Return the GitHub ``owner/repository`` used by both update readers."""
+    return os.environ.get(_UPDATE_REPOSITORY_ENV, _DEFAULT_UPDATE_REPOSITORY)
+
+
+def update_repository_url() -> str:
+    """Return the GitHub repository URL for the Velopack source."""
+    return f"https://github.com/{update_repository()}"
+
+
+def latest_release_url() -> str:
+    """Return the API URL for the configured repository's latest release."""
+    return f"https://api.github.com/repos/{update_repository()}/releases/latest"
+
+
+def releases_url() -> str:
+    """Return the browser URL for the configured repository's releases."""
+    return f"{update_repository_url()}/releases"
 
 
 class UpdateOutcome(Enum):
@@ -54,7 +77,7 @@ class GitHubUpdateReader:
         result = UpdateResult(UpdateOutcome.FAILED)
         try:
             response = self._transport.open(
-                GITHUB_LATEST_RELEASE_URL,
+                latest_release_url(),
                 lambda: False,
                 headers=_REQUEST_HEADERS,
             )

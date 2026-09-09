@@ -251,8 +251,19 @@ notes for the first self-updating release say exactly this. Before the
 download, two advisory checks select *Open releases
 page* instead of *Download update*, because the outcome is known: the
 executable path contains `/AppTranslocation/` (macOS), or `UpdateManager`
-could not be constructed. They are advisory; a locator that constructs is not
-proof that a swap will succeed, and no further pre-flight is built.
+could not be constructed, or the install root is not writable. They are
+advisory; a locator that constructs is not proof that a swap will succeed, and
+no further pre-flight is built.
+
+A translocated install therefore offers the browser rather than updating
+itself, and that is a deliberate simplification. #77 measured that the
+*physical* bundle can be replaced while the process runs from the read-only
+translocation mount — only the translocated path itself refuses, with
+`Read-only file system`. Recovering that physical path needs
+`SecTranslocateCreateOriginalPathForURL` from the Security framework through
+`ctypes`, for a state the user leaves by moving the application once, which
+the install instructions already ask for. If translocated installs turn out to
+be common, that function is where the fix goes.
 
 **Strings.** Every literal sits at its call site or in a `QT_TRANSLATE_NOOP`
 table, numbers arrive through `%1`/`%2` and the presenter's `.replace("%1", …)`,
