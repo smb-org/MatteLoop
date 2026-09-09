@@ -88,8 +88,10 @@ Native builds for macOS 15+ arm64 and Windows x64 are published on the
 assets are `MatteLoop-v<version>-macos-arm64.zip`,
 `MatteLoop-v<version>-windows-x64-Setup.exe`, and
 `MatteLoop-v<version>-windows-x64.zip`; Windows therefore offers both an
-installer and a portable archive. They are unsigned by decision: Windows warns
-through SmartScreen, so choose **More info**, then **Run anyway**; macOS
+installer and a portable archive. The portable archive extracts to a versioned
+folder, so two downloads never look alike. They are unsigned by decision:
+Windows warns through SmartScreen, so choose **More info**, then **Run
+anyway**; macOS
 refuses the first launch, so open **System Settings → Privacy & Security**,
 find the message naming MatteLoop, and choose **Open Anyway**. Linux artifacts
 are deferred, and the current native qualification covers macOS 15+ arm64

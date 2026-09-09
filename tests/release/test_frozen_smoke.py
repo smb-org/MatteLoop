@@ -970,10 +970,17 @@ def test_publish_renames_both_velopack_platform_outputs_and_requires_completenes
         macos / "velopack-macos.zip",
         windows / "releases.win-x64.json",
         windows / "io.github.smb-org.matteloop-0.3.0-win-x64-full.nupkg",
-        windows / "velopack-win.zip",
         windows / "velopack-Setup.exe",
     ):
         path.write_bytes(b"artifact")
+    with zipfile.ZipFile(windows / "velopack-win.zip", "w") as portable:
+        for name in (
+            "MatteLoop.exe",
+            "Update.exe",
+            ".portable",
+            "current/matteloop.exe",
+        ):
+            portable.writestr(name, b"artifact")
 
     subprocess.run(
         ["bash", "-e", "-c", step["run"]],
@@ -993,6 +1000,64 @@ def test_publish_renames_both_velopack_platform_outputs_and_requires_completenes
         "MatteLoop-v0.3.0-windows-x64-Setup.exe",
         "MatteLoop-v0.3.0-windows-x64.zip",
     } <= assets
+
+
+def test_publish_wraps_windows_portable_archive_in_a_versioned_root(
+    tmp_path: Path,
+) -> None:
+    workflow_path = REPOSITORY_ROOT / ".github" / "workflows" / "release.yml"
+    workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
+    step = next(
+        s
+        for s in workflow["jobs"]["publish"]["steps"]
+        if s["name"] == "Rename Velopack assets and assert release completeness"
+    )
+
+    macos = tmp_path / "bundles" / "MatteLoop-velopack-macos-15-arm64"
+    windows = tmp_path / "bundles" / "MatteLoop-velopack-windows-2022-x64"
+    macos.mkdir(parents=True)
+    windows.mkdir(parents=True)
+    for path in (
+        macos / "releases.osx-arm64.json",
+        macos / "io.github.smb-org.matteloop-0.3.0-osx-arm64-full.nupkg",
+        macos / "velopack-macos.zip",
+        windows / "releases.win-x64.json",
+        windows / "io.github.smb-org.matteloop-0.3.0-win-x64-full.nupkg",
+        windows / "velopack-Setup.exe",
+    ):
+        path.write_bytes(b"artifact")
+    with zipfile.ZipFile(windows / "velopack-win.zip", "w") as portable:
+        for name in (
+            "MatteLoop.exe",
+            "Update.exe",
+            ".portable",
+            "current/matteloop.exe",
+        ):
+            portable.writestr(name, b"artifact")
+
+    subprocess.run(
+        ["bash", "-e", "-c", step["run"]],
+        cwd=tmp_path,
+        check=True,
+        env={**os.environ, "GITHUB_REF_NAME": "v0.3.0"},
+        capture_output=True,
+    )
+
+    root = "MatteLoop-v0.3.0-windows-x64"
+    with zipfile.ZipFile(
+        tmp_path / "assets" / "MatteLoop-v0.3.0-windows-x64.zip"
+    ) as wrapped:
+        names = set(wrapped.namelist())
+
+    assert {
+        f"{root}/MatteLoop.exe",
+        f"{root}/Update.exe",
+        f"{root}/.portable",
+        f"{root}/current/matteloop.exe",
+    } <= names
+    assert all(
+        name == f"{root}/" or name.startswith(f"{root}/") for name in names
+    )
 
 
 @pytest.mark.parametrize(

@@ -684,10 +684,10 @@ machine:
   needed to pack.
 - B2. **Installed A → B** as A2.
 - B3. **Portable A → B.** Extract the portable zip of A into an ordinary
-  folder, run `current\matteloop.exe`, repeat A2. Record the extracted
-  folder's name: if two releases' zips would land in indistinguishable
-  folders, the `publish` wrapping in Decision 3 is required before the first
-  public release (#134).
+  folder, run `MatteLoop-<tag>-windows-x64\current\matteloop.exe`, repeat A2.
+  Measurement: Velopack's portable zip has no root directory; `publish` wraps
+  `MatteLoop.exe`, `Update.exe`, `.portable` and `current\` under
+  `MatteLoop-<tag>-windows-x64\`.
 - B4. **Uninstall preserves the cache.** Download one model, uninstall through
   Apps & Features, confirm `%LocalAppData%\matteloop\matteloop\Cache\models`
   survives. Record `PackagesDir`.
