@@ -2540,7 +2540,7 @@ Freed %s.</translation>
         <translation>Later</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/update_controller.py" line="495"/>
+        <location filename="../src/matteloop/ui/update_controller.py" line="501"/>
         <source>The update couldn’t be downloaded.</source>
         <translation>The update couldn’t be downloaded.</translation>
     </message>
@@ -2557,22 +2557,27 @@ Freed %s.</translation>
         <translation>Try again</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/update_controller.py" line="579"/>
+        <location filename="../src/matteloop/ui/update_controller.py" line="509"/>
+        <source>MatteLoop cannot update itself from this location.</source>
+        <translation>MatteLoop cannot update itself from this location.</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/update_controller.py" line="593"/>
         <source>MatteLoop %1 is available.</source>
         <translation>MatteLoop %1 is available.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/update_controller.py" line="585"/>
+        <location filename="../src/matteloop/ui/update_controller.py" line="599"/>
         <source>Downloading MatteLoop %1 (%2 %)…</source>
         <translation>Downloading MatteLoop %1 (%2 %)…</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/update_controller.py" line="591"/>
+        <location filename="../src/matteloop/ui/update_controller.py" line="605"/>
         <source>MatteLoop %1 is ready to install.</source>
         <translation>MatteLoop %1 is ready to install.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/update_controller.py" line="598"/>
+        <location filename="../src/matteloop/ui/update_controller.py" line="612"/>
         <source>Download size: %1 MB</source>
         <translation>Download size: %1 MB</translation>
     </message>

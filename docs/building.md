@@ -62,6 +62,9 @@ or tool source outside NuGet is downloaded. A normal macOS install root is
 Windows archive keeps the same `current\matteloop.exe` layout wherever it is
 extracted. Velopack's macOS package cache is
 `~/Library/Caches/velopack/io.github.smb-org.matteloop/`.
+MatteLoop never needs administrator rights to update itself. If such a prompt
+appears, the application is installed somewhere the user cannot write — cancel
+it and install the new version by hand.
 
 The update feed and its full packages stay on the same GitHub release as the
 application and its matching source archives. The feed must never move to

@@ -8,8 +8,8 @@ Repo: smb-org/MatteLoop
 Status: REVIEWED — maintainer decisions folded in the same day; Phase 1 is in
 implementation; Phases 2–3 are implemented and wait on the qualification gate
 in "The gate" — Stage 0 and A1 passed, A2 is re-run on the rebuilt download
-path. One open question remains, raised by A3: whether an elevation prompt
-from the helper is acceptable for an unsigned application.
+path. The maintainer accepts the helper's residual elevation prompt, subject to
+the advisory check before download and a writability re-check when arming.
 
 ## Problem statement
 
@@ -150,8 +150,8 @@ away:
   did not give up; Velopack showed "Administrator Permission Required —
   MatteLoop needs administrator permission to install version 0.3.1." The
   review had noted the helper's permission-error elevation path and the design
-  treated it as theoretical. It is not, and it raises the one open question
-  below.
+  treated it as theoretical. It is not; the decision at the end of this
+  document accepts the residual case with two conditions.
 - *"Wait for exit" is a 60 s wait that continues on timeout.* On Windows the
   helper then force-stops every process running from the install root. A
   worker that outlived the bounded shutdown waits can be killed. This is a gate
@@ -282,11 +282,14 @@ swap may still fail": **a failure after the download can end in an elevation
 prompt from Velopack's helper** — measured at A3, a read-only install root
 produced "Administrator Permission Required" rather than a failed swap. The
 checks reduce the chance of reaching that prompt (a root that is unwritable
-before the download is caught); they cannot prevent it (a root that becomes
-unwritable between download and quit, or a permission the pre-check does not
-model, is not). Whether that prompt is acceptable at all is the open question
-at the end of this document; no further pre-flight is built until it is
-answered.
+before the download is caught). Immediately before the quit path arms the
+helper, the controller repeats the same install-root writability check. If the
+root is no longer writable, it does not arm the helper and shows *Failed* with
+"MatteLoop cannot update itself from this location." and *Open releases page*;
+this closes the permission-change gap between download and quit without adding
+other pre-flight machinery. The prompt cannot be prevented entirely from
+inside the application: permissions may change after that re-check, or the
+helper may encounter a permission the check does not model.
 
 A translocated install therefore offers the browser rather than updating
 itself, and that is a deliberate simplification. #77 measured that the
@@ -319,6 +322,7 @@ variable.
 | UpdateBanner | Install and restart | Installieren und neu starten |
 | UpdateBanner | Later | Später |
 | UpdateBanner | The update couldn’t be downloaded. | Das Update konnte nicht heruntergeladen werden. |
+| UpdateBanner | MatteLoop cannot update itself from this location. | MatteLoop kann sich von diesem Speicherort aus nicht selbst aktualisieren. |
 | UpdateBanner | Try again | Erneut versuchen |
 | SettingsDialog | Updates | Updates |
 | SettingsDialog | Check for updates when MatteLoop starts | Beim Start von MatteLoop nach Updates suchen |
@@ -689,8 +693,8 @@ not the full Velopack apply.
   version 0.3.1." The prompt was cancelled, no elevation was granted, the
   permissions were restored, the installation was unchanged. This is a design
   finding, not a record: it contradicts the advisory-check paragraph in
-  Decision 2 as first written and puts the open question below to the
-  maintainer.
+  Decision 2 as first written; the accepted residual case and its arming
+  re-check are recorded below.
 - A4. **Work at quit.** Quit for install with a worker blocked the way the
   #111 harness blocks one. **Requirement: the helper defers or refuses;
   nothing is killed.**
@@ -786,11 +790,9 @@ behaviour proves nothing, and no test is written to pretend otherwise.
   macOS — for instance a half-copied `current\` that launches and misbehaves.
   The accepted failure mode is "nothing launches, reinstall"; a bundle that
   starts and is wrong is a different failure and is not accepted.
-- The maintainer rules the elevation prompt unacceptable and no pre-check can
-  guarantee an unwritable root never reaches the apply step (A3). Then the
-  helper's escalation has to be prevented at the source — a Velopack option,
-  an upstream change, or not shipping the apply path — and that is a re-plan,
-  not a patch.
+- The accepted residual elevation case becomes common despite the advisory and
+  arming checks. Revisit the decision against that measurement; the prompt
+  cannot be prevented entirely from inside the application.
 - The packed full bundle does not launch through the first-install route
   because `vpk`'s additions broke the seal in a way the nested-file failure did
   not. Re-plan means measuring `--signAppIdentity -` against the known nested
@@ -831,26 +833,25 @@ behaviour proves nothing, and no test is written to pretend otherwise.
   package and the SDK only applies, through an explicit locator (Decisions 2
   and 3). A2 is re-run on the rebuilt path.
 
-## Open question for the maintainer
+## Decision on the elevation prompt
 
-1. **Is an administrator prompt acceptable at all from an application that
-   ships unsigned by decision?** A3 measured that Velopack's helper, meeting an
-   install root it cannot write, asks for elevation ("Administrator Permission
-   Required — MatteLoop needs administrator permission to install version
-   0.3.1") instead of failing. A user asked for their password by an unsigned
-   application cannot verify what they are authorising, and refusing is the
-   correct instinct. The choices:
-   - (a) **Accept it** for the rare read-only-install case, and say so in the
-     documentation: the prompt is Velopack's, it appears only when the
-     installation directory is not writable by the user, and cancelling it
-     leaves the installed version untouched (measured). The advisory pre-check
-     stays as a way of making the case rarer.
-   - (b) **Keep an install that cannot write its own root from ever reaching
-     the apply step.** That is what the advisory check was meant to do and
-     demonstrably cannot guarantee from inside the application; guaranteeing it
-     means the helper must not escalate, which is a Velopack option if one
-     exists, an upstream change otherwise, or not shipping the apply path for
-     that case.
-   The trade-off is between a rare prompt that a careful user will refuse and
-   a guarantee the application cannot currently give. The design does not pick;
-   nothing about the apply path is published to users before this is answered.
+**Decision.** Accept Velopack's elevation prompt for the rare case where the
+installation root is not writable by the user. The prompt is Velopack's, not
+MatteLoop's; cancelling it leaves the installed version untouched, as measured
+at A3. This decision has two conditions:
+
+1. The existing advisory writability check remains before the download, making
+   the case rarer.
+2. When `aboutToQuit` arms the install, the controller repeats that same
+   writability check; if it fails, the helper is not armed and the Failed state
+   offers *Open releases page* for a manual install.
+
+The prompt cannot be prevented entirely from inside the application, because a
+permission can change after the arming check or fall outside what the check
+models. The documentation tells users that MatteLoop never needs administrator
+rights to update itself, and to cancel the prompt and install by hand if it
+appears.
+
+## Open questions
+
+None.

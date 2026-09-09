@@ -734,6 +734,70 @@ def test_about_to_quit_arms_once_and_only_for_a_pending_install(qtbot) -> None:
     assert manager.apply_calls == [(info, False, True)]
 
 
+def test_about_to_quit_refuses_install_when_root_becomes_unwritable(
+    monkeypatch, qtbot
+) -> None:
+    info = _UpdateInfo(_Asset("0.4.0"))
+    manager = _Manager(pending=info)
+    monkeypatch.setattr(os, "access", lambda _path, _mode: True)
+    window, controller, _ = _controller(
+        qtbot,
+        _settings("arm-install-unwritable"),
+        UpdateResult(UpdateOutcome.NONE),
+        manager=manager,
+    )
+
+    monkeypatch.setattr(os, "access", lambda _path, _mode: False)
+    controller.install_and_restart()
+    controller.arm_pending_install()
+
+    assert manager.apply_calls == []
+    assert window.update_dialog.message_label.text() == (
+        "MatteLoop cannot update itself from this location."
+    )
+    assert window.update_dialog.open_releases_button.isVisible()
+
+
+def test_install_refuses_before_closing_when_root_is_unwritable(
+    monkeypatch, qtbot
+) -> None:
+    info = _UpdateInfo(_Asset("0.4.0"))
+    manager = _Manager(pending=info)
+    monkeypatch.setattr(os, "access", lambda _path, _mode: True)
+    window, controller, _ = _controller(
+        qtbot,
+        _settings("install-unwritable-before-close"),
+        UpdateResult(UpdateOutcome.NONE),
+        manager=manager,
+    )
+
+    monkeypatch.setattr(os, "access", lambda _path, _mode: False)
+    controller.install_and_restart()
+
+    assert manager.apply_calls == []
+    assert window.update_dialog.message_label.text() == (
+        "MatteLoop cannot update itself from this location."
+    )
+    assert window.update_dialog.open_releases_button.isVisible()
+
+
+def test_about_to_quit_arms_install_when_root_is_writable(monkeypatch, qtbot) -> None:
+    info = _UpdateInfo(_Asset("0.4.0"))
+    manager = _Manager(pending=info)
+    monkeypatch.setattr(os, "access", lambda _path, _mode: True)
+    window, controller, _ = _controller(
+        qtbot,
+        _settings("arm-install-writable"),
+        UpdateResult(UpdateOutcome.NONE),
+        manager=manager,
+    )
+
+    controller.install_and_restart()
+    controller.arm_pending_install()
+
+    assert manager.apply_calls == [(info, False, True)]
+
+
 def test_translocated_install_uses_releases_page(monkeypatch, qtbot) -> None:
     monkeypatch.setattr(sys, "executable", "/tmp/AppTranslocation/a/d/app")
     manager = _Manager()

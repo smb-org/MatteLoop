@@ -408,6 +408,9 @@ class UpdateController(QObject):
         if self._store.state.job.phase is not JobState.IDLE:
             self._refresh_install_button()
             return
+        if not _install_root_is_writable(_physical_executable_path()):
+            self._show_install_failed()
+            return
         self._pending_install = self._ready_update
         if not self._window.close():
             self._pending_install = None
@@ -420,6 +423,9 @@ class UpdateController(QObject):
         """Arm Velopack once, and only for an install requested before quit."""
         pending, self._pending_install = self._pending_install, None
         if pending is None or self._manager is None or self._apply_armed:
+            return
+        if not _install_root_is_writable(_physical_executable_path()):
+            self._show_install_failed()
             return
         self._apply_armed = True
         try:
@@ -494,6 +500,14 @@ class UpdateController(QObject):
         self._set_offer(
             QCoreApplication.translate(
                 "UpdateBanner", "The update couldn’t be downloaded."
+            ),
+            "failed",
+        )
+
+    def _show_install_failed(self) -> None:
+        self._set_offer(
+            QCoreApplication.translate(
+                "UpdateBanner", "MatteLoop cannot update itself from this location."
             ),
             "failed",
         )
@@ -728,6 +742,10 @@ def _advisory_update_capability(manager: UpdateManager | None) -> bool:
     executable = _physical_executable_path()
     if "/AppTranslocation/" in executable.as_posix():
         return False
+    return _install_root_is_writable(executable)
+
+
+def _install_root_is_writable(executable: PurePath) -> bool:
     return os.access(_install_root(executable), os.W_OK)
 
 

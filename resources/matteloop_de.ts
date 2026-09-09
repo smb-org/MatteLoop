@@ -2540,7 +2540,7 @@ Freed %s.</source>
         <translation>Später</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/update_controller.py" line="495"/>
+        <location filename="../src/matteloop/ui/update_controller.py" line="501"/>
         <source>The update couldn’t be downloaded.</source>
         <translation>Das Update konnte nicht heruntergeladen werden.</translation>
     </message>
@@ -2557,22 +2557,27 @@ Freed %s.</source>
         <translation>Erneut versuchen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/update_controller.py" line="579"/>
+        <location filename="../src/matteloop/ui/update_controller.py" line="509"/>
+        <source>MatteLoop cannot update itself from this location.</source>
+        <translation>MatteLoop kann sich von diesem Speicherort aus nicht selbst aktualisieren.</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/update_controller.py" line="593"/>
         <source>MatteLoop %1 is available.</source>
         <translation>MatteLoop %1 ist verfügbar.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/update_controller.py" line="585"/>
+        <location filename="../src/matteloop/ui/update_controller.py" line="599"/>
         <source>Downloading MatteLoop %1 (%2 %)…</source>
         <translation>MatteLoop %1 wird heruntergeladen (%2 %) …</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/update_controller.py" line="591"/>
+        <location filename="../src/matteloop/ui/update_controller.py" line="605"/>
         <source>MatteLoop %1 is ready to install.</source>
         <translation>MatteLoop %1 ist bereit zur Installation.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/update_controller.py" line="598"/>
+        <location filename="../src/matteloop/ui/update_controller.py" line="612"/>
         <source>Download size: %1 MB</source>
         <translation>Downloadgröße: %1 MB</translation>
     </message>
