@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import re
+import sys
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
@@ -100,10 +101,11 @@ class UpdateOutcome(Enum):
 
 @dataclass(frozen=True, slots=True)
 class UpdateResult:
-    """A release-check outcome and its available version, when applicable."""
+    """A release-check outcome with available version and package size."""
 
     outcome: UpdateOutcome
     version: str | None = None
+    size: int | None = None
 
 
 def download_update(
@@ -269,7 +271,9 @@ class GitHubUpdateReader:
                 result = UpdateResult(UpdateOutcome.NONE)
             elif release_version > _current_version():
                 result = UpdateResult(
-                    UpdateOutcome.UPDATE, _version_text(release_version)
+                    UpdateOutcome.UPDATE,
+                    _version_text(release_version),
+                    _full_package_size(payload, platform=sys.platform),
                 )
             else:
                 result = UpdateResult(UpdateOutcome.NONE)
@@ -282,6 +286,26 @@ class GitHubUpdateReader:
                 except Exception as error:
                     _LOGGER.info("GitHub update response close failed: %s", error)
         return result
+
+
+def _full_package_size(payload: object, *, platform: str) -> int | None:
+    """Return the GitHub asset size for the current platform's full package."""
+    try:
+        channel = update_channel(platform)
+    except UnsupportedUpdatePlatform:
+        return None
+    if not isinstance(payload, dict) or not isinstance(payload.get("assets"), list):
+        return None
+    suffix = f"-{channel}-full.nupkg"
+    for asset in payload["assets"]:
+        if not isinstance(asset, dict) or not isinstance(asset.get("name"), str):
+            continue
+        if not asset["name"].endswith(suffix):
+            continue
+        size = asset.get("size")
+        return size if type(size) is int and size >= 0 else None
+    return None
+
 
 def _parse_tag(tag: object) -> tuple[int, int, int] | None:
     if not isinstance(tag, str):

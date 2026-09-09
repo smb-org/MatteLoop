@@ -50,13 +50,13 @@ document departs from a proposal in #74 it says so.
 - **A job dialog that blocks the main window.** `PreviewJobDialog` is opened
   with `.open()`, which makes it window-modal (it is constructed
   application-modal, but `QDialog.open` changes that). The main window — where
-  the update banner lives — is blocked while a job runs; other top-level
+  the update affordance lives — is blocked while a job runs; other top-level
   windows and other processes are not.
 - **A Preferences dialog** (`ui/settings_dialog.py`) reached from the gear in
   the action shelf with the platform Preferences shortcut.
-- **Banner containers in the inspector column** (`runtime_container`,
-  `success_container` in `ui/main_window.py`). The update notice is a third one
-  of the same shape.
+- **An update dialog and action-shelf affordance.** The update offer is a
+  window-modal `UpdateDialog`; after dismissal, a painted arrow beside the
+  Preferences gear reopens it. There is no inspector update banner.
 - **A release workflow** (`.github/workflows/release.yml`): `native-package` on
   `macos-15` and `windows-2022`, `publish` on `ubuntu-22.04` creating a
   **draft** release that the maintainer publishes by hand. That manual step is
@@ -188,11 +188,17 @@ single-flight: a second request while one is in progress is ignored.
 button. The application has no menu bar and one item does not justify adding
 one.
 
-**What the user sees.** A banner in the inspector column, built like
-`runtime_container`, hidden until needed, owned and driven by the update
-controller. **No event enters the reducer and no field is added to `AppState`**
-(`core/state.py` is frozen at 882 lines; update state has no bearing on
-capabilities). The controller reads `store.state.job.phase` where it needs it.
+**What the user sees.** When a startup check finds a newer release, the
+controller opens a window-modal `UpdateDialog` naming the version and offering
+the existing download/install actions or dismissal. The dialog appears once per
+process and only while `store.state.job.phase is JobState.IDLE`; if a job is
+already running, the offer waits until the job is idle. Dismissing it leaves a
+small upward arrow beside the Preferences gear. The arrow is visible for the
+Available, Downloading, Ready, and Failed states and reopens the same dialog.
+**No event enters the reducer and no field is added to `AppState`**
+(`core/state.py` is frozen at
+882 lines; update state has no bearing on capabilities). The controller owns
+the update state and reads `store.state.job.phase` where it needs it.
 
 | State | Label | Buttons |
 |---|---|---|
@@ -205,9 +211,10 @@ Phase 1 ships only the *Available* state, with *Open releases page* in place
 of *Download update*. It tells the user that a release exists and nothing
 about their installation.
 
-*Not now* and *Later* hide the banner until the next launch; nothing is
-persisted. *Cancel* is real: the download runs on the Qt transport, which
-polls a cancellation flag exactly as the model download does.
+*Not now* and *Later* hide the dialog but leave the arrow available; the offer
+is not persisted and the startup dialog does not repeat in one process. *Cancel*
+is real: the download runs on the Qt transport, which polls a cancellation flag
+exactly as the model download does.
 
 **Download.** Only after the user asks. #74 proposed downloading in the
 background first; a 300 MiB download on every launch of an install whose owner
@@ -230,7 +237,7 @@ in `app.py` after `SourceController.shutdown` — calls
 `manager.wait_exit_then_apply_updates(pending, restart=True)`, which spawns
 Velopack's helper. Arming only inside `aboutToQuit` means a close the user
 cancels at the transform prompt arms nothing: after `close()` returns with the
-window still visible, the pending info is dropped and the banner returns to
+window still visible, the pending info is dropped and the dialog returns to
 *Ready*. A *Ready* state is rebuilt at the next launch from
 `get_update_pending_restart()`, so *Later* loses nothing.
 
@@ -246,7 +253,7 @@ failed manual check reports in the Preferences label. A failed download is the
 does not recognise after it was written (Decision 3) — and *Try again*
 repeats it while *Open releases page* is the way out. A failure inside the helper after
 exit cannot be shown by this process; the next launch runs the check again,
-and the banner's *Open releases page* is the recovery path. If the swap itself
+and the dialog's *Open releases page* is the recovery path. If the swap itself
 failed half-way (Decision 1), there is no next launch: on macOS the Dock icon
 or the Finder entry no longer opens anything, on Windows the shortcut reports a
 missing target. What the user does is download the current release from the
@@ -280,6 +287,8 @@ variable.
 | Context | English | German |
 |---|---|---|
 | UpdateBanner | Update notice *(accessible name)* | Update-Hinweis |
+| UpdateBanner | Software update | Softwareupdate |
+| UpdateBanner | Download size: %1 MB | Downloadgröße: %1 MB |
 | UpdateBanner | MatteLoop %1 is available. | MatteLoop %1 ist verfügbar. |
 | UpdateBanner | Download update | Update herunterladen |
 | UpdateBanner | Open releases page | Release-Seite öffnen |
@@ -332,7 +341,7 @@ place. The verification is the one Velopack would have performed — it moved,
 it did not disappear — and the checksum came over the same trusted path as the
 package. Then the **self-check**: ask `get_update_pending_restart()`; if it
 does not return an asset with the expected version, the package is not where
-the SDK looks or is not what it expects, the file is deleted and the banner
+the SDK looks or is not what it expects, the file is deleted and the dialog
 shows *Failed* rather than a *Ready* it cannot honour. Measured on macOS: a
 package written this way is reported as pending with no SDK network call.
 
@@ -353,7 +362,7 @@ warning the first run produced):
 
 The `source` argument the constructor requires is the repository URL and is
 never contacted. If `UpdateExePath` or `ManifestPath` does not exist, the
-install is not Velopack-managed and the banner offers *Open releases page*;
+install is not Velopack-managed and the dialog offers *Open releases page*;
 nothing is caught by exception type. The two SDK calls that remain are
 `get_update_pending_restart()` (startup and self-check) and
 `wait_exit_then_apply_updates()` (Decision 2).
@@ -572,7 +581,7 @@ full packages carry them because they are the bundle.
   would change first-install warnings, not update integrity; the two are not
   to be conflated.
 - **Background download, skip this version, automatic apply on a later
-  launch, a check interval, release notes in the banner, mirrors, a
+  launch, a check interval, release notes in the dialog, mirrors, a
   minimum-OS policy.**
 - **Reducer or `AppState` involvement.**
 - **Any MatteLoop-built rollback, journal or crash recovery** (G3). Velopack
@@ -587,12 +596,13 @@ release notes that announce Phase 1 should not repeat a bypass that no longer
 exists.
 
 **Phase 1 — Notify.** `src/matteloop/updates.py` (API reader, tag parsing,
-comparison; no Qt), `src/matteloop/ui/update_controller.py` (thread, banner,
-Preferences wiring, `QDesktopServices.openUrl`), the Preferences row, the
-banner in `MainWindow`, the transport's `headers` keyword, strings in both
-catalogues, a README sentence. The banner has one state: *available*, with
-*Open releases page*. Startup checks only in frozen bundles. Independent of
-everything below; **this is the whole of the "no" branch.**
+comparison; no Qt), `src/matteloop/ui/update_controller.py` (thread, dialog,
+arrow and Preferences wiring, `QDesktopServices.openUrl`), the Preferences row,
+the dialog in `MainWindow`, the transport's `headers` keyword, strings in both
+catalogues, and a README sentence. The offer uses *Open releases page* in
+place of *Download update* when self-update is not advisable. Startup checks
+only in frozen bundles. Independent of everything below; **this is the whole
+of the "no" branch.**
 
 **Phase 2 — Package** and **Phase 3 — Install** are separate pull requests
 that **share one gate and merge together or not at all.** Phase 2: the
@@ -707,19 +717,20 @@ before Stage A is.
 **Phase 1.** Automated: `tests/test_updates.py` with fixture JSON for a newer,
 equal and older release, a tag that is not `vX.Y.Z`, a body that is not JSON,
 an oversized body and an HTTP error, each mapped to "update", "none" or
-"failed". `tests/ui/test_update_controller.py` with a fake reader: banner
+  "failed". `tests/ui/test_update_controller.py` with a fake reader: dialog
 hidden on "none", shown with the right text on "update", hidden after *Not
-now*, startup check suppressed when the setting is off and when not frozen,
-single-flight, Preferences label for each outcome, `openUrl` with the release
-URL. `tests/test_translations.py`; `tests/ui/test_preferences_surface.py` for
-the row and tab order. By hand: a frozen bundle with `__version__` lowered
-shows the banner within seconds on each platform, in German too.
+now* while the arrow remains, startup offer suppressed when the setting is off
+and when a job is running, single-flight, Preferences label for each outcome,
+`openUrl` with the release URL. `tests/test_translations.py`;
+`tests/ui/test_preferences_surface.py` for the row and tab order. By hand: a
+frozen bundle with `__version__` lowered shows the dialog within seconds on each
+platform, in German too.
 
 **Phases 2–3.** Automated, at the adapter boundaries only: the tag and
 completeness assertions in `tests/release/test_ci_workflow.py`; the pinned
 `vpk` version and flags; the download with a fake transport — feed parsing,
 asset selection by type and version, a checksum mismatch leaves no package
-and shows *Failed*, *Cancel* leaves no package, progress reaches the banner;
+and shows *Failed*, *Cancel* leaves no package, progress reaches the dialog;
 the controller with a fake manager for the two calls that remain — a
 self-check that returns the wrong version shows *Failed* and deletes the
 file, install disabled outside `IDLE`, a refused close drops the pending

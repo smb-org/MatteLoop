@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import sys
 from collections.abc import Callable, Mapping
 from pathlib import Path
 from threading import Event
@@ -110,13 +111,31 @@ def _reader(body: bytes) -> tuple[GitHubUpdateReader, _Transport, _Response]:
     return GitHubUpdateReader(transport), transport, response
 
 
-def test_newer_release_is_reported_as_an_update() -> None:
-    reader, transport, response = _reader(b'{"tag_name":"v0.4.0"}')
+def test_newer_release_is_reported_as_an_update(monkeypatch) -> None:
+    monkeypatch.setattr(sys, "platform", "darwin")
+    reader, transport, response = _reader(
+        json.dumps(
+            {
+                "tag_name": "v0.4.0",
+                "assets": [
+                    {
+                        "name": "MatteLoop-win-x64-full.nupkg",
+                        "size": 123,
+                    },
+                    {
+                        "name": "MatteLoop-osx-arm64-full.nupkg",
+                        "size": 398_458_880,
+                    },
+                ],
+            }
+        ).encode()
+    )
 
     result = reader.check()
 
     assert result.outcome is UpdateOutcome.UPDATE
     assert result.version == "0.4.0"
+    assert result.size == 398_458_880
     assert transport.calls == [
         (
             GITHUB_LATEST_RELEASE_URL,
@@ -124,6 +143,17 @@ def test_newer_release_is_reported_as_an_update() -> None:
         )
     ]
     assert response.closed
+
+
+def test_newer_release_without_a_platform_package_has_no_download_size(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(sys, "platform", "darwin")
+    reader, _, _ = _reader(
+        b'{"tag_name":"v0.4.0","assets":[{"name":"MatteLoop-source.zip","size":123}]}'
+    )
+
+    assert reader.check().size is None
 
 
 def test_equal_release_is_reported_as_no_update() -> None:
