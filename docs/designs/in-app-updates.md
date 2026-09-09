@@ -184,9 +184,11 @@ from Preferences at any time, including from source. Checks and downloads are
 single-flight: a second request while one is in progress is ignored.
 
 **Where the manual check lives.** Preferences gains a row *Updates* below
-*Compute acceleration*: the checkbox, a status label and a *Check for updates*
-button. The application has no menu bar and one item does not justify adding
-one.
+*Compute acceleration*: the beta/stable selector, the startup checkbox, a
+status label and a *Check for updates* button. The selector is persisted as
+`updates/channel`. Turning beta off does not downgrade an installation; it
+stays on its beta until a stable release overtakes it. The application has no
+menu bar and one item does not justify adding one.
 
 **What the user sees.** When a startup check finds a newer release, the
 controller opens a window-modal `UpdateDialog` naming the version and offering
@@ -317,16 +319,19 @@ There is one source of truth for what is released — the GitHub release — one
 network path that reads it — the Qt transport — and one thing the SDK does:
 apply.
 
-**The notice comes from the API.** One request to
-`https://api.github.com/repos/smb-org/MatteLoop/releases/latest` through the
+**The notice comes from the API.** A stable check requests
+`https://api.github.com/repos/smb-org/MatteLoop/releases/latest`; a beta check
+requests `/releases` and selects the newest non-draft release. Both use the
 existing Qt transport, whose `open` gains an optional `headers` keyword
 (forwarded into the response and set on the request before `get`; small, but
 both signatures and the call sites change). The body is capped at 1 MiB and
-parsed with `json`. `tag_name` must match `^v(\d+)\.(\d+)\.(\d+)$`; anything
-else is "no update". Newer is a tuple comparison against `__version__` parsed
-the same way. HTTP or parse failures are "couldn't check", distinct from
-"none". This reader lives in `src/matteloop/updates.py`, has no Qt
-dependency, and is the whole of Phase 1.
+parsed with `json`. `tag_name` must match
+`^v(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$`; malformed prerelease
+identifiers are rejected. Newer is real semantic-version precedence against
+the running Velopack version: finals outrank prereleases of the same core,
+and numeric prerelease identifiers compare numerically. HTTP or parse failures
+are "couldn't check", distinct from "none". This reader lives in
+`src/matteloop/updates.py`, has no Qt dependency, and is the whole of Phase 1.
 
 **The package comes through the same transport.** On *Download update*, in
 the worker: fetch `releases.<channel>.json` from
@@ -373,11 +378,12 @@ not report — an applied or superseded one — so an update never leaves a 300 
 orphan; the SDK's own startup cleanup looks in its auto-located directory and
 never sees this one.
 
-**Drafts and prereleases stay out** without code: a draft is invisible to an
-unauthenticated client and `/releases/latest` excludes drafts and prereleases
-by GitHub's definition; the feed is fetched only for the tag that request
-returned. A release is complete the moment the maintainer publishes the draft;
-every asset appears at once.
+**Stable and beta visibility is deliberate.** GitHub's `/releases/latest`
+excludes drafts and prereleases, so the stable reader needs no beta filtering
+from the endpoint. The beta reader uses `/releases`, skips drafts and compares
+all valid release tags semantically. The feed is fetched only for the tag that
+request returned. A release is complete the moment the maintainer publishes
+the draft; every asset appears at once.
 
 **Assets per release**, all on the tagged release:
 
@@ -407,9 +413,11 @@ policy for moving the macOS floor is designed here; when that day comes it is
 its own decision.
 
 **Version consistency.** The workflow's `plan` job asserts on a tag push that
-`src/matteloop/__init__.py` contains `__version__ = "<tag without v>"` and
-fails within seconds otherwise — the check that would have caught the `1.0`
-releases.
+the numeric core of the tag matches
+`src/matteloop/__init__.py`'s `__version__` and fails within seconds otherwise
+— the check that would have caught the `1.0` releases. A prerelease suffix is
+passed to `vpk` as the package version, while the bundle metadata remains
+numeric because macOS and Windows reject the suffix there.
 
 ## Decision 4 — The release workflow
 

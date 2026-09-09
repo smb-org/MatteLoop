@@ -66,12 +66,17 @@ class _Manager:
         *,
         pending: object | None = None,
         pending_values: list[object | None] | None = None,
+        current_version: str = "0.3.0",
     ) -> None:
         del update
         self.pending = pending
         self.pending_values = pending_values
+        self.current_version = current_version
         self.pending_calls = 0
         self.apply_calls: list[tuple[object, bool, bool]] = []
+
+    def get_current_version(self) -> str:
+        return self.current_version
 
     def get_update_pending_restart(self) -> object | None:
         self.pending_calls += 1
@@ -149,9 +154,13 @@ class _Reader:
     def __init__(self, result: UpdateResult) -> None:
         self.result = result
         self.calls = 0
+        self.requests: list[tuple[str, str | None]] = []
 
-    def check(self) -> UpdateResult:
+    def check(
+        self, channel: str = "stable", current_version: str | None = None
+    ) -> UpdateResult:
         self.calls += 1
+        self.requests.append((channel, current_version))
         return self.result
 
 
@@ -337,6 +346,23 @@ def test_available_update_shows_versioned_offer(qtbot) -> None:
         window.action_shelf.preferences_dialog.updates_status_label.text()
         == "MatteLoop 0.4.0 is available."
     )
+
+
+def test_update_check_uses_the_persisted_channel_and_velopack_version(qtbot) -> None:
+    settings = _settings("beta-reader-inputs")
+    settings.setValue("updates/channel", "beta")
+    manager = _Manager(current_version="0.4.0-beta.1")
+    _, controller, reader = _controller(
+        qtbot,
+        settings,
+        UpdateResult(UpdateOutcome.NONE),
+        manager=manager,
+    )
+
+    controller.check_now()
+    qtbot.waitUntil(lambda: not controller.check_in_progress)
+
+    assert reader.requests == [("beta", "0.4.0-beta.1")]
 
 
 def test_not_now_hides_the_update_offer(qtbot) -> None:

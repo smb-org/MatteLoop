@@ -26,7 +26,7 @@ from matteloop.jobs.models.download import DownloadTransport
 from matteloop.paths import cache_subdirectory
 from matteloop.ui.i18n import display_locale
 from matteloop.ui.ports import StateStore
-from matteloop.ui.preferences import load_check_on_startup
+from matteloop.ui.preferences import load_check_on_startup, load_update_channel
 from matteloop.ui.worker_thread import WorkerThread
 from matteloop.updates import (
     UpdateDownloadCancelled,
@@ -46,10 +46,14 @@ _DOWNLOAD_SHUTDOWN_TIMEOUT_MS = 5000
 
 
 class UpdateReader(Protocol):
-    def check(self) -> UpdateResult: ...
+    def check(
+        self, channel: str = "stable", current_version: str | None = None
+    ) -> UpdateResult: ...
 
 
 class UpdateManager(Protocol):
+    def get_current_version(self) -> str: ...
+
     def get_update_pending_restart(self) -> object | None: ...
 
     def wait_exit_then_apply_updates(
@@ -64,13 +68,20 @@ class UpdateManager(Protocol):
 class _UpdateWorker(QObject):
     result = Signal(object)
 
-    def __init__(self, reader: UpdateReader) -> None:
+    def __init__(
+        self,
+        reader: UpdateReader,
+        channel: str,
+        current_version: str | None,
+    ) -> None:
         super().__init__()
         self._reader = reader
+        self._channel = channel
+        self._current_version = current_version
 
     def run(self) -> None:
         try:
-            result = self._reader.check()
+            result = self._reader.check(self._channel, self._current_version)
         except Exception as error:
             _LOGGER.info("Update check failed: %s", error)
             result = UpdateResult(UpdateOutcome.FAILED)
@@ -235,7 +246,11 @@ class UpdateController(QObject):
             self._set_status(
                 QCoreApplication.translate("SettingsDialog", "Checking for updates…")
             )
-        worker = _UpdateWorker(self._reader)
+        worker = _UpdateWorker(
+            self._reader,
+            load_update_channel(self._settings),
+            _current_update_version(self._manager),
+        )
         thread = WorkerThread(worker, self)
         self._check_thread = thread
         worker.result.connect(self._check_finished)
@@ -722,6 +737,18 @@ def _update_version(update: object | None, fallback: str | None) -> str | None:
     asset = getattr(update, "TargetFullRelease", update)
     version = getattr(asset, "Version", fallback)
     return version if isinstance(version, str) else fallback
+
+
+def _current_update_version(manager: UpdateManager | None) -> str | None:
+    """Use Velopack's version when available, not the numeric bundle version."""
+    if manager is None:
+        return None
+    try:
+        version = manager.get_current_version()
+    except Exception as error:
+        _LOGGER.info("Velopack current version could not be read: %s", error)
+        return None
+    return version if isinstance(version, str) else None
 
 
 def _is_frozen_runtime() -> bool:

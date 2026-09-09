@@ -53,7 +53,7 @@
         {
           "name": "Assert tag matches package version",
           "if": "startsWith(github.ref, 'refs/tags/v')",
-          "run": "version=\"${GITHUB_REF_NAME#v}\"\ngrep -Fqx \"__version__ = \\\"$version\\\"\" src/matteloop/__init__.py"
+          "run": "version=\"${GITHUB_REF_NAME#v}\"\nif [[ ! \"$version\" =~ ^[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then\n  echo \"invalid release tag version: $version\" >&2\n  exit 1\nfi\nbase_version=\"${version%%-*}\"\ngrep -Fqx \"__version__ = \\\"$base_version\\\"\" src/matteloop/__init__.py"
         }
       ]
     },
@@ -157,13 +157,13 @@
         {
           "name": "Read macOS package version",
           "if": "runner.os == 'macOS'",
-          "run": "version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' dist/MatteLoop.app/Contents/Info.plist)\necho \"VERSION=$version\" >> \"$GITHUB_ENV\""
+          "run": "bundle_version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' dist/MatteLoop.app/Contents/Info.plist)\nversion=\"$bundle_version\"\nif [[ \"$GITHUB_REF\" == refs/tags/v* ]]; then\n  version=\"${GITHUB_REF_NAME#v}\"\nfi\necho \"VERSION=$version\" >> \"$GITHUB_ENV\""
         },
         {
           "name": "Read Windows package version",
           "if": "runner.os == 'Windows'",
           "shell": "pwsh",
-          "run": "$match = Select-String -Path src\\matteloop\\__init__.py -Pattern '^__version__ = \"(.*)\"$'\nif (-not $match) { throw 'src\\matteloop\\__init__.py has no __version__.' }\n$version = $match.Matches[0].Groups[1].Value\n\"VERSION=$version\" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append"
+          "run": "$match = Select-String -Path src\\matteloop\\__init__.py -Pattern '^__version__ = \"(.*)\"$'\nif (-not $match) { throw 'src\\matteloop\\__init__.py has no __version__.' }\n$version = $match.Matches[0].Groups[1].Value\nif ($env:GITHUB_REF -like 'refs/tags/v*') { $version = $env:GITHUB_REF_NAME.Substring(1) }\n\"VERSION=$version\" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append"
         },
         {
           "name": "Pack macOS Velopack release",
@@ -297,7 +297,7 @@
           "env": {
             "GH_TOKEN": "${{ github.token }}"
           },
-          "run": "gh release create \"$GITHUB_REF_NAME\" assets/* \\\n  --repo \"$GITHUB_REPOSITORY\" \\\n  --draft \\\n  --title \"MatteLoop $GITHUB_REF_NAME\" \\\n  --notes 'Unsigned builds. Windows warns via SmartScreen and macOS needs a right-click Open on first launch.\n\nThe MatteLoop-*-sources-* archives are the complete corresponding sources for the LGPL libraries (FFmpeg, libwebp, Qt) inside the application, published here as required by their licences. They are not needed to run MatteLoop.'"
+          "run": "release_flags=(--draft)\nif [[ \"$GITHUB_REF_NAME\" == *-* ]]; then\n  release_flags+=(--prerelease)\nfi\ngh release create \"$GITHUB_REF_NAME\" assets/* \\\n  --repo \"$GITHUB_REPOSITORY\" \\\n  \"${release_flags[@]}\" \\\n  --title \"MatteLoop $GITHUB_REF_NAME\" \\\n  --notes 'Unsigned builds. Windows warns via SmartScreen and macOS needs a right-click Open on first launch.\n\nThe MatteLoop-*-sources-* archives are the complete corresponding sources for the LGPL libraries (FFmpeg, libwebp, Qt) inside the application, published here as required by their licences. They are not needed to run MatteLoop.'"
         }
       ]
     }

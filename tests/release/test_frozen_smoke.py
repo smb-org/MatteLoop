@@ -820,6 +820,8 @@ def test_release_workflow_builds_on_dispatch_tags_and_media_stack_changes() -> N
     create = publish["steps"][-1]
     assert create["env"] == {"GH_TOKEN": "${{ github.token }}"}
     assert "--draft" in create["run"]
+    assert "--prerelease" in create["run"]
+    assert "GITHUB_REF_NAME\" == *-*" in create["run"]
     assert publish["steps"].index(validation) < publish["steps"].index(create)
     assert steps.index(cache_stats) > build_index
 
@@ -921,9 +923,12 @@ def test_release_workflow_packs_pinned_velopack_outputs() -> None:
     assert "vpk download" not in serialized
 
 
-@pytest.mark.parametrize("package_version", ["0.3.0", "0.3.1"])
-def test_release_tag_assertion_accepts_only_the_matching_package_version(
-    tmp_path: Path, package_version: str
+@pytest.mark.parametrize(
+    ("tag_version", "expected_returncode"),
+    [("0.4.0", 0), ("0.4.0-beta.1", 0), ("0.4.1", 1), ("0.4.1-beta.1", 1)],
+)
+def test_release_tag_assertion_accepts_matching_core_and_rejects_mismatch(
+    tmp_path: Path, tag_version: str, expected_returncode: int
 ) -> None:
     workflow_path = REPOSITORY_ROOT / ".github" / "workflows" / "release.yml"
     workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
@@ -935,18 +940,22 @@ def test_release_tag_assertion_accepts_only_the_matching_package_version(
     source = tmp_path / "src" / "matteloop"
     source.mkdir(parents=True)
     (source / "__init__.py").write_text(
-        '__version__ = "0.3.0"\n', encoding="utf-8"
+        '__version__ = "0.4.0"\n', encoding="utf-8"
     )
 
     completed = subprocess.run(
         ["bash", "-e", "-c", tag_check["run"]],
         cwd=tmp_path,
         check=False,
-        env={**os.environ, "GITHUB_REF_NAME": f"v{package_version}"},
+        env={
+            **os.environ,
+            "GITHUB_REF_NAME": f"v{tag_version}",
+            "GITHUB_REF": f"refs/tags/v{tag_version}",
+        },
         capture_output=True,
     )
 
-    assert completed.returncode == (0 if package_version == "0.3.0" else 1)
+    assert completed.returncode == expected_returncode
 
 
 def _stage_fake_velopack_publish_bundles(tmp_path: Path) -> None:

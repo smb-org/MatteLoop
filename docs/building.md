@@ -355,6 +355,9 @@ sign, notarize, or move the feed to another host. A later publication must keep
 the matching application/update packages, source archives and checksums on the
 same durable release endpoint; an expiring Actions artifact is not that
 endpoint.
+Release tags may carry a prerelease suffix such as `v0.4.0-beta.1`; the suffix
+is passed to Velopack while the bundle metadata remains numeric for macOS and
+Windows.
 
 ## Models and first launch
 

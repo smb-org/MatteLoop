@@ -104,7 +104,8 @@ MatteLoop tells you when a new release is available: it checks once at startup
 and opens an update offer with the version and download action. Dismissing the
 offer leaves an update arrow beside the Preferences gear so it can be reopened.
 Preferences carries a manual check and the switch that turns the startup one
-off.
+off. It can also opt into beta releases. Turning beta off never downgrades the
+installation: it stays on its beta until a stable release overtakes it.
 
 ## Run from source
 
