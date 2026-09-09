@@ -949,17 +949,8 @@ def test_release_tag_assertion_accepts_only_the_matching_package_version(
     assert completed.returncode == (0 if package_version == "0.3.0" else 1)
 
 
-def test_publish_renames_both_velopack_platform_outputs_and_requires_completeness(
-    tmp_path: Path,
-) -> None:
-    workflow_path = REPOSITORY_ROOT / ".github" / "workflows" / "release.yml"
-    workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
-    step = next(
-        s
-        for s in workflow["jobs"]["publish"]["steps"]
-        if s["name"] == "Rename Velopack assets and assert release completeness"
-    )
-
+def _stage_fake_velopack_publish_bundles(tmp_path: Path) -> None:
+    """Create the bundles/MatteLoop-velopack-* tree the rename step expects."""
     macos = tmp_path / "bundles" / "MatteLoop-velopack-macos-15-arm64"
     windows = tmp_path / "bundles" / "MatteLoop-velopack-windows-2022-x64"
     macos.mkdir(parents=True)
@@ -982,6 +973,16 @@ def test_publish_renames_both_velopack_platform_outputs_and_requires_completenes
         ):
             portable.writestr(name, b"artifact")
 
+
+def _run_publish_rename_step(tmp_path: Path) -> None:
+    """Run the release workflow's Velopack rename-and-verify step."""
+    workflow_path = REPOSITORY_ROOT / ".github" / "workflows" / "release.yml"
+    workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
+    step = next(
+        s
+        for s in workflow["jobs"]["publish"]["steps"]
+        if s["name"] == "Rename Velopack assets and assert release completeness"
+    )
     subprocess.run(
         ["bash", "-e", "-c", step["run"]],
         cwd=tmp_path,
@@ -989,6 +990,13 @@ def test_publish_renames_both_velopack_platform_outputs_and_requires_completenes
         env={**os.environ, "GITHUB_REF_NAME": "v0.3.0"},
         capture_output=True,
     )
+
+
+def test_publish_renames_both_velopack_platform_outputs_and_requires_completeness(
+    tmp_path: Path,
+) -> None:
+    _stage_fake_velopack_publish_bundles(tmp_path)
+    _run_publish_rename_step(tmp_path)
 
     assets = {path.name for path in (tmp_path / "assets").iterdir()}
     assert {
@@ -1005,43 +1013,8 @@ def test_publish_renames_both_velopack_platform_outputs_and_requires_completenes
 def test_publish_wraps_windows_portable_archive_in_a_versioned_root(
     tmp_path: Path,
 ) -> None:
-    workflow_path = REPOSITORY_ROOT / ".github" / "workflows" / "release.yml"
-    workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
-    step = next(
-        s
-        for s in workflow["jobs"]["publish"]["steps"]
-        if s["name"] == "Rename Velopack assets and assert release completeness"
-    )
-
-    macos = tmp_path / "bundles" / "MatteLoop-velopack-macos-15-arm64"
-    windows = tmp_path / "bundles" / "MatteLoop-velopack-windows-2022-x64"
-    macos.mkdir(parents=True)
-    windows.mkdir(parents=True)
-    for path in (
-        macos / "releases.osx-arm64.json",
-        macos / "io.github.smb-org.matteloop-0.3.0-osx-arm64-full.nupkg",
-        macos / "velopack-macos.zip",
-        windows / "releases.win-x64.json",
-        windows / "io.github.smb-org.matteloop-0.3.0-win-x64-full.nupkg",
-        windows / "velopack-Setup.exe",
-    ):
-        path.write_bytes(b"artifact")
-    with zipfile.ZipFile(windows / "velopack-win.zip", "w") as portable:
-        for name in (
-            "MatteLoop.exe",
-            "Update.exe",
-            ".portable",
-            "current/matteloop.exe",
-        ):
-            portable.writestr(name, b"artifact")
-
-    subprocess.run(
-        ["bash", "-e", "-c", step["run"]],
-        cwd=tmp_path,
-        check=True,
-        env={**os.environ, "GITHUB_REF_NAME": "v0.3.0"},
-        capture_output=True,
-    )
+    _stage_fake_velopack_publish_bundles(tmp_path)
+    _run_publish_rename_step(tmp_path)
 
     root = "MatteLoop-v0.3.0-windows-x64"
     with zipfile.ZipFile(

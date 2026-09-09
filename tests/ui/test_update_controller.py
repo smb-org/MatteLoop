@@ -5,7 +5,6 @@ import json
 import os
 import sys
 import time
-from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from fractions import Fraction
 from pathlib import Path, PureWindowsPath
@@ -38,6 +37,7 @@ from matteloop.updates import (
     update_feed_url,
     update_package_url,
 )
+from tests.update_fakes import FakeResponse, FakeTransport
 
 
 @dataclass(frozen=True)
@@ -90,48 +90,6 @@ class _Manager:
         self.apply_calls.append((update, silent, restart))
 
 
-class _Response:
-    def __init__(
-        self, body: bytes, *, on_read: Callable[[], None] | None = None
-    ) -> None:
-        self.body = body
-        self.on_read = on_read
-        self.read_once = False
-        self.headers: Mapping[str, str] = {}
-        self.closed = False
-
-    def read(self, _size: int) -> bytes:
-        if self.read_once:
-            return b""
-        self.read_once = True
-        if self.on_read is not None:
-            self.on_read()
-        return self.body
-
-    def close(self) -> None:
-        self.closed = True
-
-
-class _Transport:
-    def __init__(self, responses: Mapping[str, _Response | BaseException]) -> None:
-        self.responses = dict(responses)
-        self.calls: list[str] = []
-
-    def open(
-        self,
-        url: str,
-        _cancelled: Callable[[], bool],
-        *,
-        headers: Mapping[str, str] | None = None,
-    ) -> _Response:
-        del headers
-        self.calls.append(url)
-        response = self.responses[url]
-        if isinstance(response, BaseException):
-            raise response
-        return response
-
-
 @pytest.fixture(autouse=True)
 def _supported_platform(monkeypatch) -> None:
     """Pin the runtime platform: the feed channel is derived from it.
@@ -147,8 +105,8 @@ def _download_transport(
     version: str = "0.4.0",
     package: bytes = b"package",
     *,
-    package_response: _Response | BaseException | None = None,
-) -> tuple[_Transport, _Asset]:
+    package_response: FakeResponse | BaseException | None = None,
+) -> tuple[FakeTransport, _Asset]:
     asset = _Asset(
         version,
         "io.github.smb-org.matteloop-0.4.0-osx-arm64-full.nupkg",
@@ -167,11 +125,11 @@ def _download_transport(
         }
     ).encode()
     return (
-        _Transport(
+        FakeTransport(
             {
-                update_feed_url(version, platform="darwin"): _Response(feed),
+                update_feed_url(version, platform="darwin"): FakeResponse(feed),
                 update_package_url(version, asset.FileName): (
-                    package_response or _Response(package)
+                    package_response or FakeResponse(package)
                 ),
             }
         ),
@@ -222,7 +180,7 @@ def _controller(
     *,
     manager: _Manager | None = None,
     store: ReducerStore | None = None,
-    transport: _Transport | None = None,
+    transport: FakeTransport | None = None,
 ) -> tuple[MainWindow, UpdateController, _Reader]:
     if store is None:
         store = ReducerStore(AppState())
@@ -377,7 +335,7 @@ def test_download_progress_reaches_the_banner_and_finishes_ready(
     monkeypatch, qtbot, tmp_path: Path
 ) -> None:
     transport, asset = _download_transport()
-    transport.responses[update_package_url("0.4.0", asset.FileName)] = _Response(
+    transport.responses[update_package_url("0.4.0", asset.FileName)] = FakeResponse(
         b"package", on_read=lambda: time.sleep(0.25)
     )
     info = _UpdateInfo(asset)
@@ -461,7 +419,7 @@ def test_cancel_stops_the_transport_and_leaves_no_package(
     monkeypatch, qtbot, tmp_path: Path
 ) -> None:
     transport, asset = _download_transport()
-    transport.responses[update_package_url("0.4.0", asset.FileName)] = _Response(
+    transport.responses[update_package_url("0.4.0", asset.FileName)] = FakeResponse(
         b"package", on_read=lambda: time.sleep(0.25)
     )
     manager = _Manager(pending_values=[None, _UpdateInfo(asset)])

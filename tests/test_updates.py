@@ -18,6 +18,7 @@ from matteloop.updates import (
     update_feed_url,
     update_package_url,
 )
+from tests.update_fakes import FakeResponse, FakeTransport
 
 
 class _Response:
@@ -64,56 +65,12 @@ class _Transport:
         return self.response
 
 
-class _DownloadResponse:
-    def __init__(
-        self, body: bytes, *, on_read: Callable[[], None] | None = None
-    ) -> None:
-        self.body = body
-        self.on_read = on_read
-        self.read_once = False
-        self.headers: Mapping[str, str] = {}
-        self.closed = False
-
-    def read(self, _size: int) -> bytes:
-        if self.read_once:
-            return b""
-        self.read_once = True
-        if self.on_read is not None:
-            self.on_read()
-        return self.body
-
-    def close(self) -> None:
-        self.closed = True
-
-
-class _DownloadTransport:
-    def __init__(
-        self, responses: Mapping[str, _DownloadResponse | BaseException]
-    ) -> None:
-        self.responses = dict(responses)
-        self.calls: list[str] = []
-
-    def open(
-        self,
-        url: str,
-        _cancelled: Callable[[], bool],
-        *,
-        headers: Mapping[str, str] | None = None,
-    ) -> _DownloadResponse:
-        del headers
-        self.calls.append(url)
-        response = self.responses[url]
-        if isinstance(response, BaseException):
-            raise response
-        return response
-
-
 def _package_fixture(
     package: bytes = b"nupkg-content",
     *,
     version: str = "0.4.0",
-    package_response: _DownloadResponse | BaseException | None = None,
-) -> tuple[_DownloadTransport, str]:
+    package_response: FakeResponse | BaseException | None = None,
+) -> tuple[FakeTransport, str]:
     filename = "io.github.smb-org.matteloop-0.4.0-osx-arm64-full.nupkg"
     feed = json.dumps(
         {
@@ -136,11 +93,11 @@ def _package_fixture(
         }
     ).encode()
     return (
-        _DownloadTransport(
+        FakeTransport(
             {
-                update_feed_url(version, platform="darwin"): _DownloadResponse(feed),
+                update_feed_url(version, platform="darwin"): FakeResponse(feed),
                 update_package_url(version, filename): package_response
-                or _DownloadResponse(package),
+                or FakeResponse(package),
             }
         ),
         filename,
@@ -259,13 +216,13 @@ def test_update_download_checksum_mismatch_removes_the_part_file(
     tmp_path: Path,
 ) -> None:
     transport, filename = _package_fixture(
-        package_response=_DownloadResponse(b"different-content")
+        package_response=FakeResponse(b"different-content")
     )
     feed_url = update_feed_url("0.4.0", platform="darwin")
     package_url = update_package_url("0.4.0", filename)
     body = json.loads(transport.responses[feed_url].body)
     body["Assets"][1]["SHA256"] = hashlib.sha256(b"nupkg-content").hexdigest()
-    transport.responses[feed_url] = _DownloadResponse(json.dumps(body).encode())
+    transport.responses[feed_url] = FakeResponse(json.dumps(body).encode())
 
     with pytest.raises(ValueError, match="SHA256"):
         download_update(
@@ -285,7 +242,7 @@ def test_update_download_checksum_mismatch_removes_the_part_file(
 def test_update_download_cancellation_removes_the_part_file(tmp_path: Path) -> None:
     cancellation = Event()
     transport, filename = _package_fixture(
-        package_response=_DownloadResponse(b"nupkg-content", on_read=cancellation.set)
+        package_response=FakeResponse(b"nupkg-content", on_read=cancellation.set)
     )
 
     with pytest.raises(UpdateDownloadCancelled):
