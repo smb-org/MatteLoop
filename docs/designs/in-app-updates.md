@@ -8,7 +8,8 @@ Repo: smb-org/MatteLoop
 Status: REVIEWED — maintainer decisions folded in the same day; Phase 1 is in
 implementation; Phases 2–3 are implemented and wait on the qualification gate
 in "The gate" — Stage 0 and A1 passed, A2 is re-run on the rebuilt download
-path. No open questions remain.
+path. One open question remains, raised by A3: whether an elevation prompt
+from the helper is acceptable for an unsigned application.
 
 ## Problem statement
 
@@ -136,10 +137,21 @@ away:
   Windows says so in its own code. #74 asked for the working installation to
   be retained; **the maintainer has accepted this window instead**, on the
   ground that nothing the user owns lives inside the application package, so a
-  manual reinstall from the releases page is always a complete recovery. The
-  gate still measures it (A3, B7) to learn how large the window is, the
-  failure mode is named in the release notes, and the project must not build a
-  journal to compensate (G3).
+  manual reinstall from the releases page is always a complete recovery.
+  **Measured at A3:** the window is two consecutive `rename()` calls on one
+  filesystem; the extraction — the slow part — finishes before either. A
+  watcher polling every 2 ms and killing the helper the instant the bundle
+  vanished never hit it, and the installation came up as the new version. The
+  exposure is microseconds of metadata operations, not a 380 MB copy; it gets
+  one sentence in the release notes, not a warning, and the project must not
+  build a journal to compensate (G3). B7 measures the same on Windows.
+- *An unwritable install root ends in an elevation prompt, not a failure —
+  measured at A3.* With the installation directory made read-only, the helper
+  did not give up; Velopack showed "Administrator Permission Required —
+  MatteLoop needs administrator permission to install version 0.3.1." The
+  review had noted the helper's permission-error elevation path and the design
+  treated it as theoretical. It is not, and it raises the one open question
+  below.
 - *"Wait for exit" is a 60 s wait that continues on timeout.* On Windows the
   helper then force-stops every process running from the install root. A
   worker that outlived the bounded shutdown waits can be killed. This is a gate
@@ -255,20 +267,26 @@ failed manual check reports in the Preferences label. A failed download is the
 does not recognise after it was written (Decision 3) — and *Try again*
 repeats it while *Open releases page* is the way out. A failure inside the helper after
 exit cannot be shown by this process; the next launch runs the check again,
-and the dialog's *Open releases page* is the recovery path. If the swap itself
-failed half-way (Decision 1), there is no next launch: on macOS the Dock icon
-or the Finder entry no longer opens anything, on Windows the shortcut reports a
-missing target. What the user does is download the current release from the
-releases page and install it as on day one — settings, weights, cuts and
-exports are untouched because none of them live in the package. The release
-notes for the first self-updating release say exactly this. Before the
-download, two advisory checks select *Open releases
-page* instead of *Download update*, because the outcome is known: the
-executable path contains `/AppTranslocation/` (macOS), or the Velopack helper
-and manifest are not where the layout in Decision 3 puts them (a source run, a
-raw `.dist` copy), or the install root is not writable. They are advisory; a
-layout that looks right is not proof that a swap will succeed, and no further
-pre-flight is built.
+and the dialog's *Open releases page* is the recovery path. In the
+microseconds-wide case where the swap itself fails between its two renames
+(Decision 1), nothing launches; the user downloads the current release and
+installs it as on day one, and loses nothing, because nothing of theirs lives
+in the package. One sentence in the first release notes covers it.
+
+Before the download, advisory checks select *Open releases page* instead of
+*Download update* where the outcome is known: the executable path contains
+`/AppTranslocation/` (macOS), the Velopack helper and manifest are not where
+the layout in Decision 3 puts them (a source run, a raw `.dist` copy), or the
+install root is not writable. They are advisory in a stronger sense than "the
+swap may still fail": **a failure after the download can end in an elevation
+prompt from Velopack's helper** — measured at A3, a read-only install root
+produced "Administrator Permission Required" rather than a failed swap. The
+checks reduce the chance of reaching that prompt (a root that is unwritable
+before the download is caught); they cannot prevent it (a root that becomes
+unwritable between download and quit, or a permission the pre-check does not
+model, is not). Whether that prompt is acceptable at all is the open question
+at the end of this document; no further pre-flight is built until it is
+answered.
 
 A translocated install therefore offers the browser rather than updating
 itself, and that is a deliberate simplification. #77 measured that the
@@ -661,12 +679,18 @@ not the full Velopack apply.
 - A2. **A → B through the real updater.** Publish B; A finds it, downloads it,
   installs on quit, relaunches as B with settings, cuts and a downloaded model
   intact.
-- A3. **Failed swap.** Force the second rename to fail on a disposable install
-  (make the staged bundle immovable with `chflags uchg`, or the
-  `/Applications` entry unwritable). Record what is left on disk and whether A
-  still launches. 1.2.0 is expected to leave a broken installation; that
-  outcome is accepted (Decision 1) and does not stop the updater — the item
-  measures the window and supplies the observed facts for the recovery text.
+- A3. **Failed swap — measured.** Two variants on a disposable install.
+  *Killing the helper between its renames:* a 2 ms poll that killed the helper
+  the instant the bundle disappeared never caught the gap; the apply completed
+  and the installation came up as 0.3.1. The no-rollback window is two
+  adjacent `rename()` calls after extraction, accepted and sized (Decision 1).
+  *Read-only install root:* the helper did not fail; it showed "Administrator
+  Permission Required — MatteLoop needs administrator permission to install
+  version 0.3.1." The prompt was cancelled, no elevation was granted, the
+  permissions were restored, the installation was unchanged. This is a design
+  finding, not a record: it contradicts the advisory-check paragraph in
+  Decision 2 as first written and puts the open question below to the
+  maintainer.
 - A4. **Work at quit.** Quit for install with a worker blocked the way the
   #111 harness blocks one. **Requirement: the helper defers or refuses;
   nothing is killed.**
@@ -758,11 +782,15 @@ behaviour proves nothing, and no test is written to pretend otherwise.
 - Stage A fails: A2 does not update through the real feed, or A4 kills a
   stalled worker and no Velopack version in reach passes it. Stop at Phase 1
   on both platforms; Windows is never started.
-- A3 or B7 shows a window larger than "the swap failed": for instance the
-  helper deleting the old bundle *before* attempting the second rename, or
-  leaving a half-copied `current\` that launches and misbehaves. The accepted
-  failure mode is "nothing launches, reinstall"; a bundle that starts and is
-  wrong is a different failure and is not accepted.
+- B7 shows a window on Windows larger than the two renames A3 measured on
+  macOS — for instance a half-copied `current\` that launches and misbehaves.
+  The accepted failure mode is "nothing launches, reinstall"; a bundle that
+  starts and is wrong is a different failure and is not accepted.
+- The maintainer rules the elevation prompt unacceptable and no pre-check can
+  guarantee an unwritable root never reaches the apply step (A3). Then the
+  helper's escalation has to be prevented at the source — a Velopack option,
+  an upstream change, or not shipping the apply path — and that is a re-plan,
+  not a patch.
 - The packed full bundle does not launch through the first-install route
   because `vpk`'s additions broke the seal in a way the nested-file failure did
   not. Re-plan means measuring `--signAppIdentity -` against the known nested
@@ -784,7 +812,8 @@ behaviour proves nothing, and no test is written to pretend otherwise.
 ## Decisions recorded from the maintainer (2026-09-09)
 
 - The failed-rename window is accepted; recovery is a manual reinstall from
-  the releases page (Decision 1, gate items A3 and B7).
+  the releases page (Decision 1). A3 has since sized it at two adjacent
+  syscalls; B7 measures Windows.
 - Two instances from one installation are not supported (Decision 5).
 - The portable Windows distribution stays; #134 remains open until the
   archive layout is checked at the gate (Decision 3, gate item B3).
@@ -802,6 +831,26 @@ behaviour proves nothing, and no test is written to pretend otherwise.
   package and the SDK only applies, through an explicit locator (Decisions 2
   and 3). A2 is re-run on the rebuilt path.
 
-## Open questions
+## Open question for the maintainer
 
-None.
+1. **Is an administrator prompt acceptable at all from an application that
+   ships unsigned by decision?** A3 measured that Velopack's helper, meeting an
+   install root it cannot write, asks for elevation ("Administrator Permission
+   Required — MatteLoop needs administrator permission to install version
+   0.3.1") instead of failing. A user asked for their password by an unsigned
+   application cannot verify what they are authorising, and refusing is the
+   correct instinct. The choices:
+   - (a) **Accept it** for the rare read-only-install case, and say so in the
+     documentation: the prompt is Velopack's, it appears only when the
+     installation directory is not writable by the user, and cancelling it
+     leaves the installed version untouched (measured). The advisory pre-check
+     stays as a way of making the case rarer.
+   - (b) **Keep an install that cannot write its own root from ever reaching
+     the apply step.** That is what the advisory check was meant to do and
+     demonstrably cannot guarantee from inside the application; guaranteeing it
+     means the helper must not escalate, which is a Velopack option if one
+     exists, an upstream change otherwise, or not shipping the apply path for
+     that case.
+   The trade-off is between a rare prompt that a careful user will refuse and
+   a guarantee the application cannot currently give. The design does not pick;
+   nothing about the apply path is published to users before this is answered.
