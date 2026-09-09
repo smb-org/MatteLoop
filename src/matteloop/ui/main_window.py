@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from PySide6.QtCore import QByteArray, QSettings, Qt, QTimer
+from PySide6.QtCore import QByteArray, QCoreApplication, QSettings, Qt, QTimer
 from PySide6.QtGui import QFontMetrics
 from PySide6.QtWidgets import (
     QFrame,
@@ -159,6 +159,44 @@ class MainWindow(QMainWindow):
         self.runtime_banner.setWordWrap(True)
         runtime_layout.addWidget(self.runtime_banner)
         self.runtime_container.setVisible(self._runtime_unavailable)
+        self.update_container = QFrame()
+        self.update_container.setObjectName("update_banner_container")
+        self.update_container.setAccessibleName(
+            QCoreApplication.translate("UpdateBanner", "Update notice")
+        )
+        update_layout = QVBoxLayout(self.update_container)
+        update_layout.setContentsMargins(16, 8, 16, 8)
+        update_layout.setSpacing(4)
+        self.update_banner = QLabel()
+        self.update_banner.setObjectName("update_banner")
+        self.update_banner.setAccessibleName(
+            QCoreApplication.translate("UpdateBanner", "Update notice")
+        )
+        self.update_banner.setWordWrap(True)
+        update_layout.addWidget(self.update_banner)
+        update_actions_row = QWidget()
+        update_actions_row.setObjectName("update_actions_row")
+        update_actions_layout = QHBoxLayout(update_actions_row)
+        update_actions_layout.setContentsMargins(0, 0, 0, 0)
+        update_actions_layout.addStretch(1)
+        self.update_open_releases_button = QPushButton(
+            QCoreApplication.translate("UpdateBanner", "Open releases page")
+        )
+        self.update_open_releases_button.setObjectName("update_open_releases")
+        self.update_open_releases_button.setAccessibleName(
+            QCoreApplication.translate("UpdateBanner", "Open releases page")
+        )
+        self.update_not_now_button = QPushButton(
+            QCoreApplication.translate("UpdateBanner", "Not now")
+        )
+        self.update_not_now_button.setObjectName("update_not_now")
+        self.update_not_now_button.setAccessibleName(
+            QCoreApplication.translate("UpdateBanner", "Not now")
+        )
+        update_actions_layout.addWidget(self.update_open_releases_button)
+        update_actions_layout.addWidget(self.update_not_now_button)
+        update_layout.addWidget(update_actions_row)
+        self.update_container.hide()
         self.success_container = QFrame()
         self.success_container.setObjectName("success_banner_container")
         success_layout = QVBoxLayout(self.success_container)
@@ -202,6 +240,7 @@ class MainWindow(QMainWindow):
         self.edited_cut_recovery = self.inspector.edited_cut_recovery
         inspector_layout.addWidget(self.inspector, 1)
         inspector_layout.addWidget(self.runtime_container)
+        inspector_layout.addWidget(self.update_container)
         inspector_layout.addWidget(self.success_container)
         inspector_layout.addWidget(self.action_shelf)
         root.addWidget(inspector_column)
@@ -254,6 +293,8 @@ class MainWindow(QMainWindow):
         widgets.extend(
             [
                 *self.inspector.tab_widgets(),
+                self.update_open_releases_button,
+                self.update_not_now_button,
                 self.success_banner,
                 self.open_output_button,
                 self.open_folder_button,

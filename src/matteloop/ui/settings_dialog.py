@@ -4,10 +4,14 @@ from __future__ import annotations
 
 from PySide6.QtCore import QCoreApplication, QSettings, QSignalBlocker
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QDialog,
     QDialogButtonBox,
+    QFormLayout,
+    QHBoxLayout,
     QLabel,
+    QPushButton,
     QVBoxLayout,
     QWidget,
 )
@@ -35,6 +39,7 @@ from matteloop.ui.i18n import (
     translate_language_name,
 )
 from matteloop.ui.ports import StateStore, WindowServices
+from matteloop.ui.preferences import load_check_on_startup, persist_check_on_startup
 
 
 class SettingsDialog(QDialog):
@@ -85,6 +90,30 @@ class SettingsDialog(QDialog):
         )
         for option in self._provider_options:
             self.provider_picker.addItem("", option.provider)
+        self.updates_check_on_startup = QCheckBox(
+            QCoreApplication.translate(
+                "SettingsDialog", "Check for updates when MatteLoop starts"
+            )
+        )
+        self.updates_check_on_startup.setObjectName("updates_check_on_startup")
+        self.updates_check_on_startup.setAccessibleName(
+            QCoreApplication.translate(
+                "SettingsDialog", "Check for updates when MatteLoop starts"
+            )
+        )
+        self.updates_status_label = QLabel()
+        self.updates_status_label.setObjectName("updates_status")
+        self.updates_status_label.setAccessibleName(
+            QCoreApplication.translate("SettingsDialog", "Updates")
+        )
+        self.updates_status_label.setProperty("secondary", True)
+        self.check_for_updates_button = QPushButton(
+            QCoreApplication.translate("SettingsDialog", "Check for updates")
+        )
+        self.check_for_updates_button.setObjectName("check_for_updates")
+        self.check_for_updates_button.setAccessibleName(
+            QCoreApplication.translate("SettingsDialog", "Check for updates")
+        )
         self.button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
         self.button_box.setObjectName("settings_actions")
         self.button_box.setAccessibleName(
@@ -136,6 +165,7 @@ class SettingsDialog(QDialog):
         )
         provider_label_widget.setBuddy(self.provider_picker)
         form.addRow(provider_label_widget, self.provider_picker)
+        self._add_updates_row(form)
 
         self.heading_label = QLabel(
             QCoreApplication.translate("SettingsDialog", "Preferences")
@@ -149,9 +179,27 @@ class SettingsDialog(QDialog):
         layout.addLayout(form)
         layout.addWidget(self.button_box)
 
+    def _add_updates_row(self, form: QFormLayout) -> None:
+        updates_row = QWidget()
+        updates_layout = QVBoxLayout(updates_row)
+        updates_layout.setContentsMargins(0, 0, 0, 0)
+        updates_layout.setSpacing(4)
+        updates_layout.addWidget(self.updates_check_on_startup)
+        updates_layout.addWidget(self.updates_status_label)
+        check_row = QWidget()
+        check_layout = QHBoxLayout(check_row)
+        check_layout.setContentsMargins(0, 0, 0, 0)
+        check_layout.addWidget(self.check_for_updates_button)
+        check_layout.addStretch(1)
+        updates_layout.addWidget(check_row)
+        updates_label = QLabel(QCoreApplication.translate("SettingsDialog", "Updates"))
+        updates_label.setBuddy(self.updates_check_on_startup)
+        form.addRow(updates_label, updates_row)
+
     def _connect_controls(self) -> None:
         self.language_selector.currentIndexChanged.connect(self._language_changed)
         self.provider_picker.currentIndexChanged.connect(self._provider_changed)
+        self.updates_check_on_startup.toggled.connect(self._updates_changed)
         self.button_box.rejected.connect(self.reject)
         close_button = self.button_box.button(QDialogButtonBox.StandardButton.Close)
         if close_button is not None:
@@ -159,8 +207,12 @@ class SettingsDialog(QDialog):
                 QCoreApplication.translate("SettingsDialog", "Close preferences")
             )
         self.setTabOrder(self.language_selector, self.provider_picker)
+        self.setTabOrder(self.provider_picker, self.updates_check_on_startup)
+        self.setTabOrder(
+            self.updates_check_on_startup, self.check_for_updates_button
+        )
         if close_button is not None:
-            self.setTabOrder(self.provider_picker, close_button)
+            self.setTabOrder(self.check_for_updates_button, close_button)
 
     def load(self) -> None:
         """Reload the current reducer-owned value before showing the dialog."""
@@ -186,6 +238,10 @@ class SettingsDialog(QDialog):
             if provider_index >= 0:
                 self.provider_picker.setCurrentIndex(provider_index)
         self.provider_picker.setEnabled(state.job.phase is JobState.IDLE)
+        with QSignalBlocker(self.updates_check_on_startup):
+            self.updates_check_on_startup.setChecked(
+                load_check_on_startup(self._settings)
+            )
 
     def _provider_changed(self, _index: int) -> None:
         provider = self.provider_picker.currentData()
@@ -196,3 +252,6 @@ class SettingsDialog(QDialog):
         language = self.language_selector.itemData(index)
         if isinstance(language, str):
             persist_language(self._settings, language)
+
+    def _updates_changed(self, enabled: bool) -> None:
+        persist_check_on_startup(self._settings, enabled)

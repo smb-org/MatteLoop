@@ -174,6 +174,23 @@ def test_preferences_exposes_and_emits_the_selected_execution_provider(qtbot) ->
     assert services.commands[0].execution_provider == COREML_EXECUTION_PROVIDER
 
 
+def test_preferences_exposes_and_persists_the_update_startup_setting(qtbot) -> None:
+    settings = _settings("updates")
+    dialog = SettingsDialog(
+        ReducerStore(AppState()), Services(), settings=settings
+    )
+    qtbot.addWidget(dialog)
+
+    assert dialog.updates_check_on_startup.isChecked()
+    assert dialog.updates_check_on_startup.text() == (
+        "Check for updates when MatteLoop starts"
+    )
+    assert dialog.check_for_updates_button.text() == "Check for updates"
+    dialog.updates_check_on_startup.setChecked(False)
+
+    assert settings.value("updates/check_on_startup") is False
+
+
 def test_preferences_changes_provider_before_a_video_is_loaded(qtbot) -> None:
     settings = _settings("provider-before-source")
     store = ReducerStore(AppState())

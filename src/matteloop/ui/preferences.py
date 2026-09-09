@@ -6,8 +6,10 @@ from PySide6.QtCore import QSettings
 
 from matteloop.core.execution_providers import ProviderOption, select_provider
 from matteloop.core.parameters import ParameterState, parameters_from_values
+from matteloop.ui.inspector_disclosure import read_bool
 
 _PREFIX = "parameters/"
+UPDATES_CHECK_ON_STARTUP_KEY = "updates/check_on_startup"
 _KEYS = (
     "model_id",
     "edge_mode",
@@ -63,3 +65,13 @@ def persist_parameters(settings: QSettings, parameters: ParameterState) -> None:
     else:
         settings.setValue(f"{_PREFIX}output_filename", parameters.output_filename)
     settings.setValue(f"{_PREFIX}max_mib", str(parameters.max_mib))
+
+
+def load_check_on_startup(settings: QSettings) -> bool:
+    """Read the update startup preference, defaulting to enabled."""
+    return read_bool(settings, UPDATES_CHECK_ON_STARTUP_KEY, True)
+
+
+def persist_check_on_startup(settings: QSettings, enabled: bool) -> None:
+    """Persist the update startup preference as one QSettings primitive."""
+    settings.setValue(UPDATES_CHECK_ON_STARTUP_KEY, enabled)

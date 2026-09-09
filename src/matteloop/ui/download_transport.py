@@ -5,7 +5,7 @@ from __future__ import annotations
 import ssl
 from collections.abc import Mapping
 
-from PySide6.QtCore import QEventLoop, QTimer, QUrl
+from PySide6.QtCore import QByteArray, QEventLoop, QTimer, QUrl
 from PySide6.QtNetwork import (
     QNetworkAccessManager,
     QNetworkProxyFactory,
@@ -36,13 +36,23 @@ class QtNetworkDownloadTransport:
     """Open model responses with Qt's platform trust store and proxy settings."""
 
     def open(
-        self, url: str, cancelled: CancellationCheck
+        self,
+        url: str,
+        cancelled: CancellationCheck,
+        *,
+        headers: Mapping[str, str] | None = None,
     ) -> _QtNetworkDownloadResponse:
-        return _QtNetworkDownloadResponse(url, cancelled)
+        return _QtNetworkDownloadResponse(url, cancelled, headers=headers)
 
 
 class _QtNetworkDownloadResponse:
-    def __init__(self, url: str, cancelled: CancellationCheck) -> None:
+    def __init__(
+        self,
+        url: str,
+        cancelled: CancellationCheck,
+        *,
+        headers: Mapping[str, str] | None = None,
+    ) -> None:
         QNetworkProxyFactory.setUseSystemConfiguration(True)
         self._cancelled = cancelled
         self._manager = QNetworkAccessManager()
@@ -53,6 +63,10 @@ class _QtNetworkDownloadResponse:
             QNetworkRequest.Attribute.RedirectPolicyAttribute,
             QNetworkRequest.RedirectPolicy.NoLessSafeRedirectPolicy,
         )
+        for name, value in (headers or {}).items():
+            request.setRawHeader(
+                QByteArray(name.encode("ascii")), QByteArray(value.encode("utf-8"))
+            )
         self._reply = self._manager.get(request)
         self._tls_error = False
         self._closed = False
