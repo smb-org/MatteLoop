@@ -42,6 +42,9 @@ if __name__ == "__main__":
 
         resource_tracker_main(interpreter_fd)
     else:
+        from velopack import App
+
+        App().set_auto_apply_on_startup(False).run()
         from matteloop.app import main
 
         raise SystemExit(main())

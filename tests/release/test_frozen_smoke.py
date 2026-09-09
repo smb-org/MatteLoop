@@ -479,6 +479,7 @@ def test_pyside_deploy_spec_parses_to_required_native_bundle_contract() -> None:
 
     args = set(shlex.split(parser.get("nuitka", "extra_args")))
     assert "--include-package=matteloop" in args
+    assert "--include-package=velopack" in args
     assert "--include-module=matteloop.smoke_child" in args
     assert "--include-module=rembg.sessions.base" in args
     assert {
@@ -558,6 +559,7 @@ def test_native_bundle_includes_project_license_notices() -> None:
     ) in args
     assert "--include-data-files=legal/GPL-3.0.txt=GPL-3.0.txt" in args
     assert "--include-data-files=legal/LGPL-3.0.txt=LGPL-3.0.txt" in args
+    assert "--include-data-files=legal/VELOPACK-MIT.txt=VELOPACK-MIT.txt" in args
     assert (
         "--include-data-files=legal/QT-PYSIDE-LGPL-NOTICE.md=QT-PYSIDE-LGPL-NOTICE.md"
     ) in args
@@ -771,12 +773,14 @@ def test_release_workflow_builds_on_dispatch_tags_and_media_stack_changes() -> N
     assert cache_stats["shell"] == "bash"
     assert "du -sh" in cache_stats["run"]
     assert "ccache -s" in cache_stats["run"]
-    assert steps.index(cache_stats) == build_index + 1
+    assert steps.index(cache_stats) > build_index
 
     upload = next(step for step in steps if step.get("id") == "upload")
     assert upload["if"] == "runner.os == 'Windows'"
     assert upload["with"]["name"] == "MatteLoop-unsigned-${{ matrix.target }}"
-    assert upload["with"]["path"] == "dist"
+    assert upload["with"]["path"] == (
+        "dist/MatteLoop.dist\ndist/MatteLoop-*-sources-*"
+    )
     # On macOS, delocate's av/.dylibs and other hidden directories travel
     # inside the ditto archive; this hidden-file setting belongs to Windows.
     assert upload["with"]["include-hidden-files"] is True
@@ -802,9 +806,9 @@ def test_release_workflow_builds_on_dispatch_tags_and_media_stack_changes() -> N
     assert "dist/MatteLoop-*-sources-*" in macos_upload["with"]["path"]
     serialized = json.dumps(workflow).lower()
     assert "secrets." not in serialized
-    assert "codesign" not in serialized
     assert "signing" not in serialized
     assert "notar" not in serialized
+    assert "--signAppIdentity" not in serialized
 
     # Publishing exists but stays gated on a version tag, uses the job token
     # rather than a stored credential, and leaves the release as a draft so
@@ -817,6 +821,178 @@ def test_release_workflow_builds_on_dispatch_tags_and_media_stack_changes() -> N
     assert create["env"] == {"GH_TOKEN": "${{ github.token }}"}
     assert "--draft" in create["run"]
     assert publish["steps"].index(validation) < publish["steps"].index(create)
+    assert steps.index(cache_stats) > build_index
+
+
+def test_release_workflow_packs_pinned_velopack_outputs() -> None:
+    workflow_path = REPOSITORY_ROOT / ".github" / "workflows" / "release.yml"
+    workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
+    plan_steps = workflow["jobs"]["plan"]["steps"]
+    checkout = next(step for step in plan_steps if step.get("name") == "Checkout")
+    assert checkout["uses"].startswith("actions/checkout@")
+    tag_check = next(
+        step
+        for step in plan_steps
+        if step.get("name") == "Assert tag matches package version"
+    )
+    assert tag_check["if"] == "startsWith(github.ref, 'refs/tags/v')"
+    assert "GITHUB_REF_NAME#v" in tag_check["run"]
+    assert "grep" in tag_check["run"]
+
+    native_steps = workflow["jobs"]["native-package"]["steps"]
+    stage_zero = next(
+        step for step in native_steps if step["name"].startswith("Stage 0")
+    )
+    assert stage_zero["if"] == "runner.os == 'macOS'"
+    assert "mv dist/MatteLoop.app dist/MatteLoop-stage0-original.app" in stage_zero[
+        "run"
+    ]
+    assert "mv dist/MatteLoop-stage0-copy.app dist/MatteLoop.app" in stage_zero[
+        "run"
+    ]
+    assert "Contents/MacOS/matteloop --version" in stage_zero["run"]
+
+    install = next(
+        step for step in native_steps if step["name"] == "Install pinned Velopack CLI"
+    )
+    assert install["run"] == (
+        "dotnet tool install vpk --version 1.2.0 --tool-path .vpk"
+    )
+
+    mac_pack = next(
+        step
+        for step in native_steps
+        if step["name"] == "Pack macOS Velopack release"
+    )
+    assert mac_pack["if"] == "runner.os == 'macOS'"
+    assert '"[osx]" pack' in mac_pack["run"]
+    for flag in (
+        "--packId io.github.smb-org.matteloop",
+        "--mainExe matteloop",
+        "--channel osx-arm64",
+        "--runtime osx-arm64",
+        "--packTitle MatteLoop",
+        "--noInst",
+        "--delta None",
+        "--outputDir dist/velopack",
+    ):
+        assert flag in mac_pack["run"]
+
+    win_pack = next(
+        step
+        for step in native_steps
+        if step["name"] == "Pack Windows Velopack release"
+    )
+    assert win_pack["if"] == "runner.os == 'Windows'"
+    assert '"[win]" pack' in win_pack["run"]
+    for flag in (
+        "--packId io.github.smb-org.matteloop",
+        "--mainExe matteloop.exe",
+        "--channel win-x64",
+        "--runtime win-x64",
+        "--icon assets\\branding\\matteloop\\derived\\matteloop.ico",
+        "--shortcuts StartMenuRoot",
+        "--delta None",
+    ):
+        assert flag in win_pack["run"]
+    assert "--noPortable" not in win_pack["run"]
+
+    signature = next(
+        step
+        for step in native_steps
+        if step["name"] == "Record packed macOS code signature"
+    )
+    assert "codesign --verify --deep" in signature["run"]
+    assert "not a gate" in signature["run"]
+
+    upload = next(
+        step for step in native_steps if step["name"] == "Upload Velopack output"
+    )
+    assert upload["with"] == {
+        "name": "MatteLoop-velopack-${{ matrix.target }}",
+        "path": "dist/velopack",
+        "if-no-files-found": "error",
+        "include-hidden-files": True,
+    }
+
+    serialized = json.dumps(workflow)
+    assert "release_to" not in serialized
+    assert "vpk upload" not in serialized
+    assert "vpk download" not in serialized
+
+
+@pytest.mark.parametrize("package_version", ["0.3.0", "0.3.1"])
+def test_release_tag_assertion_accepts_only_the_matching_package_version(
+    tmp_path: Path, package_version: str
+) -> None:
+    workflow_path = REPOSITORY_ROOT / ".github" / "workflows" / "release.yml"
+    workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
+    tag_check = next(
+        step
+        for step in workflow["jobs"]["plan"]["steps"]
+        if step.get("name") == "Assert tag matches package version"
+    )
+    source = tmp_path / "src" / "matteloop"
+    source.mkdir(parents=True)
+    (source / "__init__.py").write_text(
+        '__version__ = "0.3.0"\n', encoding="utf-8"
+    )
+
+    completed = subprocess.run(
+        ["bash", "-e", "-c", tag_check["run"]],
+        cwd=tmp_path,
+        check=False,
+        env={**os.environ, "GITHUB_REF_NAME": f"v{package_version}"},
+        capture_output=True,
+    )
+
+    assert completed.returncode == (0 if package_version == "0.3.0" else 1)
+
+
+def test_publish_renames_both_velopack_platform_outputs_and_requires_completeness(
+    tmp_path: Path,
+) -> None:
+    workflow_path = REPOSITORY_ROOT / ".github" / "workflows" / "release.yml"
+    workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
+    step = next(
+        s
+        for s in workflow["jobs"]["publish"]["steps"]
+        if s["name"] == "Rename Velopack assets and assert release completeness"
+    )
+
+    macos = tmp_path / "bundles" / "MatteLoop-velopack-macos-15-arm64"
+    windows = tmp_path / "bundles" / "MatteLoop-velopack-windows-2022-x64"
+    macos.mkdir(parents=True)
+    windows.mkdir(parents=True)
+    for path in (
+        macos / "releases.osx-arm64.json",
+        macos / "io.github.smb-org.matteloop-0.3.0-osx-arm64-full.nupkg",
+        macos / "velopack-macos.zip",
+        windows / "releases.win-x64.json",
+        windows / "io.github.smb-org.matteloop-0.3.0-win-x64-full.nupkg",
+        windows / "velopack-win.zip",
+        windows / "velopack-Setup.exe",
+    ):
+        path.write_bytes(b"artifact")
+
+    subprocess.run(
+        ["bash", "-e", "-c", step["run"]],
+        cwd=tmp_path,
+        check=True,
+        env={**os.environ, "GITHUB_REF_NAME": "v0.3.0"},
+        capture_output=True,
+    )
+
+    assets = {path.name for path in (tmp_path / "assets").iterdir()}
+    assert {
+        "releases.osx-arm64.json",
+        "releases.win-x64.json",
+        "io.github.smb-org.matteloop-0.3.0-osx-arm64-full.nupkg",
+        "io.github.smb-org.matteloop-0.3.0-win-x64-full.nupkg",
+        "MatteLoop-v0.3.0-macos-arm64.zip",
+        "MatteLoop-v0.3.0-windows-x64-Setup.exe",
+        "MatteLoop-v0.3.0-windows-x64.zip",
+    } <= assets
 
 
 @pytest.mark.parametrize(
@@ -997,7 +1173,7 @@ def test_release_validation_requires_an_executable_macos_launcher(
     )
     assets_dir = tmp_path / "assets"
     assets_dir.mkdir()
-    archive = assets_dir / "MatteLoop-v9.9.9-macos-15-arm64.zip"
+    archive = assets_dir / "MatteLoop-v9.9.9-macos-arm64.zip"
     launcher = zipfile.ZipInfo("MatteLoop.app/Contents/MacOS/MatteLoop")
     launcher.external_attr = launcher_mode << 16
     with zipfile.ZipFile(archive, "w") as created:

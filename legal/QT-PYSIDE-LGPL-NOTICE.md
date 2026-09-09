@@ -13,13 +13,15 @@ notice as `GPL-3.0.txt` and `LGPL-3.0.txt`. Practical installation information
 for rebuilding and replacing the dynamically linked components is installed as
 `RELINK.md`.
 
-Binary distribution must keep the application together with all four adjacent
-source deliverables:
-
-- its `MatteLoop-media-sources-<target>-<identity>.tar.gz` archive and
-  `.sha256` file; and
-- its `MatteLoop-qt-sources-6.10.3-<identity>.tar.gz` companion and `.sha256`
-  file.
+MatteLoop publishes each application and update package with access to its
+matching source companions at
+`https://github.com/smb-org/MatteLoop/releases/tag/v<version>`. The media and
+Qt source archives and checksums are separate downloads; they are not required
+to run or update the application. Packages retain the applicable licence
+notices and library-replacement instructions. Redistribution must preserve the
+applicable licences and provide the required corresponding source through a
+permitted method. For network distribution under GPLv3 §6(d), source may be on
+another server with equivalent access and clear directions beside the binary.
 
 The Qt companion contains the original, unmodified official source archives
 for Qt Base 6.10.3, Qt Image Formats 6.10.3, and PySide Setup 6.10.3, plus

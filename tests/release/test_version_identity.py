@@ -4,6 +4,7 @@ import configparser
 import plistlib
 import shlex
 import subprocess
+import tomllib
 from collections.abc import Callable
 from pathlib import Path
 from types import SimpleNamespace
@@ -85,6 +86,20 @@ def test_native_packaging_version_matches_the_package_version() -> None:
     assert f"--macos-app-version={configured_version}" in args
     assert f"--macos-signed-app-name={BUNDLE_IDENTIFIER}" in args
     assert "--macos-app-name=MatteLoop" in args
+
+
+def test_velopack_runtime_dependency_is_pinned_in_project_and_lock() -> None:
+    project = tomllib.loads((REPOSITORY_ROOT / "pyproject.toml").read_text())
+    assert "velopack==1.2.0" in project["project"]["dependencies"]
+
+    lock = tomllib.loads((REPOSITORY_ROOT / "uv.lock").read_text())
+    application = next(
+        package for package in lock["package"] if package["name"] == "matteloop"
+    )
+    assert {
+        "name": "velopack",
+        "specifier": "==1.2.0",
+    } in application["metadata"]["requires-dist"]
 
 
 def test_macos_bundle_metadata_identifies_and_verifies_the_current_build(

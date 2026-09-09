@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import importlib.util
+import runpy
+import sys
 from pathlib import Path
 from types import ModuleType
 
@@ -50,3 +52,41 @@ def test_application_arguments_without_interpreter_code_are_preserved() -> None:
 
     assert payload is None
     assert argv == ["matteloop", "--version"]
+
+
+def test_plain_application_argv_runs_velopack_before_the_application(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[object] = []
+
+    class FakeApp:
+        def set_auto_apply_on_startup(self, enabled: bool) -> FakeApp:
+            calls.append(("auto_apply", enabled))
+            return self
+
+        def run(self) -> None:
+            calls.append("run")
+
+    def fake_main(argv: list[str] | None = None) -> int:
+        calls.append(("main", argv))
+        return 0
+
+    velopack = ModuleType("velopack")
+    velopack.App = FakeApp  # type: ignore[attr-defined]
+    matteloop = ModuleType("matteloop")
+    app = ModuleType("matteloop.app")
+    app.main = fake_main  # type: ignore[attr-defined]
+    matteloop.app = app  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "velopack", velopack)
+    monkeypatch.setitem(sys.modules, "matteloop", matteloop)
+    monkeypatch.setitem(sys.modules, "matteloop.app", app)
+    monkeypatch.setattr(sys, "argv", ["matteloop", "--version"])
+
+    with pytest.raises(SystemExit) as exited:
+        runpy.run_path(
+            str(Path(__file__).parents[1] / "packaging" / "entrypoint.py"),
+            run_name="__main__",
+        )
+
+    assert exited.value.code == 0
+    assert calls == [("auto_apply", False), "run", ("main", None)]

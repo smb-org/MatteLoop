@@ -34,8 +34,39 @@ You need:
 The native prerequisite gate requires PySide6, PySide6_Essentials,
 PySide6_Addons, and shiboken6 to be installed at exactly 6.10.3. The locked
 build also includes Nuitka 2.8.10, PyAV 16.1.0, Pillow 12.3.0, NumPy 2.5.2,
-`rembg` 2.0.75, and CPU `onnxruntime` 1.29.0. Do not install a second Python
-environment for the build; run the commands below from the repository root.
+`rembg` 2.0.75, `velopack` 1.2.0, and CPU `onnxruntime` 1.29.0. Do not install
+a second Python environment for the build; run the commands below from the
+repository root.
+
+Velopack packaging uses the pinned `vpk` 1.2.0 .NET local tool. Install it
+from NuGet with the hosted runner's .NET SDK:
+
+macOS:
+
+```sh
+dotnet tool install vpk --version 1.2.0 --tool-path .vpk
+./.vpk/vpk --help
+```
+
+Windows PowerShell:
+
+```powershell
+dotnet tool install vpk --version 1.2.0 --tool-path .vpk
+.\.vpk\vpk.exe --help
+```
+
+The workflow sets `DOTNET_ROOT` to the SDK that supplies `dotnet`; no runtime
+or tool source outside NuGet is downloaded. A normal macOS install root is
+`/Applications/MatteLoop.app`. A Windows installer uses
+`%LocalAppData%\io.github.smb-org.matteloop\current\matteloop.exe`; a portable
+Windows archive keeps the same `current\matteloop.exe` layout wherever it is
+extracted. Velopack's macOS package cache is
+`~/Library/Caches/velopack/io.github.smb-org.matteloop/`.
+
+The update feed and its full packages stay on the same GitHub release as the
+application and its matching source archives. The feed must never move to
+another host unless those source archives and checksums move with it too, with
+clear directions beside the binaries.
 
 ## ONNX Runtime distribution trap
 
@@ -77,8 +108,9 @@ uv run --frozen --no-sync pyside6-lrelease resources/matteloop_en.ts resources/m
 The repository's original code, documentation, and visual assets use 0BSD.
 The native bundle includes the project's `LICENSE`, `THIRD_PARTY_NOTICES.md`,
 the complete `GPL-3.0.txt` and `LGPL-3.0.txt` texts, the prominent
-`QT-PYSIDE-LGPL-NOTICE.md`, and practical `RELINK.md`. Those installed files
-are necessary but are not by themselves sufficient to qualify a binary
+`QT-PYSIDE-LGPL-NOTICE.md`, the Velopack `VELOPACK-MIT.txt` text, and practical
+`RELINK.md`. Those installed files are necessary but are not by themselves
+sufficient to qualify a binary
 distribution: both corresponding-source archive/checksum pairs described
 below must remain beside the app.
 
@@ -309,13 +341,15 @@ hash of the media manifest, tool input and lock files, all
 `scripts/build_media_stack.py`, and `scripts/verify_media_stack.py`; it has no
 broad restore key.
 
-Windows uploads all of `dist/` as one temporary unsigned Actions artifact;
-macOS uploads the finished `MatteLoop-<target>.zip` together with the source
-archives and their checksums, and `publish` moves the archive unchanged and
-verifies the launcher is executable. It does not create a release, publish,
-sign, notarize, or permanently host the corresponding sources. A later
-authorized publication must keep all five deliverables together on a durable
-endpoint; an expiring Actions artifact is not that endpoint.
+Windows uploads the standalone bundle and source archives as one temporary
+unsigned Actions artifact; macOS uploads the pre-package archive and source
+archives, while a separate Velopack artifact carries the feeds, full packages,
+installer and portable archive. `publish` renames those assets, verifies the
+packed macOS launcher, and creates a draft release only for a tag. It does not
+sign, notarize, or move the feed to another host. A later publication must keep
+the matching application/update packages, source archives and checksums on the
+same durable release endpoint; an expiring Actions artifact is not that
+endpoint.
 
 ## Models and first launch
 

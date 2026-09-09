@@ -363,21 +363,14 @@ releases.
 The current shape cannot simply be extended: Velopack's macOS packaging
 modifies the bundle and must run on macOS, while `publish` runs on Ubuntu; the
 version must be checked against the tag before two twenty-minute builds; and
-qualification needs the same workflow to publish into a repository that is
-not the product's.
+qualification needs the same workflow artifacts to be downloaded and published
+by hand into a temporary public test release.
 
 - **`plan`** gains the tag-equals-version assertion (checkout plus one `grep`).
-- **`workflow_dispatch`** gains an input `release_to` naming a repository. When
-  set, `publish` runs for the dispatch and creates the draft release there.
-  A second repository is needed because a real A → B needs two publicly
-  readable *published* releases, and the live repository's releases are what
-  users see. It is a public repository under the same organisation
-  (`smb-org/MatteLoop-update-test` or similar), created when the gate runs and
-  deleted or left dormant afterwards. The existing account owns it, so no new
-  token and no new secret are involved; the run's own `GITHUB_TOKEN` is scoped
-  to the source repository, so the cross-repository `gh release create` uses
-  the account's existing credential. The input is present from the first
-  packaging commit.
+- **`workflow_dispatch`** keeps its existing platform input. The gate's two
+  qualification releases are published by hand from the downloaded workflow
+  artifacts with the maintainer's own `gh`; the workflow never targets another
+  repository and needs no additional Actions secret.
 - **`native-package`**, after "Build native standalone bundle":
   1. *Install vpk* — `dotnet tool install vpk --version 1.2.0 --tool-path .vpk`
      on the runner's .NET SDK; `DOTNET_ROOT` set explicitly, since the apphost
@@ -559,7 +552,7 @@ everything below; **this is the whole of the "no" branch.**
 **Phase 2 — Package** and **Phase 3 — Install** are separate pull requests
 that **share one gate and merge together or not at all.** Phase 2: the
 `velopack` dependency, the spec entry, the entrypoint change, the `vpk` steps,
-`release_to`, the tag and completeness assertions, the legal rewrite, the
+the tag and completeness assertions, the legal rewrite, the
 `docs/building.md` additions (vpk pin, `DOTNET_ROOT`, install roots, package
 cache locations). Phase 3: the SDK path in the controller — construction at
 startup, the daemon download thread, *Ready* and *Failed*, `aboutToQuit`
@@ -577,10 +570,10 @@ Everything Decision 1 lists as unknown is answered here, before any public
 distribution change. The gate is **sequential and macOS-first**: Stage A on
 macOS is the decision point, and **no Windows packaging change is published
 before Stage A has passed.** The material is the **actual full Nuitka bundle**
-built by the **real workflow** from the qualification branch and published,
-via `release_to`, into the public test repository under the same organisation
-(Decision 4) as release A, and again — from a throwaway commit that only
-raises `__version__` — as release B. Installs are disposable.
+built by the **real workflow** from the qualification branch. The maintainer
+downloads the workflow artifacts and publishes release A by hand in a
+temporary public test repository, then does the same — from a throwaway commit
+that only raises `__version__` — for release B. Installs are disposable.
 
 **Stage 0 — the macOS 15 swap, on the runner.** `native-package` already runs
 on `macos-15`. After the bundle is built and smoke-tested, a step renames

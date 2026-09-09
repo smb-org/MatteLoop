@@ -45,6 +45,15 @@
         {
           "id": "select",
           "run": "case \"${{ inputs.platform }}\" in\n  windows) targets='[{\"target\":\"windows-2022-x64\",\"os\":\"windows-2022\"}]' ;;\n  macos) targets='[{\"target\":\"macos-15-arm64\",\"os\":\"macos-15\"}]' ;;\n  *) targets='[{\"target\":\"windows-2022-x64\",\"os\":\"windows-2022\"},{\"target\":\"macos-15-arm64\",\"os\":\"macos-15\"}]' ;;\nesac\necho \"targets=$targets\" >> \"$GITHUB_OUTPUT\""
+        },
+        {
+          "name": "Checkout",
+          "uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1"
+        },
+        {
+          "name": "Assert tag matches package version",
+          "if": "startsWith(github.ref, 'refs/tags/v')",
+          "run": "version=\"${GITHUB_REF_NAME#v}\"\ngrep -Fqx \"__version__ = \\\"$version\\\"\" src/matteloop/__init__.py"
         }
       ]
     },
@@ -126,6 +135,63 @@
           "run": "uv run --frozen --no-sync python scripts/build.py"
         },
         {
+          "name": "Stage 0: verify macOS swap and relaunch",
+          "if": "runner.os == 'macOS'",
+          "run": "set -euo pipefail\nmv dist/MatteLoop.app dist/MatteLoop-stage0-original.app\ncp -R dist/MatteLoop-stage0-original.app dist/MatteLoop-stage0-copy.app\nmv dist/MatteLoop-stage0-copy.app dist/MatteLoop.app\nversion=$(sed -n 's/^__version__ = \\\"\\(.*\\)\\\"$/\\1/p' src/matteloop/__init__.py)\ntest -n \"$version\"\ntest \"$(dist/MatteLoop.app/Contents/MacOS/matteloop --version)\" = \"MatteLoop $version\"\nrm -rf dist/MatteLoop.app\nmv dist/MatteLoop-stage0-original.app dist/MatteLoop.app"
+        },
+        {
+          "name": "Set DOTNET_ROOT (macOS)",
+          "if": "runner.os == 'macOS'",
+          "run": "dotnet_path=$(realpath \"$(command -v dotnet)\")\ndotnet_bin=$(dirname \"$dotnet_path\")\nif [ -d \"$dotnet_bin/../libexec\" ]; then\n  dotnet_root=\"$(cd \"$dotnet_bin/../libexec\" && pwd)\"\nelse\n  dotnet_root=\"$dotnet_bin\"\nfi\necho \"DOTNET_ROOT=$dotnet_root\" >> \"$GITHUB_ENV\""
+        },
+        {
+          "name": "Set DOTNET_ROOT (Windows)",
+          "if": "runner.os == 'Windows'",
+          "shell": "pwsh",
+          "run": "$dotnet = (Get-Command dotnet).Source\n\"DOTNET_ROOT=$(Split-Path $dotnet)\" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append"
+        },
+        {
+          "name": "Install pinned Velopack CLI",
+          "run": "dotnet tool install vpk --version 1.2.0 --tool-path .vpk"
+        },
+        {
+          "name": "Read macOS package version",
+          "if": "runner.os == 'macOS'",
+          "run": "version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' dist/MatteLoop.app/Contents/Info.plist)\necho \"VERSION=$version\" >> \"$GITHUB_ENV\""
+        },
+        {
+          "name": "Read Windows package version",
+          "if": "runner.os == 'Windows'",
+          "shell": "pwsh",
+          "run": "$match = Select-String -Path src\\matteloop\\__init__.py -Pattern '^__version__ = \"(.*)\"$'\nif (-not $match) { throw 'src\\matteloop\\__init__.py has no __version__.' }\n$version = $match.Matches[0].Groups[1].Value\n\"VERSION=$version\" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append"
+        },
+        {
+          "name": "Pack macOS Velopack release",
+          "if": "runner.os == 'macOS'",
+          "run": "mkdir -p dist/velopack\n.vpk/vpk \"[osx]\" pack --packId io.github.smb-org.matteloop --packVersion \"$VERSION\" --packDir dist/MatteLoop.app --mainExe matteloop --channel osx-arm64 --runtime osx-arm64 --packTitle MatteLoop --noInst --delta None --outputDir dist/velopack"
+        },
+        {
+          "name": "Pack Windows Velopack release",
+          "if": "runner.os == 'Windows'",
+          "shell": "pwsh",
+          "run": "New-Item -ItemType Directory -Force dist\\velopack | Out-Null\n.vpk\\vpk.exe \"[win]\" pack --packId io.github.smb-org.matteloop --packVersion $env:VERSION --packDir dist\\MatteLoop.dist --mainExe matteloop.exe --channel win-x64 --runtime win-x64 --packTitle MatteLoop --icon assets\\branding\\matteloop\\derived\\matteloop.ico --shortcuts StartMenuRoot --delta None --outputDir dist\\velopack"
+        },
+        {
+          "name": "Verify packed macOS launcher",
+          "if": "runner.os == 'macOS'",
+          "run": "set -euo pipefail\npacked=$(find dist/velopack -maxdepth 1 -type f -name '*.zip' -print -quit)\ntest -n \"$packed\"\nextracted=$(mktemp -d)\nunzip -q \"$packed\" -d \"$extracted\"\napp=$(find \"$extracted\" -maxdepth 1 -type d -name '*.app' -print -quit)\ntest -n \"$app\"\nlauncher=\"$app/Contents/MacOS/matteloop\"\ntest -x \"$launcher\""
+        },
+        {
+          "name": "Verify packed macOS launchability",
+          "if": "runner.os == 'macOS'",
+          "run": "set -euo pipefail\npacked=$(find dist/velopack -maxdepth 1 -type f -name '*.zip' -print -quit)\ntest -n \"$packed\"\nextracted=$(mktemp -d)\nunzip -q \"$packed\" -d \"$extracted\"\napp=$(find \"$extracted\" -maxdepth 1 -type d -name '*.app' -print -quit)\ntest -n \"$app\"\nversion=\"$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' \"$app/Contents/Info.plist\")\"\ntest \"$(\"$app/Contents/MacOS/matteloop\" --version)\" = \"MatteLoop $version\""
+        },
+        {
+          "name": "Record packed macOS code signature",
+          "if": "runner.os == 'macOS'",
+          "run": "set -euo pipefail\npacked=$(find dist/velopack -maxdepth 1 -type f -name '*.zip' -print -quit)\ntest -n \"$packed\"\nextracted=$(mktemp -d)\nunzip -q \"$packed\" -d \"$extracted\"\napp=$(find \"$extracted\" -maxdepth 1 -type d -name '*.app' -print -quit)\ntest -n \"$app\"\nset +e\ncodesign --verify --deep \"$app\"\nstatus=$?\nset -e\necho \"codesign --verify --deep exit status: $status (recorded; not a gate)\""
+        },
+        {
           "name": "Report compile cache statistics",
           "if": "always()",
           "shell": "bash",
@@ -171,7 +237,7 @@
           "uses": "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
           "with": {
             "name": "MatteLoop-unsigned-${{ matrix.target }}",
-            "path": "dist",
+            "path": "dist/MatteLoop.dist\ndist/MatteLoop-*-sources-*",
             "if-no-files-found": "error",
             "include-hidden-files": true
           }
@@ -184,6 +250,16 @@
             "name": "MatteLoop-unsigned-${{ matrix.target }}",
             "path": "dist/MatteLoop-${{ matrix.target }}.zip\ndist/MatteLoop-*-sources-*",
             "if-no-files-found": "error"
+          }
+        },
+        {
+          "name": "Upload Velopack output",
+          "uses": "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+          "with": {
+            "name": "MatteLoop-velopack-${{ matrix.target }}",
+            "path": "dist/velopack",
+            "if-no-files-found": "error",
+            "include-hidden-files": true
           }
         }
       ]
@@ -201,7 +277,7 @@
           "uses": "actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
           "with": {
             "path": "bundles",
-            "pattern": "MatteLoop-unsigned-*"
+            "pattern": "MatteLoop-*"
           }
         },
         {
@@ -209,8 +285,12 @@
           "run": "mkdir -p assets\nfor bundle in bundles/MatteLoop-unsigned-*; do\n  target=\"${bundle##*/MatteLoop-unsigned-}\"\n  # The source archives beside the bundle are the LGPL corresponding\n  # sources; they ship as their own assets so the application download is\n  # not 90 MB heavier for every user. Whatever remains is the application.\n  find \"$bundle\" -maxdepth 1 -name \"MatteLoop-*-sources-*\" -exec mv {} assets/ \\;\n  if [ \"$target\" = \"macos-15-arm64\" ]; then\n    mv \"$bundle/MatteLoop-${target}.zip\" \"assets/MatteLoop-${GITHUB_REF_NAME}-${target}.zip\"\n  else\n    (cd \"$bundle\" && zip -qry \"../../assets/MatteLoop-${GITHUB_REF_NAME}-${target}.zip\" .)\n  fi\ndone\nls -lh assets"
         },
         {
+          "name": "Rename Velopack assets and assert release completeness",
+          "run": "set -euo pipefail\nmkdir -p assets\nrm -f \"assets/MatteLoop-${GITHUB_REF_NAME}-macos-15-arm64.zip\"\nrm -f \"assets/MatteLoop-${GITHUB_REF_NAME}-windows-2022-x64.zip\"\nfor package in bundles/MatteLoop-velopack-*; do\n  test -d \"$package\"\n  target=\"${package##*/MatteLoop-velopack-}\"\n  if [ \"$target\" = \"macos-15-arm64\" ]; then\n    feed=$(find \"$package\" -maxdepth 1 -type f -name 'releases.osx-arm64.json' -print -quit)\n    full=$(find \"$package\" -maxdepth 1 -type f -name '*-osx-arm64-full.nupkg' -print -quit)\n    portable=$(find \"$package\" -maxdepth 1 -type f -name '*.zip' -print -quit)\n    test -n \"$feed\" -a -n \"$full\" -a -n \"$portable\"\n    mv \"$feed\" assets/releases.osx-arm64.json\n    mv \"$full\" assets/\n    mv \"$portable\" \"assets/MatteLoop-${GITHUB_REF_NAME}-macos-arm64.zip\"\n  elif [ \"$target\" = \"windows-2022-x64\" ]; then\n    feed=$(find \"$package\" -maxdepth 1 -type f -name 'releases.win-x64.json' -print -quit)\n    full=$(find \"$package\" -maxdepth 1 -type f -name '*-win-x64-full.nupkg' -print -quit)\n    installer=$(find \"$package\" -maxdepth 1 -type f -name '*-Setup.exe' -print -quit)\n    portable=$(find \"$package\" -maxdepth 1 -type f -name '*.zip' -print -quit)\n    test -n \"$feed\" -a -n \"$full\" -a -n \"$installer\" -a -n \"$portable\"\n    mv \"$feed\" assets/releases.win-x64.json\n    mv \"$full\" assets/\n    mv \"$installer\" \"assets/MatteLoop-${GITHUB_REF_NAME}-windows-x64-Setup.exe\"\n    mv \"$portable\" \"assets/MatteLoop-${GITHUB_REF_NAME}-windows-x64.zip\"\n  else\n    echo \"unexpected Velopack artifact target: $target\" >&2\n    exit 1\n  fi\ndone\ntest -f assets/releases.osx-arm64.json\ntest -f assets/releases.win-x64.json\ntest \"$(find assets -maxdepth 1 -type f -name '*-osx-arm64-full.nupkg' | wc -l | tr -d ' ')\" = 1\ntest \"$(find assets -maxdepth 1 -type f -name '*-win-x64-full.nupkg' | wc -l | tr -d ' ')\" = 1\nls -lh assets"
+        },
+        {
           "name": "Validate macOS archive launcher permissions",
-          "run": "set -euo pipefail\narchive=\"assets/MatteLoop-${GITHUB_REF_NAME}-macos-15-arm64.zip\"\ntest -f \"$archive\"\nextracted=$(mktemp -d)\nunzip -q \"$archive\" -d \"$extracted\"\npython3 -c 'import pathlib, plistlib, sys; app = pathlib.Path(sys.argv[1]); executable = plistlib.loads((app / \"Contents\" / \"Info.plist\").read_bytes())[\"CFBundleExecutable\"]; launcher = app / \"Contents\" / \"MacOS\" / executable; assert launcher.is_file() and launcher.stat().st_mode & 0o111, f\"{launcher} is not executable\"' \"$extracted/MatteLoop.app\""
+          "run": "set -euo pipefail\narchive=\"assets/MatteLoop-${GITHUB_REF_NAME}-macos-arm64.zip\"\ntest -f \"$archive\"\nextracted=$(mktemp -d)\nunzip -q \"$archive\" -d \"$extracted\"\npython3 -c 'import pathlib, plistlib, sys; app = pathlib.Path(sys.argv[1]); executable = plistlib.loads((app / \"Contents\" / \"Info.plist\").read_bytes())[\"CFBundleExecutable\"]; launcher = app / \"Contents\" / \"MacOS\" / executable; assert launcher.is_file() and launcher.stat().st_mode & 0o111, f\"{launcher} is not executable\"' \"$extracted/MatteLoop.app\""
         },
         {
           "name": "Create the draft release",
