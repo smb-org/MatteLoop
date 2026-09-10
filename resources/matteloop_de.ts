@@ -1888,63 +1888,96 @@ Freed %s.</source>
 <context>
     <name>SettingsDialog</name>
     <message>
-        <location filename="../src/matteloop/ui/i18n.py" line="133"/>
+        <location filename="../src/matteloop/ui/i18n.py" line="146"/>
         <source>German</source>
         <translation>Deutsch</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/i18n.py" line="134"/>
+        <location filename="../src/matteloop/ui/i18n.py" line="147"/>
         <source>English</source>
         <translation>Englisch</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/settings_dialog.py" line="54"/>
-        <location filename="../src/matteloop/ui/settings_dialog.py" line="56"/>
-        <location filename="../src/matteloop/ui/settings_dialog.py" line="141"/>
+        <location filename="../src/matteloop/ui/settings_dialog.py" line="57"/>
+        <location filename="../src/matteloop/ui/settings_dialog.py" line="59"/>
+        <location filename="../src/matteloop/ui/settings_dialog.py" line="178"/>
         <source>Preferences</source>
         <translation>Einstellungen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/settings_dialog.py" line="77"/>
-        <location filename="../src/matteloop/ui/settings_dialog.py" line="130"/>
+        <location filename="../src/matteloop/ui/settings_dialog.py" line="80"/>
+        <location filename="../src/matteloop/ui/settings_dialog.py" line="157"/>
         <source>Interface language</source>
         <translation>Oberflächensprache</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/settings_dialog.py" line="84"/>
-        <location filename="../src/matteloop/ui/settings_dialog.py" line="135"/>
+        <location filename="../src/matteloop/ui/settings_dialog.py" line="87"/>
+        <location filename="../src/matteloop/ui/settings_dialog.py" line="162"/>
         <source>Compute acceleration</source>
         <translation>Beschleunigung</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/settings_dialog.py" line="91"/>
+        <location filename="../src/matteloop/ui/settings_dialog.py" line="92"/>
+        <location filename="../src/matteloop/ui/settings_dialog.py" line="98"/>
+        <source>Check for updates when MatteLoop starts</source>
+        <translation>Beim Start von MatteLoop nach Updates suchen</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/settings_dialog.py" line="105"/>
+        <location filename="../src/matteloop/ui/settings_dialog.py" line="173"/>
+        <source>Updates</source>
+        <translation>Updates</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/settings_dialog.py" line="109"/>
+        <location filename="../src/matteloop/ui/settings_dialog.py" line="113"/>
+        <source>Check for updates</source>
+        <translation>Nach Updates suchen</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/settings_dialog.py" line="118"/>
         <source>Preferences actions</source>
         <translation>Einstellungsaktionen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/settings_dialog.py" line="98"/>
+        <location filename="../src/matteloop/ui/settings_dialog.py" line="125"/>
         <source>Preferences description</source>
         <translation>Beschreibung der Einstellungen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/settings_dialog.py" line="102"/>
+        <location filename="../src/matteloop/ui/settings_dialog.py" line="129"/>
         <source>These settings apply to every clip.</source>
         <translation>Diese Einstellungen gelten für jeden Clip.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/settings_dialog.py" line="107"/>
+        <location filename="../src/matteloop/ui/settings_dialog.py" line="134"/>
         <source>Interface language changes apply after restarting MatteLoop.</source>
         <translation>Die Oberflächensprache wird nach einem Neustart von MatteLoop angewendet.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/settings_dialog.py" line="114"/>
+        <location filename="../src/matteloop/ui/settings_dialog.py" line="141"/>
         <source>Language restart note</source>
         <translation>Hinweis zum Neustart für die Sprache</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/settings_dialog.py" line="159"/>
+        <location filename="../src/matteloop/ui/settings_dialog.py" line="197"/>
         <source>Close preferences</source>
         <translation>Einstellungen schließen</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/update_controller.py" line="102"/>
+        <source>Checking for updates…</source>
+        <translation>Nach Updates wird gesucht …</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/update_controller.py" line="123"/>
+        <source>No update found.</source>
+        <translation>Kein Update gefunden.</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/update_controller.py" line="131"/>
+        <source>Couldn’t check for updates. Try again later.</source>
+        <translation>Updates konnten nicht geprüft werden. Versuchen Sie es später erneut.</translation>
     </message>
 </context>
 <context>
@@ -2424,6 +2457,32 @@ Freed %s.</source>
         <location filename="../src/matteloop/ui/transform_stage.py" line="244"/>
         <source>The current cut has unsaved transform changes. Discard them and continue?</source>
         <translation>Das aktuelle Schnittset enthält ungespeicherte Transformationsänderungen. Sollen sie verworfen und fortgefahren werden?</translation>
+    </message>
+</context>
+<context>
+    <name>UpdateBanner</name>
+    <message>
+        <location filename="../src/matteloop/ui/main_window.py" line="165"/>
+        <location filename="../src/matteloop/ui/main_window.py" line="173"/>
+        <source>Update notice</source>
+        <translation>Update-Hinweis</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/main_window.py" line="183"/>
+        <location filename="../src/matteloop/ui/main_window.py" line="187"/>
+        <source>Open releases page</source>
+        <translation>Release-Seite öffnen</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/main_window.py" line="190"/>
+        <location filename="../src/matteloop/ui/main_window.py" line="194"/>
+        <source>Not now</source>
+        <translation>Jetzt nicht</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/update_controller.py" line="146"/>
+        <source>MatteLoop %1 is available.</source>
+        <translation>MatteLoop %1 ist verfügbar.</translation>
     </message>
 </context>
 <context>

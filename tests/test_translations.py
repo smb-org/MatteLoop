@@ -142,6 +142,26 @@ def test_composed_status_copy_is_translated_from_the_checked_german_qm() -> None
         application.removeTranslator(translator)
 
 
+def test_update_copy_is_translated_from_the_checked_german_qm() -> None:
+    from PySide6.QtCore import QCoreApplication, QTranslator
+    from PySide6.QtWidgets import QApplication
+
+    application = QApplication.instance() or QApplication([])
+    translator = QTranslator()
+    catalogue = REPOSITORY_ROOT / "resources" / "matteloop_de.qm"
+    assert translator.load(str(catalogue))
+    application.installTranslator(translator)
+    try:
+        assert QCoreApplication.translate(
+            "UpdateBanner", "MatteLoop %1 is available."
+        ) == "MatteLoop %1 ist verfügbar."
+        assert QCoreApplication.translate(
+            "SettingsDialog", "Couldn’t check for updates. Try again later."
+        ) == "Updates konnten nicht geprüft werden. Versuchen Sie es später erneut."
+    finally:
+        application.removeTranslator(translator)
+
+
 def test_render_stages_are_translated_at_the_dialog_boundary() -> None:
     from PySide6.QtWidgets import QApplication
 

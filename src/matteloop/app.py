@@ -67,10 +67,7 @@ def _run_gui() -> int:
     application = QApplication.instance()
     if not isinstance(application, QApplication):
         application = QApplication(["matteloop"])
-    application.setApplicationName("MatteLoop")
-    application.setApplicationDisplayName("MatteLoop")
-    application.setOrganizationName("MatteLoop")
-    application.setApplicationVersion(__version__)
+    _configure_application_identity(application)
     settings = QSettings()
     language = selected_language(settings)
     configure_locale(language)
@@ -102,7 +99,30 @@ def _run_gui() -> int:
     )
     application.aboutToQuit.connect(controller.shutdown)
     window.show()
+    _start_update_controller(window, settings, application)
     return application.exec()
+
+
+def _configure_application_identity(application: Any) -> None:
+    """Name the application for QSettings, the window manager and --version."""
+    application.setApplicationName("MatteLoop")
+    application.setApplicationDisplayName("MatteLoop")
+    application.setOrganizationName("MatteLoop")
+    application.setApplicationVersion(__version__)
+
+
+def _start_update_controller(window: Any, settings: Any, application: Any) -> None:
+    from matteloop.ui.download_transport import QtNetworkDownloadTransport
+    from matteloop.ui.update_controller import UpdateController
+    from matteloop.updates import GitHubUpdateReader
+
+    update_controller = UpdateController(
+        window,
+        settings,
+        GitHubUpdateReader(QtNetworkDownloadTransport()),
+        parent=application,
+    )
+    update_controller.start()
 
 
 def _load_onnxruntime() -> object:

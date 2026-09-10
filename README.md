@@ -91,6 +91,10 @@ Settings → Privacy & Security**, find the message naming MatteLoop, and choose
 **Open Anyway**. Linux artifacts are deferred, and the current native
 qualification covers macOS 15+ arm64 only.
 
+MatteLoop tells you when a new release is available: it checks once at startup
+and shows a notice with a link to the releases page. Preferences carries a
+manual check and the switch that turns the startup one off.
+
 ## Run from source
 
 Use CPython 3.13 and install the locked environment with:

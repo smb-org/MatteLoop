@@ -44,7 +44,13 @@ class DownloadResponse(Protocol):
 
 @runtime_checkable
 class DownloadTransport(Protocol):
-    def open(self, url: str, cancelled: CancellationCheck) -> DownloadResponse: ...
+    def open(
+        self,
+        url: str,
+        cancelled: CancellationCheck,
+        *,
+        headers: Mapping[str, str] | None = None,
+    ) -> DownloadResponse: ...
 
 
 class _LexicalPathApi(Protocol):

@@ -32,6 +32,7 @@ class _HttpResponse:
     length_header: str = "Content-Length"
     location: str | None = None
     delay: float = 0.0
+    request_headers: dict[str, str] | None = None
 
 
 class _HttpHandler(BaseHTTPRequestHandler):
@@ -40,6 +41,10 @@ class _HttpHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         response = self.response
+        if response.request_headers is not None:
+            response.request_headers.update(
+                {key: value for key, value in self.headers.items()}
+            )
         self.send_response(response.status)
         if response.location is not None:
             self.send_header("Location", response.location)
@@ -136,6 +141,22 @@ def test_qt_transport_exposes_content_length_header(
         assert response.headers["Content-Length"] == str(len(body))
     finally:
         response.close()
+
+
+def test_qt_transport_forwards_explicit_request_headers(
+    http_server: Callable[[_HttpResponse], str], qtbot
+) -> None:
+    del qtbot
+    observed: dict[str, str] = {}
+    response = _transport().open(
+        http_server(_HttpResponse(b"header-aware response", request_headers=observed)),
+        lambda: False,
+        headers={"Accept": "application/vnd.github+json", "X-Test": "present"},
+    )
+    response.close()
+
+    assert observed["Accept"] == "application/vnd.github+json"
+    assert observed["X-Test"] == "present"
 
 
 def test_qt_transport_reports_non_success_http_status(
