@@ -297,7 +297,7 @@
           "env": {
             "GH_TOKEN": "${{ github.token }}"
           },
-          "run": "release_flags=(--draft)\nif [[ \"$GITHUB_REF_NAME\" == *-* ]]; then\n  release_flags+=(--prerelease)\nfi\ngh release create \"$GITHUB_REF_NAME\" assets/* \\\n  --repo \"$GITHUB_REPOSITORY\" \\\n  \"${release_flags[@]}\" \\\n  --title \"MatteLoop $GITHUB_REF_NAME\" \\\n  --notes 'Unsigned builds. Windows warns via SmartScreen and macOS needs a right-click Open on first launch.\n\nThe MatteLoop-*-sources-* archives are the complete corresponding sources for the LGPL libraries (FFmpeg, libwebp, Qt) inside the application, published here as required by their licences. They are not needed to run MatteLoop.'"
+          "run": "release_flags=(--draft)\nif [[ \"$GITHUB_REF_NAME\" == *-* ]]; then\n  release_flags+=(--prerelease)\nfi\ngh release create \"$GITHUB_REF_NAME\" assets/* \\\n  --repo \"$GITHUB_REPOSITORY\" \\\n  \"${release_flags[@]}\" \\\n  --title \"MatteLoop $GITHUB_REF_NAME\" \\\n  --notes 'Unsigned builds by decision. Windows warns via SmartScreen: choose More info, then Run anyway. macOS refuses the first launch: open System Settings \u2192 Privacy & Security, find the message naming MatteLoop, and choose Open Anyway.\n\nThe MatteLoop-*-sources-* archives are the complete corresponding sources for the LGPL libraries (FFmpeg, libwebp, Qt) inside the application, published here as required by their licences. They are not needed to run MatteLoop.'"
         }
       ]
     }
