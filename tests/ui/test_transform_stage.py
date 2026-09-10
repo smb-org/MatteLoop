@@ -13,7 +13,7 @@ from pathlib import Path
 from PIL import Image
 from PySide6.QtCore import Qt
 
-import matteloop.ui.transform_stage as transform_stage_module
+import matteloop.ui.worker_thread as worker_thread_module
 from matteloop.core.crop_state import CropChanged
 from matteloop.core.parameters import (
     AlphaThresholdChanged,
@@ -466,7 +466,7 @@ def test_shutdown_cancels_a_live_facts_computation_instead_of_waiting_for_it(
 def test_shutdown_retains_an_unreleased_facts_thread(
     tmp_path, qtbot, monkeypatch
 ) -> None:
-    monkeypatch.setattr(transform_stage_module, "_THREAD_SHUTDOWN_TIMEOUT_MS", 25)
+    monkeypatch.setattr(worker_thread_module, "SHUTDOWN_TIMEOUT_MS", 25)
     artifact = _seed_cut(tmp_path, "seed-facts-timeout")
     store = ReducerStore(_ready_state(tmp_path / "source.mp4"))
     reader = _StallEveryReadReader()

@@ -161,6 +161,7 @@ import matteloop.ui.controller as controller_module
 import matteloop.ui.i18n as i18n_module
 import matteloop.ui.main_window as main_window_module
 import matteloop.ui.theme as theme_module
+import matteloop.ui.worker_thread as worker_thread_module
 from matteloop.ui.ports import VideoDropped
 from matteloop.ui.transform_group import TransformGroup
 
@@ -205,7 +206,7 @@ class MainWindow(QWidget):
 
 logs_module.log_file = lambda: log_path
 controller_module.PyAVSourceAdapter = BlockingSourceAdapter
-controller_module._THREAD_SHUTDOWN_TIMEOUT_MS = 25
+worker_thread_module.SHUTDOWN_TIMEOUT_MS = 25
 main_window_module.MainWindow = MainWindow
 execution_providers.provider_options_from_runtime = lambda model_id: ()
 i18n_module.configure_locale = lambda language: None
