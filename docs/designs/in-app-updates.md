@@ -6,8 +6,9 @@ CLI and a Nuitka probe, and after the #77 spike report
 Branch: feat/issue-74-in-app-updates
 Repo: smb-org/MatteLoop
 Status: REVIEWED — maintainer decisions folded in the same day; Phase 1 is in
-implementation; Phases 2–3 wait on the qualification gate in "The gate". No
-open questions remain.
+implementation; Phases 2–3 are implemented and wait on the qualification gate
+in "The gate" — Stage 0 and A1 passed, A2 is re-run on the rebuilt download
+path. No open questions remain.
 
 ## Problem statement
 
@@ -36,8 +37,9 @@ document departs from a proposal in #74 it says so.
   `QNetworkAccessManager` with the system proxy configuration, the platform
   trust store, the never-downgrade redirect policy, a 60 s inactivity timeout
   and a cancellation poll, behind the `DownloadTransport` protocol in
-  `jobs/models/download.py`. The release check reuses it. Velopack's own
-  downloads do **not** go through it (Decision 3).
+  `jobs/models/download.py`. The release check, the channel feed and the
+  update package all go through it; it is the only network path in the
+  application (Decision 3).
 - **A shutdown path that waits for work.** `application.aboutToQuit` runs
   `SourceController.shutdown` (`app.py`), which closes the runtime before
   joining the workers it unblocks (#111) and joins render and transform threads
@@ -151,19 +153,24 @@ away:
   failed with "a sealed resource is missing or invalid"). Whether the full
   MatteLoop bundle still launches through the first-install route is unknown;
   today's bundles already fail deep verification and launch.
-- *No download cancellation.* `download_updates(update_info,
-  progress_callback)` cannot be interrupted; exceptions from the callback are
-  logged and ignored.
-- *Its own network stack.* `ureq` with `rustls` and Mozilla roots, no system
-  proxy configuration, no platform trust store. Machines with an interception
-  proxy or a corporate root CA may fail every Velopack request while the Qt
-  transport and the browser succeed.
-- *A failed feed reads as "no update".* `GithubSource` reads at most ten
-  releases and skips missing or unreadable feeds; an aggregate of nothing is
-  `None`, the same as "up to date".
-- *The macOS package cache is under `~/Library/Caches/velopack/<packId>/`*,
-  and staging happens there, not beside the bundle. Writability of the bundle's
-  parent says nothing about the swap.
+- *Its own network stack, and it is unusable behind TLS interception —
+  measured.* `ureq` with `rustls` and a compiled-in root list; no system proxy
+  configuration, no platform trust store, and none of `SSL_CERT_FILE`,
+  `SSL_CERT_DIR`, `CURL_CA_BUNDLE`, `REQUESTS_CA_BUNDLE` honoured (all four
+  tried). On the Stage A machine, behind an ordinary interception proxy whose
+  root sits in the system store, every SDK request failed with `invalid peer
+  certificate: UnknownIssuer` while `curl`, the browser and MatteLoop's Qt
+  transport succeeded on the same network in the same second. **The SDK
+  therefore neither checks nor downloads in this design** (Decision 3). That
+  choice also removes three other 1.2.0 limitations the review found — no
+  download cancellation, a failed feed indistinguishable from "no update", and
+  staging under an auto-located cache the project does not choose — because
+  the code paths that had them are no longer called.
+- *Auto-location is not needed.* `VelopackLocatorConfig` lets the application
+  say where its bundle, helper, manifest and packages directory are. Measured:
+  with an explicit locator, a package written into the packages directory by
+  something other than the SDK is reported by `get_update_pending_restart()`
+  and is what the helper applies.
 
 ## Decision 2 — The user-facing flow
 
@@ -190,7 +197,7 @@ capabilities). The controller reads `store.state.job.phase` where it needs it.
 | State | Label | Buttons |
 |---|---|---|
 | Available | MatteLoop 0.4.0 is available. | Download update · Not now |
-| Downloading | Downloading MatteLoop 0.4.0 (37 %)… | — |
+| Downloading | Downloading MatteLoop 0.4.0 (37 %)… | Cancel |
 | Ready | MatteLoop 0.4.0 is ready to install. | Install and restart · Later |
 | Failed | The update couldn’t be downloaded. | Try again · Open releases page |
 
@@ -199,27 +206,25 @@ of *Download update*. It tells the user that a release exists and nothing
 about their installation.
 
 *Not now* and *Later* hide the banner until the next launch; nothing is
-persisted. There is no Cancel: the SDK cannot cancel, and a button that
-pretends to would be a lie.
+persisted. *Cancel* is real: the download runs on the Qt transport, which
+polls a cancellation flag exactly as the model download does.
 
 **Download.** Only after the user asks. #74 proposed downloading in the
 background first; a 300 MiB download on every launch of an install whose owner
 keeps pressing *Later* is a poor default, and the answer is one click away. The
-download runs `manager.check_for_updates()` followed by
-`manager.download_updates(info, progress)` on a **daemon `threading.Thread`**,
-not a `WorkerThread`: `QThread.quit()` does not interrupt `run()`, the SDK
-cannot be interrupted at all, and a daemon thread is the one stdlib mechanism
-that lets the process exit while the download is still running. Progress
-reaches the banner through a queued signal. Closing MatteLoop mid-download
-therefore quits immediately; that Velopack discards the partial package and
-`get_update_pending_restart()` stays `None` at the next launch is a gate item,
-not an assumption. The download keeps running if a job starts; it is I/O and
+download is the feed-and-package fetch in Decision 3, run in a `WorkerThread`
+with a `CancellationCheck` the transport polls, the same shape as a model
+download. *Cancel*, and the controller's shutdown on `aboutToQuit`, set that
+flag; the worker is then joined with the same bounded wait the other workers
+get. A cancelled or failed download leaves nothing behind but a `.part` file
+that is deleted; a package exists in the packages directory only after its
+SHA-256 matched. The download keeps running if a job starts; it is I/O and
 touches neither the segmentation process nor the work directory.
 
 **Install.** *Install and restart* checks `store.state.job.phase is
 JobState.IDLE` (the button is also disabled otherwise, refreshed from a store
 subscription as `SettingsDialog.load` refreshes the provider picker), records
-the pending `UpdateInfo`, and calls `window.close()`. Everything after that is
+the pending `VelopackAsset`, and calls `window.close()`. Everything after that is
 the existing quit path. The update controller's `aboutToQuit` slot — connected
 in `app.py` after `SourceController.shutdown` — calls
 `manager.wait_exit_then_apply_updates(pending, restart=True)`, which spawns
@@ -227,8 +232,7 @@ Velopack's helper. Arming only inside `aboutToQuit` means a close the user
 cancels at the transform prompt arms nothing: after `close()` returns with the
 window still visible, the pending info is dropped and the banner returns to
 *Ready*. A *Ready* state is rebuilt at the next launch from
-`get_update_pending_restart()` (a `VelopackAsset`, which the apply call
-accepts), so *Later* loses nothing.
+`get_update_pending_restart()`, so *Later* loses nothing.
 
 What this does **not** guarantee, and the gate must measure: that the helper
 waits for a worker that outlives the bounded shutdown (Decision 1). The
@@ -238,8 +242,9 @@ configuration and is not defended against.
 
 **On failure.** A failed startup check is logged at INFO and shows nothing. A
 failed manual check reports in the Preferences label. A failed download is the
-*Failed* state; *Try again* repeats it and *Open releases page* is the way out
-for every environment the SDK cannot reach. A failure inside the helper after
+*Failed* state — a transport error, a checksum mismatch, or a package the SDK
+does not recognise after it was written (Decision 3) — and *Try again*
+repeats it while *Open releases page* is the way out. A failure inside the helper after
 exit cannot be shown by this process; the next launch runs the check again,
 and the banner's *Open releases page* is the recovery path. If the swap itself
 failed half-way (Decision 1), there is no next launch: on macOS the Dock icon
@@ -250,9 +255,21 @@ exports are untouched because none of them live in the package. The release
 notes for the first self-updating release say exactly this. Before the
 download, two advisory checks select *Open releases
 page* instead of *Download update*, because the outcome is known: the
-executable path contains `/AppTranslocation/` (macOS), or `UpdateManager`
-could not be constructed. They are advisory; a locator that constructs is not
-proof that a swap will succeed, and no further pre-flight is built.
+executable path contains `/AppTranslocation/` (macOS), or the Velopack helper
+and manifest are not where the layout in Decision 3 puts them (a source run, a
+raw `.dist` copy), or the install root is not writable. They are advisory; a
+layout that looks right is not proof that a swap will succeed, and no further
+pre-flight is built.
+
+A translocated install therefore offers the browser rather than updating
+itself, and that is a deliberate simplification. #77 measured that the
+*physical* bundle can be replaced while the process runs from the read-only
+translocation mount — only the translocated path itself refuses, with
+`Read-only file system`. Recovering that physical path needs
+`SecTranslocateCreateOriginalPathForURL` from the Security framework through
+`ctypes`, for a state the user leaves by moving the application once, which
+the install instructions already ask for. If translocated installs turn out to
+be common, that function is where the fix goes.
 
 **Strings.** Every literal sits at its call site or in a `QT_TRANSLATE_NOOP`
 table, numbers arrive through `%1`/`%2` and the presenter's `.replace("%1", …)`,
@@ -268,6 +285,7 @@ variable.
 | UpdateBanner | Open releases page | Release-Seite öffnen |
 | UpdateBanner | Not now | Jetzt nicht |
 | UpdateBanner | Downloading MatteLoop %1 (%2 %)… | MatteLoop %1 wird heruntergeladen (%2 %) … |
+| UpdateBanner | Cancel | Abbrechen |
 | UpdateBanner | MatteLoop %1 is ready to install. | MatteLoop %1 ist bereit zur Installation. |
 | UpdateBanner | Install and restart | Installieren und neu starten |
 | UpdateBanner | Later | Später |
@@ -286,10 +304,11 @@ variable.
 
 ## Decision 3 — Version and feed model
 
-There is one source of truth for what is released — the GitHub release — and
-two readers of it, with different jobs.
+There is one source of truth for what is released — the GitHub release — one
+network path that reads it — the Qt transport — and one thing the SDK does:
+apply.
 
-**The notice comes from the API, always.** One request to
+**The notice comes from the API.** One request to
 `https://api.github.com/repos/smb-org/MatteLoop/releases/latest` through the
 existing Qt transport, whose `open` gains an optional `headers` keyword
 (forwarded into the response and set on the request before `get`; small, but
@@ -300,31 +319,56 @@ the same way. HTTP or parse failures are "couldn't check", distinct from
 "none". This reader lives in `src/matteloop/updates.py`, has no Qt
 dependency, and is the whole of Phase 1.
 
-It stays the notice reader after Phase 3 rather than being replaced by the
-SDK's check, for two reasons found in review: the SDK's check cannot tell a
-failed feed from an absent one, and the SDK's network stack is not the one a
-corporate machine's browser trusts. The Qt reader gives a truthful notice on
-every machine that can reach GitHub at all; whether the SDK can also download
-is discovered when the user asks, and the banner's failure state hands over to
-the browser.
+**The package comes through the same transport.** On *Download update*, in
+the worker: fetch `releases.<channel>.json` from
+`https://github.com/smb-org/MatteLoop/releases/download/v<tag>/`, where the
+channel is `osx-arm64` on macOS and `win-x64` on Windows; select the asset with
+`Type == "Full"` and the notice's version (the feed is Velopack's own
+`{"Assets": [{PackageId, Version, Type, FileName, SHA1, SHA256, Size}]}`);
+fetch `FileName` from the same release into `<packages>/<FileName>.part`
+through the transport, hashing as it streams; compare with the feed's
+`SHA256` (case-insensitively — `vpk` writes upper-case hex); rename into
+place. The verification is the one Velopack would have performed — it moved,
+it did not disappear — and the checksum came over the same trusted path as the
+package. Then the **self-check**: ask `get_update_pending_restart()`; if it
+does not return an asset with the expected version, the package is not where
+the SDK looks or is not what it expects, the file is deleted and the banner
+shows *Failed* rather than a *Ready* it cannot honour. Measured on macOS: a
+package written this way is reported as pending with no SDK network call.
 
-**The payload comes from the SDK.** On *Download update*, on the daemon
-thread: `UpdateManager(GithubSource("https://github.com/smb-org/MatteLoop"))`,
-no options — the channel `vpk` wrote into `sq.version` is the right one,
-downgrades are refused by default, and `UpdateOptions` is not constructed (its
-two required positional arguments are not needed). `check_for_updates()`
-returning `None` is reported as a failed download, not as "up to date".
-`UpdateManager` is constructed once at startup to select the *Download update*
-action; a `RuntimeError` from the SDK's not-installed condition is logged at
-WARNING with its message and selects *Open releases page*, so that a
-programming error in construction is visible in the log rather than silently
-demoting every install to the browser path.
+**The SDK applies, and does nothing else.** `check_for_updates()` and
+`download_updates()` are not called anywhere. `UpdateManager` is constructed
+with an **explicit locator** derived from the running executable instead of
+auto-location (which also removes the `Couldn't write out staging userId`
+warning the first run produced):
+
+| | macOS (measured) | Windows (unmeasured until Stage B) |
+|---|---|---|
+| `RootAppDir` | the `.app` (`executable.parents[2]`) | parent of `current\` |
+| `UpdateExePath` | `Contents/MacOS/UpdateMac` | `<root>\Update.exe` |
+| `ManifestPath` | `Contents/Resources/sq.version` | `current\sq.version` |
+| `CurrentBinaryDir` | `Contents/MacOS` | `current\` |
+| `PackagesDir` | `cache_subdirectory("updates")` | `cache_subdirectory("updates")` |
+| `IsPortable` | `False` | whether the root carries Velopack's portable marker; decided at Stage B |
+
+The `source` argument the constructor requires is the repository URL and is
+never contacted. If `UpdateExePath` or `ManifestPath` does not exist, the
+install is not Velopack-managed and the banner offers *Open releases page*;
+nothing is caught by exception type. The two SDK calls that remain are
+`get_update_pending_restart()` (startup and self-check) and
+`wait_exit_then_apply_updates()` (Decision 2).
+
+`PackagesDir` is the project's cache, beside the model cache. At startup the
+controller deletes any package there that `get_update_pending_restart()` does
+not report — an applied or superseded one — so an update never leaves a 300 MiB
+orphan; the SDK's own startup cleanup looks in its auto-located directory and
+never sees this one.
 
 **Drafts and prereleases stay out** without code: a draft is invisible to an
-unauthenticated client, `/releases/latest` excludes drafts and prereleases by
-GitHub's definition, and `GithubSource(prerelease=False)` skips prereleases.
-A release is complete the moment the maintainer publishes the draft; every
-asset appears at once.
+unauthenticated client and `/releases/latest` excludes drafts and prereleases
+by GitHub's definition; the feed is fetched only for the tag that request
+returned. A release is complete the moment the maintainer publishes the draft;
+every asset appears at once.
 
 **Assets per release**, all on the tagged release:
 
@@ -363,21 +407,14 @@ releases.
 The current shape cannot simply be extended: Velopack's macOS packaging
 modifies the bundle and must run on macOS, while `publish` runs on Ubuntu; the
 version must be checked against the tag before two twenty-minute builds; and
-qualification needs the same workflow to publish into a repository that is
-not the product's.
+qualification needs the same workflow artifacts to be downloaded and published
+by hand into a temporary public test release.
 
 - **`plan`** gains the tag-equals-version assertion (checkout plus one `grep`).
-- **`workflow_dispatch`** gains an input `release_to` naming a repository. When
-  set, `publish` runs for the dispatch and creates the draft release there.
-  A second repository is needed because a real A → B needs two publicly
-  readable *published* releases, and the live repository's releases are what
-  users see. It is a public repository under the same organisation
-  (`smb-org/MatteLoop-update-test` or similar), created when the gate runs and
-  deleted or left dormant afterwards. The existing account owns it, so no new
-  token and no new secret are involved; the run's own `GITHUB_TOKEN` is scoped
-  to the source repository, so the cross-repository `gh release create` uses
-  the account's existing credential. The input is present from the first
-  packaging commit.
+- **`workflow_dispatch`** keeps its existing platform input. The gate's two
+  qualification releases are published by hand from the downloaded workflow
+  artifacts with the maintainer's own `gh`; the workflow never targets another
+  repository and needs no additional Actions secret.
 - **`native-package`**, after "Build native standalone bundle":
   1. *Install vpk* — `dotnet tool install vpk --version 1.2.0 --tool-path .vpk`
      on the runner's .NET SDK; `DOTNET_ROOT` set explicitly, since the apphost
@@ -443,10 +480,11 @@ installation is not supported; the README states it. The updater relies on
 it (Decision 1) and nothing enforces it.
 
 **What never moves.** `QSettings`, the model cache, `.matteloop-work` beside
-the output directory, cuts, exports. Velopack's own package cache is the
-updater's and satisfies "keep the updater's downloaded packages in its own
-local cache" from #74 without writing one; its location on each platform is
-recorded in `docs/building.md` from the gate.
+the output directory, cuts, exports. Downloaded packages live in
+`cache_subdirectory("updates")` — the updater's own cache, as #74 asks,
+chosen by this project and swept by it (Decision 3); an uninstall leaves it
+behind the same way it leaves the weights, and it is documented in
+`docs/building.md` beside the model cache.
 
 **Existing 0.3.0 installations** get one manual step in the release notes:
 macOS — replace the app in `/Applications` as before; Windows — run
@@ -559,13 +597,13 @@ everything below; **this is the whole of the "no" branch.**
 **Phase 2 — Package** and **Phase 3 — Install** are separate pull requests
 that **share one gate and merge together or not at all.** Phase 2: the
 `velopack` dependency, the spec entry, the entrypoint change, the `vpk` steps,
-`release_to`, the tag and completeness assertions, the legal rewrite, the
+the tag and completeness assertions, the legal rewrite, the
 `docs/building.md` additions (vpk pin, `DOTNET_ROOT`, install roots, package
-cache locations). Phase 3: the SDK path in the controller — construction at
-startup, the daemon download thread, *Ready* and *Failed*, `aboutToQuit`
-arming, the advisory checks, `MATTELOOP_UPDATE_REPO` (one environment
-variable, read in one place, used by both the API reader and the
-`GithubSource` URL). Both are developed on one qualification branch; the gate
+cache locations). Phase 3: the feed-and-package download through the
+transport, the explicit locator, the self-check, *Ready*, *Failed* and
+*Cancel*, `aboutToQuit` arming, the advisory checks, the package sweep,
+`MATTELOOP_UPDATE_REPO` (one environment variable, read in one place, used by
+the notice request and the feed and package URLs alike). Both are developed on one qualification branch; the gate
 runs on that branch's artifacts; the first public release after the merge is
 the first self-updating release and its notes carry the migration step.
 
@@ -577,10 +615,10 @@ Everything Decision 1 lists as unknown is answered here, before any public
 distribution change. The gate is **sequential and macOS-first**: Stage A on
 macOS is the decision point, and **no Windows packaging change is published
 before Stage A has passed.** The material is the **actual full Nuitka bundle**
-built by the **real workflow** from the qualification branch and published,
-via `release_to`, into the public test repository under the same organisation
-(Decision 4) as release A, and again — from a throwaway commit that only
-raises `__version__` — as release B. Installs are disposable.
+built by the **real workflow** from the qualification branch. The maintainer
+downloads the workflow artifacts and publishes release A by hand in a
+temporary public test repository, then does the same — from a throwaway commit
+that only raises `__version__` — for release B. Installs are disposable.
 
 **Stage 0 — the macOS 15 swap, on the runner.** `native-package` already runs
 on `macos-15`. After the bundle is built and smoke-tested, a step renames
@@ -615,9 +653,11 @@ not the full Velopack apply.
   #111 harness blocks one. **Requirement: the helper defers or refuses;
   nothing is killed.**
 - A5. **Network.** Offline mid-download: A stays usable, the next launch shows
-  no pending package. Behind an interception proxy or a corporate root CA:
-  record what the SDK check and download do, and confirm the Qt notice and
-  the browser path still work.
+  no pending package. Behind an interception proxy: **measured and answered
+  on the first run** — the SDK's own network path fails with `UnknownIssuer`
+  and honours no CA override, the Qt transport and the browser succeed; that
+  is why the SDK no longer checks or downloads (Decision 3). The re-run
+  records that the rebuilt path downloads on that same machine.
 - A6. **Translocation.** A quarantined copy opened via LaunchServices shows
   *Open releases page*, not a crash and not a failed swap.
 - Record `PackagesDir`.
@@ -627,6 +667,15 @@ deferral or refusal; A3, A5 and A6 are recorded, not scored. If A2 fails, or
 A4 fails on 1.2.0 and a newer Velopack in reach does not fix it, stop at
 Phase 1 on both platforms.
 
+*Status after the first run (2026-09-09).* Stage 0 passed on the `macos-15`
+runner. A1 passed: the packed bundle runs and its smoke test passes inside the
+packed artifact; the notice appeared, in German, from the real feed;
+`codesign --verify --deep` exits 1 as predicted, recorded. A2 did not run —
+the SDK download failed before it started (A5). **Stage A is not passed.** A2
+is re-run against the same two qualification releases (0.3.0 → 0.3.1) once the
+download path in Decision 3 is rebuilt, and A2 now also confirms that the
+helper applies a package the SDK did not download itself.
+
 **Stage B — Windows. Reached only after Stage A passes.** On a real Windows
 machine:
 
@@ -635,10 +684,10 @@ machine:
   needed to pack.
 - B2. **Installed A → B** as A2.
 - B3. **Portable A → B.** Extract the portable zip of A into an ordinary
-  folder, run `current\matteloop.exe`, repeat A2. Record the extracted
-  folder's name: if two releases' zips would land in indistinguishable
-  folders, the `publish` wrapping in Decision 3 is required before the first
-  public release (#134).
+  folder, run `MatteLoop-<tag>-windows-x64\current\matteloop.exe`, repeat A2.
+  Measurement: Velopack's portable zip has no root directory; `publish` wraps
+  `MatteLoop.exe`, `Update.exe`, `.portable` and `current\` under
+  `MatteLoop-<tag>-windows-x64\`.
 - B4. **Uninstall preserves the cache.** Download one model, uninstall through
   Apps & Features, confirm `%LocalAppData%\matteloop\matteloop\Cache\models`
   survives. Record `PackagesDir`.
@@ -668,14 +717,18 @@ shows the banner within seconds on each platform, in German too.
 
 **Phases 2–3.** Automated, at the adapter boundaries only: the tag and
 completeness assertions in `tests/release/test_ci_workflow.py`; the pinned
-`vpk` version and flags; the controller with a fake manager — progress reaches
-the banner, a failed download shows *Try again*, install disabled outside
-`IDLE`, a refused close drops the pending install, `aboutToQuit` arms exactly
-once and only when pending, the advisory checks select the browser path, a
-`None` from the SDK check is reported as a failed download. Everything about
-hooks, freezing, signing, replacement, relaunch, killing and rollback is
-**only** proved by the gate; a fake manager that supports invented behaviour
-proves nothing, and no test is written to pretend otherwise.
+`vpk` version and flags; the download with a fake transport — feed parsing,
+asset selection by type and version, a checksum mismatch leaves no package
+and shows *Failed*, *Cancel* leaves no package, progress reaches the banner;
+the controller with a fake manager for the two calls that remain — a
+self-check that returns the wrong version shows *Failed* and deletes the
+file, install disabled outside `IDLE`, a refused close drops the pending
+install, `aboutToQuit` arms exactly once and only when pending, the advisory
+checks select the browser path, the startup sweep deletes what is not
+pending; the locator derivation from a macOS and a Windows executable path.
+Everything about hooks, freezing, signing, replacement, relaunch, killing and
+rollback is **only** proved by the gate; a fake manager that supports invented
+behaviour proves nothing, and no test is written to pretend otherwise.
 
 **Phase 4.** The delta measurement, recorded in the issue.
 
@@ -695,9 +748,12 @@ proves nothing, and no test is written to pretend otherwise.
   because `vpk`'s additions broke the seal in a way the nested-file failure did
   not. Re-plan means measuring `--signAppIdentity -` against the known nested
   `.py` problem, not adding it blind.
-- The SDK cannot reach GitHub on the corporate-CA machine and the maintainer
-  considers that population material. The browser path covers them, but "in-app
-  updates" would not be true for them; say so in the README or re-plan.
+- The helper applies only what the SDK itself downloaded. `get_update_pending_restart()`
+  reporting the hand-placed package is measured; the apply of it is what the
+  A2 re-run proves. If the macOS helper or the Windows one rejects it, the
+  drop-in path is dead and the design goes back to Decision 1.
+- The Windows locator derivation (Decision 3) is wrong, or `IsPortable` has to
+  be detected in a way the table does not foresee. Measured only at Stage B.
 - Frozen worker startup or the Windows hook launches misbehave with the entry
   change (A1, B1, B5).
 - The guardrail ratchet: if the controller wants to reach into the reducer, the
@@ -722,6 +778,10 @@ proves nothing, and no test is written to pretend otherwise.
   asked; it can run as an ordinary CI step.
 - The gate is sequential and macOS-first; Stage A is the go/no-go for
   Windows, and no Windows packaging change is published before it passes.
+- After the first Stage A run: the SDK's network path is unusable behind TLS
+  interception (measured), so the Qt transport fetches the feed and the
+  package and the SDK only applies, through an explicit locator (Decisions 2
+  and 3). A2 is re-run on the rebuilt path.
 
 ## Open questions
 

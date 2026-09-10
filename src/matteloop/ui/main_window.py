@@ -179,6 +179,20 @@ class MainWindow(QMainWindow):
         update_actions_layout = QHBoxLayout(update_actions_row)
         update_actions_layout.setContentsMargins(0, 0, 0, 0)
         update_actions_layout.addStretch(1)
+        self.update_download_button = QPushButton(
+            QCoreApplication.translate("UpdateBanner", "Download update")
+        )
+        self.update_download_button.setObjectName("update_download")
+        self.update_download_button.setAccessibleName(
+            QCoreApplication.translate("UpdateBanner", "Download update")
+        )
+        self.update_install_button = QPushButton(
+            QCoreApplication.translate("UpdateBanner", "Install and restart")
+        )
+        self.update_install_button.setObjectName("update_install")
+        self.update_install_button.setAccessibleName(
+            QCoreApplication.translate("UpdateBanner", "Install and restart")
+        )
         self.update_open_releases_button = QPushButton(
             QCoreApplication.translate("UpdateBanner", "Open releases page")
         )
@@ -193,9 +207,24 @@ class MainWindow(QMainWindow):
         self.update_not_now_button.setAccessibleName(
             QCoreApplication.translate("UpdateBanner", "Not now")
         )
+        self.update_later_button = QPushButton(
+            QCoreApplication.translate("UpdateBanner", "Later")
+        )
+        self.update_later_button.setObjectName("update_later")
+        self.update_later_button.setAccessibleName(
+            QCoreApplication.translate("UpdateBanner", "Later")
+        )
+        update_actions_layout.addWidget(self.update_download_button)
+        update_actions_layout.addWidget(self.update_install_button)
         update_actions_layout.addWidget(self.update_open_releases_button)
         update_actions_layout.addWidget(self.update_not_now_button)
+        update_actions_layout.addWidget(self.update_later_button)
         update_layout.addWidget(update_actions_row)
+        self.update_download_button.hide()
+        self.update_install_button.hide()
+        self.update_open_releases_button.hide()
+        self.update_not_now_button.hide()
+        self.update_later_button.hide()
         self.update_container.hide()
         self.success_container = QFrame()
         self.success_container.setObjectName("success_banner_container")
@@ -293,8 +322,11 @@ class MainWindow(QMainWindow):
         widgets.extend(
             [
                 *self.inspector.tab_widgets(),
+                self.update_download_button,
+                self.update_install_button,
                 self.update_open_releases_button,
                 self.update_not_now_button,
+                self.update_later_button,
                 self.success_banner,
                 self.open_output_button,
                 self.open_folder_button,

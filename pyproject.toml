@@ -14,6 +14,7 @@ license-files = [
   "THIRD_PARTY_NOTICES.md",
   "resources/fonts/OFL.txt",
   "legal/DIRECTML-LICENSE.txt",
+  "legal/VELOPACK-MIT.txt",
 ]
 authors = [{ name = "MatteLoop contributors" }]
 dependencies = [
@@ -22,6 +23,7 @@ dependencies = [
   "Pillow>=12.1,<13",
   "numpy>=2.3,<3",
   "rembg==2.0.75",
+  "velopack==1.2.0",
   "onnxruntime-directml>=1.24,<2; sys_platform == 'win32'",
   "onnxruntime>=1.23.2,<2; sys_platform != 'win32'",
   "platformdirs>=4.3,<5",

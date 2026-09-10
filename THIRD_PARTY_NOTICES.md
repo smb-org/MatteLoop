@@ -6,9 +6,17 @@ copyright or related rights exist. That license does not replace the licenses
 of the third-party material described below.
 
 This file documents both the source distribution and the delivered native
-build contract. Each successful native build requires the app, its
-target-specific media complete-source archive and checksum, and its Qt/PySide
-source companion and checksum together. No written source offer is used.
+build contract.
+
+MatteLoop publishes each application and update package with access to its
+matching source companions at
+`https://github.com/smb-org/MatteLoop/releases/tag/v<version>`. The media and
+Qt source archives and checksums are separate downloads; they are not required
+to run or update the application. Packages retain the applicable licence
+notices and library-replacement instructions. Redistribution must preserve the
+applicable licences and provide the required corresponding source through a
+permitted method. For network distribution under GPLv3 §6(d), source may be on
+another server with equivalent access and clear directions beside the binary.
 
 ## Material stored in this repository
 
@@ -54,6 +62,8 @@ and must preserve all applicable notices.
 | ONNX Runtime | MIT; Windows bundles use `onnxruntime-directml` | <https://github.com/microsoft/onnxruntime> |
 | DirectML (DirectML.dll inside `onnxruntime-directml`) | Microsoft Software License Terms, proprietary; redistribution inside applications on Windows permitted (section 1a); Windows and Xbox only | <https://www.nuget.org/packages/Microsoft.AI.DirectML> |
 | platformdirs | MIT | <https://github.com/tox-dev/platformdirs> |
+| velopack SDK | MIT; full text ships as `VELOPACK-MIT.txt` | <https://github.com/velopack/velopack> |
+| Velopack `UpdateMac` / `Update.exe` helper | MIT; full text ships as `VELOPACK-MIT.txt` | <https://github.com/velopack/velopack> |
 
 The full DirectML terms ship as `DIRECTML-LICENSE.txt` in the Windows bundle.
 
@@ -107,12 +117,15 @@ changes; and rebuild instructions. Its adjacent `.sha256` is published beside
 the application artifact, while an artifact-set JSON in the build cache binds
 all media evidence by digest and identity.
 
-The manual GitHub Actions workflow only creates a temporary unsigned build
-artifact. It does not publish, sign, notarize, create a release, or provide a
-permanent source host. Any later authorized native publication must keep the
-application, matching media complete-source archive/checksum, and matching Qt
-source companion/checksum together on a durable endpoint. This boundary does
-not prevent publishing MatteLoop's own source under 0BSD.
+MatteLoop publishes each application and update package with access to its
+matching source companions at
+`https://github.com/smb-org/MatteLoop/releases/tag/v<version>`. The media and
+Qt source archives and checksums are separate downloads; they are not required
+to run or update the application. Packages retain the applicable licence
+notices and library-replacement instructions. Redistribution must preserve the
+applicable licences and provide the required corresponding source through a
+permitted method. For network distribution under GPLv3 §6(d), source may be on
+another server with equivalent access and clear directions beside the binary.
 
 The unsigned macOS arm64 artifact completed the repository, media verifier,
 codec-fixture, bundle, checksum, and packaged smoke gates on 2026-09-01.

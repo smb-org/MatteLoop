@@ -99,7 +99,7 @@ def _run_gui() -> int:
     )
     application.aboutToQuit.connect(controller.shutdown)
     window.show()
-    _start_update_controller(window, settings, application)
+    _start_update_controller(window, settings, application, store)
     return application.exec()
 
 
@@ -111,18 +111,26 @@ def _configure_application_identity(application: Any) -> None:
     application.setApplicationVersion(__version__)
 
 
-def _start_update_controller(window: Any, settings: Any, application: Any) -> None:
+def _start_update_controller(
+    window: Any, settings: Any, application: Any, store: Any
+) -> None:
+    """Wire the update controller, including its bounded quit path."""
     from matteloop.ui.download_transport import QtNetworkDownloadTransport
     from matteloop.ui.update_controller import UpdateController
     from matteloop.updates import GitHubUpdateReader
 
+    transport = QtNetworkDownloadTransport()
     update_controller = UpdateController(
         window,
         settings,
-        GitHubUpdateReader(QtNetworkDownloadTransport()),
+        GitHubUpdateReader(transport),
         parent=application,
+        store=store,
+        transport=transport,
     )
     update_controller.start()
+    application.aboutToQuit.connect(update_controller.shutdown)
+    application.aboutToQuit.connect(update_controller.arm_pending_install)
 
 
 def _load_onnxruntime() -> object:

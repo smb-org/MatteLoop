@@ -84,12 +84,20 @@ other component and its licence.
 ## Getting it
 
 Native builds for macOS 15+ arm64 and Windows x64 are published on the
-[releases page](https://github.com/smb-org/MatteLoop/releases). They are
-unsigned by decision: Windows warns through SmartScreen, so choose **More
-info**, then **Run anyway**; macOS refuses the first launch, so open **System
-Settings → Privacy & Security**, find the message naming MatteLoop, and choose
-**Open Anyway**. Linux artifacts are deferred, and the current native
-qualification covers macOS 15+ arm64 only.
+[releases page](https://github.com/smb-org/MatteLoop/releases). The release
+assets are `MatteLoop-v<version>-macos-arm64.zip`,
+`MatteLoop-v<version>-windows-x64-Setup.exe`, and
+`MatteLoop-v<version>-windows-x64.zip`; Windows therefore offers both an
+installer and a portable archive. The portable archive extracts to a versioned
+folder, so two downloads never look alike. They are unsigned by decision:
+Windows warns through SmartScreen, so choose **More info**, then **Run
+anyway**; macOS refuses the first launch, so open **System Settings → Privacy &
+Security**, find the message naming MatteLoop, and choose **Open Anyway**.
+Linux artifacts are deferred, and the current native qualification covers
+macOS 15+ arm64 only.
+
+Use one MatteLoop instance per installation. The installer and portable
+archive update their own `current` installation in place.
 
 MatteLoop tells you when a new release is available: it checks once at startup
 and shows a notice with a link to the releases page. Preferences carries a
