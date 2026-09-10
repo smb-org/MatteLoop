@@ -194,7 +194,7 @@ def _controller(
     return window, controller, reader
 
 
-def test_no_update_keeps_the_banner_hidden(qtbot) -> None:
+def test_no_update_keeps_the_offer_hidden(qtbot) -> None:
     window, controller, _ = _controller(
         qtbot, _settings("none"), UpdateResult(UpdateOutcome.NONE)
     )
@@ -202,33 +202,144 @@ def test_no_update_keeps_the_banner_hidden(qtbot) -> None:
     controller.check_now()
     qtbot.waitUntil(lambda: not controller.check_in_progress)
 
-    assert not window.update_container.isVisible()
+    assert not window.update_dialog.isVisible()
+    assert not window.action_shelf.update_button.isVisible()
     assert window.action_shelf.preferences_dialog.updates_status_label.text() == (
         "No update found."
     )
 
 
-def test_available_update_shows_versioned_banner(qtbot) -> None:
+def test_startup_update_opens_the_offer_once_per_session(monkeypatch, qtbot) -> None:
+    settings = _settings("startup-offer")
     window, controller, _ = _controller(
         qtbot,
-        _settings("update"),
+        settings,
+        UpdateResult(UpdateOutcome.UPDATE, "0.4.0"),
+    )
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(
+        "matteloop.ui.update_controller.QTimer.singleShot",
+        lambda _delay, callback: callback(),
+    )
+
+    controller.start()
+    qtbot.waitUntil(lambda: not controller.check_in_progress)
+
+    assert window.update_dialog.isVisible()
+    assert not window.action_shelf.update_button.isVisible()
+    window.update_dialog.not_now_button.click()
+    assert not window.update_dialog.isVisible()
+    assert window.action_shelf.update_button.isVisible()
+
+    controller._state_changed(AppState())
+    assert not window.update_dialog.isVisible()
+
+
+def test_startup_update_does_not_open_while_a_job_runs(
+    monkeypatch, qtbot, tmp_path: Path
+) -> None:
+    settings = _settings("startup-offer-running")
+    store = _ready_store(tmp_path)
+    store.dispatch(RenderRequested("job", "request"))
+    window, controller, _ = _controller(
+        qtbot,
+        settings,
+        UpdateResult(UpdateOutcome.UPDATE, "0.4.0"),
+        store=store,
+    )
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(
+        "matteloop.ui.update_controller.QTimer.singleShot",
+        lambda _delay, callback: callback(),
+    )
+
+    controller.start()
+    qtbot.waitUntil(lambda: not controller.check_in_progress)
+
+    assert not window.update_dialog.isVisible()
+
+
+def test_dismissed_offer_reopens_from_the_arrow(qtbot) -> None:
+    window, controller, _ = _controller(
+        qtbot,
+        _settings("arrow-reopen"),
         UpdateResult(UpdateOutcome.UPDATE, "0.4.0"),
     )
 
     controller.check_now()
     qtbot.waitUntil(lambda: not controller.check_in_progress)
+    window.update_dialog.not_now_button.click()
 
-    assert window.update_container.isVisible()
-    assert window.update_banner.text() == "MatteLoop 0.4.0 is available."
-    assert window.update_open_releases_button.text() == "Open releases page"
-    assert window.update_not_now_button.text() == "Not now"
+    assert window.action_shelf.update_button.isVisible()
+    window.action_shelf.update_button.click()
+
+    assert window.update_dialog.isVisible()
+    assert window.update_dialog.message_label.text() == (
+        "MatteLoop 0.4.0 is available."
+    )
+
+
+def test_startup_check_off_suppresses_offer_and_arrow(monkeypatch, qtbot) -> None:
+    settings = _settings("startup-offer-disabled")
+    settings.setValue("updates/check_on_startup", False)
+    window, controller, reader = _controller(
+        qtbot,
+        settings,
+        UpdateResult(UpdateOutcome.UPDATE, "0.4.0"),
+    )
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(
+        "matteloop.ui.update_controller.QTimer.singleShot",
+        lambda _delay, callback: callback(),
+    )
+
+    controller.start()
+
+    assert reader.calls == 0
+    assert not window.update_dialog.isVisible()
+    assert not window.action_shelf.update_button.isVisible()
+
+
+def test_turning_startup_check_off_before_start_hides_pending_offer(qtbot) -> None:
+    settings = _settings("startup-off-before-start")
+    manager = _Manager(pending=_UpdateInfo(_Asset("0.4.0")))
+    window, controller, _ = _controller(
+        qtbot,
+        settings,
+        UpdateResult(UpdateOutcome.NONE),
+        manager=manager,
+    )
+    settings.setValue("updates/check_on_startup", False)
+
+    controller.start()
+
+    assert not window.update_dialog.isVisible()
+    assert not window.action_shelf.update_button.isVisible()
+
+
+def test_available_update_shows_versioned_offer(qtbot) -> None:
+    window, controller, _ = _controller(
+        qtbot,
+        _settings("update"),
+        UpdateResult(UpdateOutcome.UPDATE, "0.4.0", 380 * 1024 * 1024),
+    )
+
+    controller.check_now()
+    qtbot.waitUntil(lambda: not controller.check_in_progress)
+
+    assert window.update_dialog.isVisible()
+    assert window.update_dialog.message_label.text() == "MatteLoop 0.4.0 is available."
+    assert window.update_dialog.size_label.text() == "Download size: 380 MB"
+    assert window.update_dialog.size_label.isVisible()
+    assert window.update_dialog.open_releases_button.text() == "Open releases page"
+    assert window.update_dialog.not_now_button.text() == "Not now"
     assert (
         window.action_shelf.preferences_dialog.updates_status_label.text()
         == "MatteLoop 0.4.0 is available."
     )
 
 
-def test_not_now_hides_the_update_banner(qtbot) -> None:
+def test_not_now_hides_the_update_offer(qtbot) -> None:
     window, controller, _ = _controller(
         qtbot,
         _settings("dismiss"),
@@ -237,9 +348,23 @@ def test_not_now_hides_the_update_banner(qtbot) -> None:
 
     controller.check_now()
     qtbot.waitUntil(lambda: not controller.check_in_progress)
-    window.update_not_now_button.click()
+    window.update_dialog.not_now_button.click()
 
-    assert not window.update_container.isVisible()
+    assert not window.update_dialog.isVisible()
+
+
+def test_update_offer_omits_unknown_download_size(qtbot) -> None:
+    window, controller, _ = _controller(
+        qtbot,
+        _settings("unknown-size"),
+        UpdateResult(UpdateOutcome.UPDATE, "0.4.0"),
+    )
+
+    controller.check_now()
+    qtbot.waitUntil(lambda: not controller.check_in_progress)
+
+    assert not window.update_dialog.size_label.isVisible()
+    assert window.update_dialog.size_label.text() == ""
 
 
 def test_manual_check_reports_a_failed_reader(qtbot) -> None:
@@ -250,7 +375,7 @@ def test_manual_check_reports_a_failed_reader(qtbot) -> None:
     controller.check_now()
     qtbot.waitUntil(lambda: not controller.check_in_progress)
 
-    assert not window.update_container.isVisible()
+    assert not window.update_dialog.isVisible()
     assert window.action_shelf.preferences_dialog.updates_status_label.text() == (
         "Couldn’t check for updates. Try again later."
     )
@@ -325,13 +450,13 @@ def test_open_releases_page_uses_the_release_url(monkeypatch, qtbot) -> None:
 
     controller.check_now()
     qtbot.waitUntil(lambda: not controller.check_in_progress)
-    window.update_open_releases_button.click()
+    window.update_dialog.open_releases_button.click()
 
     assert opened == [QUrl("https://github.com/smb-org/MatteLoop/releases")]
     del window
 
 
-def test_download_progress_reaches_the_banner_and_finishes_ready(
+def test_download_progress_reaches_the_offer_and_finishes_ready(
     monkeypatch, qtbot, tmp_path: Path
 ) -> None:
     transport, asset = _download_transport()
@@ -353,14 +478,17 @@ def test_download_progress_reaches_the_banner_and_finishes_ready(
 
     controller.check_now()
     qtbot.waitUntil(lambda: not controller.check_in_progress)
-    window.update_download_button.click()
+    window.update_dialog.download_button.click()
     qtbot.waitUntil(
-        lambda: window.update_banner.text() == "Downloading MatteLoop 0.4.0 (0 %)…"
+        lambda: window.update_dialog.message_label.text()
+        == "Downloading MatteLoop 0.4.0 (0 %)…"
     )
     qtbot.waitUntil(lambda: not controller.download_in_progress)
 
-    assert window.update_banner.text() == "MatteLoop 0.4.0 is ready to install."
-    assert window.update_install_button.isVisible()
+    assert window.update_dialog.message_label.text() == (
+        "MatteLoop 0.4.0 is ready to install."
+    )
+    assert window.update_dialog.install_button.isVisible()
 
 
 def test_failed_download_offers_try_again(monkeypatch, qtbot, tmp_path: Path) -> None:
@@ -380,12 +508,59 @@ def test_failed_download_offers_try_again(monkeypatch, qtbot, tmp_path: Path) ->
 
     controller.check_now()
     qtbot.waitUntil(lambda: not controller.check_in_progress)
-    window.update_download_button.click()
+    window.update_dialog.download_button.click()
     qtbot.waitUntil(lambda: not controller.download_in_progress)
 
-    assert window.update_banner.text() == "The update couldn’t be downloaded."
-    assert window.update_download_button.text() == "Try again"
-    assert window.update_open_releases_button.isVisible()
+    assert window.update_dialog.message_label.text() == (
+        "The update couldn’t be downloaded."
+    )
+    assert window.update_dialog.download_button.text() == "Try again"
+    assert window.update_dialog.open_releases_button.isVisible()
+    window.update_dialog.close()
+    qtbot.waitUntil(lambda: window.action_shelf.update_button.isVisible())
+    window.action_shelf.update_button.click()
+    assert window.update_dialog.isVisible()
+    assert window.update_dialog.message_label.text() == (
+        "The update couldn’t be downloaded."
+    )
+
+
+def test_downloading_offer_reopens_from_the_arrow(
+    monkeypatch, qtbot, tmp_path: Path
+) -> None:
+    transport, asset = _download_transport()
+    transport.responses[update_package_url("0.4.0", asset.FileName)] = FakeResponse(
+        b"package", on_read=lambda: time.sleep(0.25)
+    )
+    manager = _Manager(pending_values=[None, _UpdateInfo(asset)])
+    monkeypatch.setattr(
+        "matteloop.ui.update_controller.cache_subdirectory", lambda *_: tmp_path
+    )
+    window, controller, _ = _controller(
+        qtbot,
+        _settings("downloading-arrow"),
+        UpdateResult(UpdateOutcome.UPDATE, "0.4.0"),
+        manager=manager,
+        transport=transport,
+    )
+
+    controller.check_now()
+    qtbot.waitUntil(lambda: not controller.check_in_progress)
+    window.update_dialog.download_button.click()
+    qtbot.waitUntil(
+        lambda: window.update_dialog.message_label.text()
+        == "Downloading MatteLoop 0.4.0 (0 %)…"
+    )
+    window.update_dialog.close()
+    qtbot.waitUntil(lambda: window.action_shelf.update_button.isVisible())
+    window.action_shelf.update_button.click()
+
+    assert window.update_dialog.isVisible()
+    assert window.update_dialog.message_label.text() == (
+        "Downloading MatteLoop 0.4.0 (0 %)…"
+    )
+    window.update_dialog.download_button.click()
+    qtbot.waitUntil(lambda: not controller.download_in_progress)
 
 
 def test_self_check_rejecting_the_package_offers_try_again(
@@ -408,10 +583,12 @@ def test_self_check_rejecting_the_package_offers_try_again(
 
     controller.check_now()
     qtbot.waitUntil(lambda: not controller.check_in_progress)
-    window.update_download_button.click()
+    window.update_dialog.download_button.click()
     qtbot.waitUntil(lambda: not controller.download_in_progress)
 
-    assert window.update_banner.text() == "The update couldn’t be downloaded."
+    assert window.update_dialog.message_label.text() == (
+        "The update couldn’t be downloaded."
+    )
     assert not list(tmp_path.glob("*.nupkg"))
 
 
@@ -436,14 +613,17 @@ def test_cancel_stops_the_transport_and_leaves_no_package(
 
     controller.check_now()
     qtbot.waitUntil(lambda: not controller.check_in_progress)
-    window.update_download_button.click()
+    window.update_dialog.download_button.click()
     qtbot.waitUntil(
-        lambda: window.update_banner.text() == "Downloading MatteLoop 0.4.0 (0 %)…"
+        lambda: window.update_dialog.message_label.text()
+        == "Downloading MatteLoop 0.4.0 (0 %)…"
     )
-    window.update_download_button.click()
+    window.update_dialog.download_button.click()
     qtbot.waitUntil(lambda: not controller.download_in_progress)
 
-    assert window.update_banner.text() == "MatteLoop 0.4.0 is available."
+    assert window.update_dialog.message_label.text() == (
+        "MatteLoop 0.4.0 is available."
+    )
     assert not list(tmp_path.glob("*.nupkg"))
 
 
@@ -470,12 +650,12 @@ def test_install_button_tracks_idle_state_and_handler_reads_it_again(
     )
 
     store.dispatch(RenderRequested("job", "request"))
-    assert not window.update_install_button.isEnabled()
+    assert not window.update_dialog.install_button.isEnabled()
     controller.install_and_restart()
     assert manager.apply_calls == []
     store.dispatch(CancelRequested("job"))
     store.dispatch(CancelAcknowledged("job"))
-    assert window.update_install_button.isEnabled()
+    assert window.update_dialog.install_button.isEnabled()
 
 
 def test_refused_close_drops_pending_install_and_returns_to_ready(qtbot) -> None:
@@ -497,11 +677,13 @@ def test_refused_close_drops_pending_install_and_returns_to_ready(qtbot) -> None
         manager=manager,
     )
 
-    window.update_install_button.click()
+    window.update_dialog.install_button.click()
 
     assert manager.apply_calls == []
-    assert window.update_banner.text() == "MatteLoop 0.4.0 is ready to install."
-    assert window.update_install_button.isEnabled()
+    assert window.update_dialog.message_label.text() == (
+        "MatteLoop 0.4.0 is ready to install."
+    )
+    assert window.update_dialog.install_button.isEnabled()
 
 
 def test_about_to_quit_arms_once_and_only_for_a_pending_install(qtbot) -> None:
@@ -514,7 +696,9 @@ def test_about_to_quit_arms_once_and_only_for_a_pending_install(qtbot) -> None:
         manager=manager,
     )
 
-    assert window.update_banner.text() == "MatteLoop 0.4.0 is ready to install."
+    assert window.update_dialog.message_label.text() == (
+        "MatteLoop 0.4.0 is ready to install."
+    )
     controller.arm_pending_install()
     assert manager.apply_calls == []
     controller.install_and_restart()
@@ -537,8 +721,8 @@ def test_translocated_install_uses_releases_page(monkeypatch, qtbot) -> None:
     controller.check_now()
     qtbot.waitUntil(lambda: not controller.check_in_progress)
 
-    assert window.update_open_releases_button.isVisible()
-    assert not window.update_download_button.isVisible()
+    assert window.update_dialog.open_releases_button.isVisible()
+    assert not window.update_dialog.download_button.isVisible()
 
 
 def test_non_writable_install_uses_releases_page(monkeypatch, qtbot) -> None:
@@ -554,8 +738,8 @@ def test_non_writable_install_uses_releases_page(monkeypatch, qtbot) -> None:
     controller.check_now()
     qtbot.waitUntil(lambda: not controller.check_in_progress)
 
-    assert window.update_open_releases_button.isVisible()
-    assert not window.update_download_button.isVisible()
+    assert window.update_dialog.open_releases_button.isVisible()
+    assert not window.update_dialog.download_button.isVisible()
 
 
 def test_repository_environment_overrides_the_explicit_velopack_source(

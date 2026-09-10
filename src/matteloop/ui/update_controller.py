@@ -24,6 +24,7 @@ from PySide6.QtGui import QDesktopServices
 from matteloop.core.state import AppState, JobState
 from matteloop.jobs.models.download import DownloadTransport
 from matteloop.paths import cache_subdirectory
+from matteloop.ui.i18n import display_locale
 from matteloop.ui.ports import StateStore
 from matteloop.ui.preferences import load_check_on_startup
 from matteloop.ui.worker_thread import WorkerThread
@@ -155,22 +156,42 @@ class UpdateController(QObject):
         self._download_cancellation: Event | None = None
         self._startup_scheduled = False
         self._startup_check_active = False
-        self._banner_dismissed = False
+        self._startup_offer_shown = False
+        self._startup_offer_pending = False
+        self._updates_enabled = load_check_on_startup(self._settings)
+        self._offer_state: str | None = None
         self._available_version: str | None = None
+        self._available_size: int | None = None
+        self._download_percent = 0
         self._ready_update: object | None = _pending_update(self._manager)
         self._pending_install: object | None = None
         self._apply_armed = False
         self._store_unsubscribe = self._store.subscribe(self._state_changed)
-        preferences = window.action_shelf.preferences_dialog
+        self._connect_widgets()
+        self._restore_pending_update()
+
+    def _connect_widgets(self) -> None:
+        preferences = self._window.action_shelf.preferences_dialog
         preferences.check_for_updates_button.clicked.connect(self.check_now)
-        window.update_download_button.clicked.connect(self._download_button_clicked)
-        window.update_install_button.clicked.connect(self.install_and_restart)
-        window.update_open_releases_button.clicked.connect(self.open_releases_page)
-        window.update_not_now_button.clicked.connect(self.dismiss_banner)
-        window.update_later_button.clicked.connect(self.dismiss_banner)
+        preferences.updates_check_on_startup.toggled.connect(
+            self._startup_setting_changed
+        )
+        dialog = self._window.update_dialog
+        dialog.download_button.clicked.connect(self._download_button_clicked)
+        dialog.install_button.clicked.connect(self.install_and_restart)
+        dialog.open_releases_button.clicked.connect(self.open_releases_page)
+        dialog.not_now_button.clicked.connect(self.dismiss_offer)
+        dialog.later_button.clicked.connect(self.dismiss_offer)
+        dialog.finished.connect(self._dialog_finished)
+        self._window.action_shelf.update_button.clicked.connect(self.show_offer)
+
+    def _restore_pending_update(self) -> None:
         self._available_version = _update_version(self._ready_update, None)
         if self._ready_update is not None and self._available_version:
-            self._show_ready(self._available_version)
+            self._show_ready(self._available_version, show_dialog=False)
+            if self._updates_enabled:
+                self._startup_offer_pending = True
+                self._present_startup_offer()
         else:
             self._refresh_install_button()
 
@@ -187,7 +208,14 @@ class UpdateController(QObject):
         if self._startup_scheduled:
             return
         self._startup_scheduled = True
-        if load_check_on_startup(self._settings) and _is_frozen_runtime():
+        self._updates_enabled = load_check_on_startup(self._settings)
+        if not self._updates_enabled:
+            self._startup_offer_pending = False
+            self._window.update_dialog.hide()
+            self._refresh_update_button()
+            self._refresh_install_button()
+            return
+        if _is_frozen_runtime():
             QTimer.singleShot(_STARTUP_DELAY_MS, self._startup_check)
 
     @Slot()
@@ -221,24 +249,31 @@ class UpdateController(QObject):
         )
         startup = self._startup_check_active
         if result.outcome is UpdateOutcome.UPDATE and result.version:
+            self._available_size = result.size
             if self._ready_update is None:
                 self._available_version = result.version
                 message = self._available_message(result.version)
                 self._set_status(message)
-                self._show_available(message)
+                self._show_available(message, show_dialog=not startup)
+                if startup:
+                    self._startup_offer_pending = True
+                    self._present_startup_offer()
             else:
                 ready_version = _update_version(
                     self._ready_update, self._available_version
                 )
                 if ready_version:
                     self._available_version = ready_version
-                    self._show_ready(ready_version)
+                    self._show_ready(ready_version, show_dialog=not startup)
+                    if startup:
+                        self._startup_offer_pending = True
+                        self._present_startup_offer()
         elif result.outcome is UpdateOutcome.NONE:
             self._set_status(
                 QCoreApplication.translate("SettingsDialog", "No update found.")
             )
             if self._ready_update is None:
-                self._hide_banner()
+                self._hide_offer()
         else:
             if startup:
                 _LOGGER.info("Startup update check failed")
@@ -250,7 +285,7 @@ class UpdateController(QObject):
                     )
                 )
             if self._ready_update is None:
-                self._hide_banner()
+                self._hide_offer()
         thread = self._check_thread
         if thread is not None:
             thread.quit()
@@ -274,7 +309,7 @@ class UpdateController(QObject):
         version = self._available_version
         if not version:
             return
-        self._banner_dismissed = False
+        self._download_percent = 0
         self._show_downloading(version, 0)
         cancellation = Event()
         worker = _DownloadWorker(
@@ -314,6 +349,7 @@ class UpdateController(QObject):
         if self._available_version is None:
             return
         percent = 0 if total <= 0 else min(100, max(0, completed * 100 // total))
+        self._download_percent = percent
         self._show_downloading(self._available_version, percent)
 
     @Slot(object)
@@ -383,9 +419,26 @@ class UpdateController(QObject):
         self.cancel_download()
 
     @Slot()
-    def dismiss_banner(self) -> None:
-        self._banner_dismissed = True
-        self._hide_banner()
+    def dismiss_offer(self) -> None:
+        self._startup_offer_pending = False
+        self._window.update_dialog.hide()
+        self._refresh_update_button()
+
+    @Slot()
+    def show_offer(self) -> None:
+        """Reopen the current update offer from the action-shelf arrow."""
+        if not self._updates_enabled or not self._is_job_idle():
+            return
+        if self._offer_state == "available":
+            self._show_available(
+                self._available_message(self._available_version or "")
+            )
+        elif self._offer_state == "downloading" and self._available_version:
+            self._show_downloading(self._available_version, self._download_percent)
+        elif self._offer_state == "ready" and self._available_version:
+            self._show_ready(self._available_version)
+        elif self._offer_state == "failed":
+            self._show_failed()
 
     @Slot()
     def open_releases_page(self) -> None:
@@ -393,70 +446,119 @@ class UpdateController(QObject):
 
     def _state_changed(self, _state: AppState) -> None:
         self._refresh_install_button()
+        if self._is_job_idle():
+            self._present_startup_offer()
+        elif self._window.update_dialog.isVisible():
+            self._window.update_dialog.hide()
+        self._refresh_update_button()
+
+    @Slot(int)
+    def _dialog_finished(self, _result: int) -> None:
+        self._refresh_update_button()
 
     def _refresh_install_button(self) -> None:
         enabled = (
-            self._ready_update is not None
+            self._updates_enabled
+            and self._ready_update is not None
             and self._store.state.job.phase is JobState.IDLE
         )
-        self._window.update_install_button.setEnabled(enabled)
+        self._window.update_dialog.install_button.setEnabled(enabled)
 
-    def _show_available(self, message: str) -> None:
-        self._set_banner(message, "available")
+    def _show_available(self, message: str, *, show_dialog: bool = True) -> None:
+        self._set_offer(message, "available", show_dialog=show_dialog)
 
     def _show_downloading(self, version: str, percent: int) -> None:
-        self._set_banner(self._downloading_message(version, percent), "downloading")
+        self._set_offer(
+            self._downloading_message(version, percent), "downloading"
+        )
 
-    def _show_ready(self, version: str) -> None:
-        self._set_banner(self._ready_message(version), "ready")
+    def _show_ready(self, version: str, *, show_dialog: bool = True) -> None:
+        self._set_offer(self._ready_message(version), "ready", show_dialog=show_dialog)
 
     def _show_failed(self) -> None:
-        self._set_banner(
+        self._set_offer(
             QCoreApplication.translate(
                 "UpdateBanner", "The update couldn’t be downloaded."
             ),
             "failed",
         )
 
-    def _set_banner(self, message: str, state: str) -> None:
-        if self._banner_dismissed:
-            return
-        self._window.update_banner.setText(message)
-        self._window.update_banner.setAccessibleDescription(message)
-        self._window.update_container.show()
-        self._window.update_download_button.setVisible(
-            state == "downloading"
-            or (state == "available" and self._self_update_advisable)
-            or state == "failed"
+    def _set_offer(self, message: str, state: str, *, show_dialog: bool = True) -> None:
+        self._offer_state = state
+        dialog = self._window.update_dialog
+        dialog.message_label.setText(message)
+        dialog.message_label.setAccessibleDescription(message)
+        size_message = (
+            self._download_size_message(self._available_size)
+            if self._available_size is not None
+            else None
         )
-        self._window.update_open_releases_button.setVisible(
-            (state == "available" and not self._self_update_advisable)
-            or state == "failed"
-        )
-        self._window.update_not_now_button.setVisible(state == "available")
-        self._window.update_install_button.setVisible(state == "ready")
-        self._window.update_later_button.setVisible(state == "ready")
-        if state == "downloading":
-            download_copy = QCoreApplication.translate("UpdateBanner", "Cancel")
-        elif state == "failed":
-            download_copy = QCoreApplication.translate("UpdateBanner", "Try again")
+        dialog.set_download_size(size_message)
+        if state == "available":
+            dialog.show_available_actions(can_download=self._self_update_advisable)
+        elif state == "downloading":
+            dialog.show_downloading_actions()
+        elif state == "ready":
+            dialog.show_ready_actions()
         else:
-            download_copy = QCoreApplication.translate(
-                "UpdateBanner", "Download update"
-            )
-        self._window.update_download_button.setText(download_copy)
-        self._window.update_download_button.setAccessibleName(download_copy)
-        self._window.update_install_button.setText(
-            QCoreApplication.translate("UpdateBanner", "Install and restart")
-        )
-        self._window.update_later_button.setText(
-            QCoreApplication.translate("UpdateBanner", "Later")
-        )
+            dialog.show_failed_actions()
+        self._refresh_update_button()
+        if show_dialog and self._updates_enabled:
+            self._show_offer_dialog()
         self._refresh_install_button()
 
-    def _hide_banner(self) -> None:
-        self._window.update_container.hide()
+    def _hide_offer(self) -> None:
+        self._offer_state = None
+        self._window.update_dialog.hide()
+        self._window.action_shelf.update_button.hide()
         self._refresh_install_button()
+
+    def _show_offer_dialog(self) -> None:
+        if not self._is_job_idle():
+            return
+        self._window.update_dialog.open()
+        self._window.update_dialog.raise_()
+        self._window.update_dialog.activateWindow()
+        self._refresh_update_button()
+        for button in (
+            self._window.update_dialog.download_button,
+            self._window.update_dialog.install_button,
+            self._window.update_dialog.open_releases_button,
+        ):
+            if button.isVisible() and button.isEnabled():
+                button.setFocus()
+                break
+
+    def _present_startup_offer(self) -> None:
+        if (
+            not self._startup_offer_pending
+            or self._startup_offer_shown
+            or not self._updates_enabled
+            or not self._offer_state
+            or not self._is_job_idle()
+        ):
+            return
+        self._startup_offer_pending = False
+        self._startup_offer_shown = True
+        self._show_offer_dialog()
+
+    def _refresh_update_button(self) -> None:
+        self._window.action_shelf.update_button.setVisible(
+            self._updates_enabled
+            and self._offer_state in ("available", "downloading", "ready", "failed")
+            and not self._window.update_dialog.isVisible()
+        )
+
+    def _startup_setting_changed(self, enabled: bool) -> None:
+        self._updates_enabled = enabled
+        if not enabled:
+            self._startup_offer_pending = False
+            self._window.update_dialog.hide()
+        self._refresh_update_button()
+        self._refresh_install_button()
+
+    def _is_job_idle(self) -> bool:
+        return self._store.state.job.phase is JobState.IDLE
 
     def _available_message(self, version: str) -> str:
         template = QCoreApplication.translate(
@@ -475,6 +577,11 @@ class UpdateController(QObject):
             "UpdateBanner", "MatteLoop %1 is ready to install."
         )
         return template.replace("%1", version)
+
+    def _download_size_message(self, size: int) -> str:
+        megabytes = size // (1024 * 1024)
+        template = QCoreApplication.translate("UpdateBanner", "Download size: %1 MB")
+        return template.replace("%1", display_locale().toString(megabytes))
 
     def _set_status(self, message: str) -> None:
         self._window.action_shelf.preferences_dialog.updates_status_label.setText(

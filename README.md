@@ -100,8 +100,10 @@ Use one MatteLoop instance per installation. The installer and portable
 archive update their own `current` installation in place.
 
 MatteLoop tells you when a new release is available: it checks once at startup
-and shows a notice with a link to the releases page. Preferences carries a
-manual check and the switch that turns the startup one off.
+and opens an update offer with the version and download action. Dismissing the
+offer leaves an update arrow beside the Preferences gear so it can be reopened.
+Preferences carries a manual check and the switch that turns the startup one
+off.
 
 ## Run from source
 
