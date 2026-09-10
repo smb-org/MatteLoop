@@ -73,7 +73,7 @@ from matteloop.ui.render_controller import RenderController
 from matteloop.ui.timeline import SourceFrameWorker
 from matteloop.ui.transform_group import TransformGroup
 from matteloop.ui.transform_stage import TransformStageController
-from matteloop.ui.worker_thread import WorkerThread
+from matteloop.ui.worker_thread import WorkerThread, wait_for_thread_shutdown
 
 _THREAD_SHUTDOWN_TIMEOUT_MS = 5000
 
@@ -345,8 +345,13 @@ class SourceController(QObject):
                 unsubscribe()
             self._frame_timer.stop()
             self._cancel_frame_threads()
-            for thread, _worker in tuple(self._frame_threads):
-                if not thread.wait(_THREAD_SHUTDOWN_TIMEOUT_MS):
+            for thread, frame_worker in tuple(self._frame_threads):
+                if not wait_for_thread_shutdown(
+                    thread,
+                    _THREAD_SHUTDOWN_TIMEOUT_MS,
+                    description="source frame worker",
+                    worker=frame_worker,
+                ):
                     complete = False
             self._model_manager.close()
             complete = self._transform_stage.shutdown() and complete
@@ -355,8 +360,13 @@ class SourceController(QObject):
             threads = tuple(self._threads.items())
             for _request_id, (thread, _load_worker) in threads:
                 thread.quit()
-            for _request_id, (thread, _load_worker) in threads:
-                if not thread.wait(_THREAD_SHUTDOWN_TIMEOUT_MS):
+            for _request_id, (thread, load_worker) in threads:
+                if not wait_for_thread_shutdown(
+                    thread,
+                    _THREAD_SHUTDOWN_TIMEOUT_MS,
+                    description="source load worker",
+                    worker=load_worker,
+                ):
                     complete = False
         except BaseException:
             complete = False

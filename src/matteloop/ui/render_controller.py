@@ -56,7 +56,7 @@ from matteloop.ui.ports import (
 from matteloop.ui.preview_controller import PreviewJobDialog, PreviewRuntime
 from matteloop.ui.render_worker import RenderWorker
 from matteloop.ui.request_builder import _preview_inputs, _render_request
-from matteloop.ui.worker_thread import WorkerThread
+from matteloop.ui.worker_thread import WorkerThread, wait_for_shutdown_worker
 from matteloop.ui.workspace_controller import WorkspacePickerController
 from matteloop.ui.workspace_dialog import WorkspacePickerDialog
 from matteloop.ui.workspace_presentation import request_for_workspace
@@ -194,14 +194,17 @@ class RenderController(QObject):
                 self._threads.pop(job_id, None)
         if self._probe_thread is not None:
             try:
-                if not self._probe_thread.wait(5000):
+                if not wait_for_shutdown_worker(
+                    self._probe_thread, self._probe_worker, "workspace probe worker"
+                ):
                     complete = False
             except RuntimeError:
                 self._probe_thread = None
                 complete = False
-        for job_id, (thread, _worker) in tuple(self._threads.items()):
+        for job_id, (thread, worker) in tuple(self._threads.items()):
             try:
-                if not thread.wait(5000):
+                name = f"render worker {job_id}"
+                if not wait_for_shutdown_worker(thread, worker, name):
                     complete = False
             except RuntimeError:
                 self._threads.pop(job_id, None)
