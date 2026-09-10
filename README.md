@@ -7,10 +7,13 @@ back a transparent animated WebP that loops.
 the cut-out result on the right over a transparency checkerboard, and the
 inspector on the far right](assets/screenshots/main-window.png)
 
-Nothing leaves your computer. The video, the model weights, every intermediate
-frame and the finished loop stay on your disk — there is no account, no upload,
-and no network call except the one that fetches a model weight the first time
-you use it.
+Your video, model weights, every intermediate frame and the finished loop stay
+on your disk. MatteLoop makes no network request except the update check, the
+update package download, and the model download on first use. The segmentation
+runtime's own telemetry is switched off on macOS and Linux; on Windows it is
+switched off after the runtime loads, but a startup diagnostic event is
+written to Windows' event tracing before that and may be collected under the
+device's diagnostic data policy.
 
 ## What it is for
 

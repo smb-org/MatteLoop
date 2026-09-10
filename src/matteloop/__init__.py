@@ -1,6 +1,19 @@
 """MatteLoop package."""
 
+import os
+
 from PIL import Image
+
+# The runtime starts Microsoft's 1DS telemetry SDK on import. Without this,
+# it records a hardware-fingerprint event per launch and uploads it; a
+# packaged 0.4.0 build produced a crash report at quit inside that SDK's
+# teardown. This variable is documented in ONNX Runtime's docs/Privacy.md
+# under "Disabling Telemetry" and read in PosixTelemetry::Initialize(); it
+# must be set before the first onnxruntime import in every process, which is
+# why it lives here rather than in load_onnxruntime(). Assigned unconditionally:
+# MatteLoop offers no telemetry opt-in, so an inherited ORT_DISABLE_TELEMETRY=0
+# or empty value is never intentional and must not survive the import.
+os.environ["ORT_DISABLE_TELEMETRY"] = "1"
 
 __version__ = "0.4.0"
 
