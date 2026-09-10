@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from fractions import Fraction
 from pathlib import Path
+from threading import Event
 
-from PySide6.QtCore import QPoint, Qt
+from PySide6.QtCore import QObject, QPoint, Qt, QThread
 from PySide6.QtTest import QTest
 
 from matteloop.core.timeline import (
@@ -122,3 +123,35 @@ def test_timeline_reset_range_button_emits_reset_range_command(qtbot) -> None:
     qtbot.mouseClick(widget.reset_range_button, Qt.MouseButton.LeftButton)
 
     assert events == [ResetRange()]
+
+
+def test_timeline_shutdown_retains_an_unreleased_thumbnail_thread(
+    qtbot, monkeypatch
+) -> None:
+    class _StalledThread(QThread):
+        def __init__(self) -> None:
+            super().__init__()
+            self.started = Event()
+            self.release = Event()
+
+        def run(self) -> None:
+            self.started.set()
+            self.release.wait(5)
+
+    monkeypatch.setattr("matteloop.ui.timeline._THREAD_SHUTDOWN_TIMEOUT_MS", 25)
+    widget = TimelineWidget()
+    qtbot.addWidget(widget)
+    thread = _StalledThread()
+    worker = QObject()
+    widget._thumbnail_threads.append(  # noqa: SLF001
+        (thread, worker),  # type: ignore[arg-type]
+    )
+    thread.start()
+    assert thread.started.wait(1)
+
+    assert not widget.shutdown()
+    assert not widget.shutdown_complete
+    assert thread.parent() is None
+
+    thread.release.set()
+    assert thread.wait(1000)

@@ -608,6 +608,7 @@ def test_uncooperative_update_check_does_not_abort_process_on_shutdown() -> None
         controller.deleteLater()
         window.deleteLater()
         QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+        del app
         if not reader.finished.wait(2):
             raise AssertionError("the uncooperative reader did not finish")
         if not thread.wait(1000):
@@ -625,6 +626,66 @@ def test_uncooperative_update_check_does_not_abort_process_on_shutdown() -> None
         timeout=10,
     )
     assert result.returncode == 0, result.stderr
+
+
+def test_shutdown_reports_when_an_update_download_outlives_its_bounded_wait(
+    monkeypatch, qtbot
+) -> None:
+    started = Event()
+    release = Event()
+
+    def blocked_download(*_args: object, **_kwargs: object) -> object:
+        started.set()
+        release.wait(5)
+        raise RuntimeError("released download")
+
+    monkeypatch.setattr(
+        "matteloop.ui.update_controller._DOWNLOAD_SHUTDOWN_TIMEOUT_MS", 25
+    )
+    monkeypatch.setattr(
+        "matteloop.ui.update_controller.download_update", blocked_download
+    )
+    window, controller, _ = _controller(
+        qtbot,
+        _settings("download-timeout"),
+        UpdateResult(UpdateOutcome.NONE),
+        manager=_Manager(),
+        transport=object(),  # type: ignore[arg-type]
+    )
+    controller._available_version = "0.4.0"  # noqa: SLF001
+    controller.start_download()
+    qtbot.waitUntil(started.is_set, timeout=1000)
+
+    assert not controller.shutdown()
+    thread = controller._download_thread  # noqa: SLF001
+    assert thread is not None
+    assert thread.parent() is None
+
+    release.set()
+    assert thread.wait(1000)
+
+
+def test_incomplete_timeline_shutdown_refuses_pending_install(
+    monkeypatch, qtbot, caplog
+) -> None:
+    info = _UpdateInfo(_Asset("0.4.0"))
+    manager = _Manager(pending=info)
+    monkeypatch.setattr(os, "access", lambda _path, _mode: True)
+    window, controller, _ = _controller(
+        qtbot,
+        _settings("arm-install-incomplete-timeline-shutdown"),
+        UpdateResult(UpdateOutcome.NONE),
+        manager=manager,
+        source_shutdown_complete=lambda: window.timeline_widget.shutdown_complete,
+    )
+
+    controller._pending_install = info  # noqa: SLF001
+    window.timeline_widget._shutdown_complete = False  # noqa: SLF001
+    with caplog.at_level("WARNING"):
+        controller.arm_pending_install()
+
+    assert manager.apply_calls == []
+    assert "application work did not stop during shutdown" in caplog.text
 
 
 def test_manual_check_shows_an_update_when_startup_checks_are_disabled(qtbot) -> None:

@@ -131,7 +131,10 @@ def _start_update_controller(
         parent=application,
         store=store,
         transport=transport,
-        source_shutdown_complete=lambda: source_controller.shutdown_complete,
+        source_shutdown_complete=lambda: (
+            source_controller.shutdown_complete
+            and window.timeline_widget.shutdown_complete
+        ),
     )
     update_controller.start()
     application.aboutToQuit.connect(update_controller.shutdown)

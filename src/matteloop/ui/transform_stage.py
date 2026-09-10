@@ -49,9 +49,12 @@ from matteloop.ui.result_player import (
     ResultPlayerCanvas,
 )
 from matteloop.ui.transform_group import CutFacts, TransformGroup
+from matteloop.ui.worker_thread import wait_for_thread_shutdown
 
 if TYPE_CHECKING:
     from fractions import Fraction
+
+_THREAD_SHUTDOWN_TIMEOUT_MS = 5000
 
 
 class FrameReader(Protocol):
@@ -268,12 +271,13 @@ class TransformStageController(QObject):
         self.close_session()
         facts_complete = self._join_worker(wait=True)
         complete = frame_complete and facts_complete
-        for thread, _worker in self._retiring:
-            try:
-                if not thread.wait(5000):
-                    complete = False
-            except RuntimeError:
-                complete = False
+        for thread, worker in self._retiring:
+            complete = wait_for_thread_shutdown(
+                thread,
+                _THREAD_SHUTDOWN_TIMEOUT_MS,
+                description="transform worker",
+                worker=worker,
+            ) and complete
         self._retiring.clear()
         return complete
 
@@ -526,7 +530,12 @@ class TransformStageController(QObject):
         try:
             thread.quit()
             if wait:
-                return bool(thread.wait(5000))
+                return wait_for_thread_shutdown(
+                    thread,
+                    _THREAD_SHUTDOWN_TIMEOUT_MS,
+                    description="transform worker",
+                    worker=worker,
+                )
             elif worker is not None:
                 self._retiring.append((thread, worker))
         except RuntimeError:

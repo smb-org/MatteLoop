@@ -34,7 +34,7 @@ from matteloop.ui.update_paths import (
     _physical_executable_path,
     _update_version,
 )
-from matteloop.ui.worker_thread import WorkerThread
+from matteloop.ui.worker_thread import WorkerThread, wait_for_thread_shutdown
 from matteloop.updates import (
     UpdateDownloadCancelled,
     UpdateOutcome,
@@ -381,11 +381,11 @@ class UpdateController(QObject):
         if thread is None:
             return True
         thread.quit()
-        if thread.wait(_DOWNLOAD_SHUTDOWN_TIMEOUT_MS):
-            return True
-        thread.setParent(QCoreApplication.instance())
-        _LOGGER.warning("MatteLoop update check thread outlived shutdown")
-        return False
+        return wait_for_thread_shutdown(
+            thread,
+            _DOWNLOAD_SHUTDOWN_TIMEOUT_MS,
+            description="MatteLoop update check thread",
+        )
 
     @Slot()
     def cancel_download(self) -> bool:
@@ -395,11 +395,11 @@ class UpdateController(QObject):
         thread = self._download_thread
         if thread is not None:
             thread.quit()
-            if thread.wait(_DOWNLOAD_SHUTDOWN_TIMEOUT_MS):
-                return True
-            thread.setParent(QCoreApplication.instance())
-            _LOGGER.warning("MatteLoop update download thread outlived shutdown")
-            return False
+            return wait_for_thread_shutdown(
+                thread,
+                _DOWNLOAD_SHUTDOWN_TIMEOUT_MS,
+                description="MatteLoop update download thread",
+            )
         return True
 
     @Slot()
