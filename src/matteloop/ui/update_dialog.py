@@ -31,6 +31,12 @@ class UpdateDialog(QDialog):
         self._build_layout()
         self._set_tab_order()
 
+    def _make_button(self, text: str, object_name: str) -> QPushButton:
+        button = QPushButton(text)
+        button.setObjectName(object_name)
+        button.setAccessibleName(text)
+        return button
+
     def _build_widgets(self) -> None:
         notice_name = QCoreApplication.translate("UpdateBanner", "Update notice")
         self.heading_label = QLabel(
@@ -53,47 +59,29 @@ class UpdateDialog(QDialog):
         )
         self.size_label.hide()
 
-        self.download_button = QPushButton(
-            QCoreApplication.translate("UpdateBanner", "Download update")
+        self.download_button = self._make_button(
+            QCoreApplication.translate("UpdateBanner", "Download update"),
+            "update_download",
         )
-        self.download_button.setObjectName("update_download")
-        self.download_button.setAccessibleName(
-            QCoreApplication.translate("UpdateBanner", "Download update")
+        self.install_button = self._make_button(
+            QCoreApplication.translate("UpdateBanner", "Install and restart"),
+            "update_install",
         )
-        self.install_button = QPushButton(
-            QCoreApplication.translate("UpdateBanner", "Install and restart")
+        self.release_notes_button = self._make_button(
+            QCoreApplication.translate("UpdateBanner", "Release notes"),
+            "update_release_notes",
         )
-        self.install_button.setObjectName("update_install")
-        self.install_button.setAccessibleName(
-            QCoreApplication.translate("UpdateBanner", "Install and restart")
+        self.open_releases_button = self._make_button(
+            QCoreApplication.translate("UpdateBanner", "Open releases page"),
+            "update_open_releases",
         )
-        self.release_notes_button = QPushButton(
-            QCoreApplication.translate("UpdateBanner", "Release notes")
+        self.not_now_button = self._make_button(
+            QCoreApplication.translate("UpdateBanner", "Not now"),
+            "update_not_now",
         )
-        self.release_notes_button.setObjectName("update_release_notes")
-        self.release_notes_button.setAccessibleName(
-            QCoreApplication.translate("UpdateBanner", "Release notes")
-        )
-        self.open_releases_button = QPushButton(
-            QCoreApplication.translate("UpdateBanner", "Open releases page")
-        )
-        self.open_releases_button.setObjectName("update_open_releases")
-        self.open_releases_button.setAccessibleName(
-            QCoreApplication.translate("UpdateBanner", "Open releases page")
-        )
-        self.not_now_button = QPushButton(
-            QCoreApplication.translate("UpdateBanner", "Not now")
-        )
-        self.not_now_button.setObjectName("update_not_now")
-        self.not_now_button.setAccessibleName(
-            QCoreApplication.translate("UpdateBanner", "Not now")
-        )
-        self.later_button = QPushButton(
-            QCoreApplication.translate("UpdateBanner", "Later")
-        )
-        self.later_button.setObjectName("update_later")
-        self.later_button.setAccessibleName(
-            QCoreApplication.translate("UpdateBanner", "Later")
+        self.later_button = self._make_button(
+            QCoreApplication.translate("UpdateBanner", "Later"),
+            "update_later",
         )
 
     def _build_layout(self) -> None:
