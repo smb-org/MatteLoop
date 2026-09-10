@@ -15,7 +15,7 @@ from PIL import Image
 # or empty value is never intentional and must not survive the import.
 os.environ["ORT_DISABLE_TELEMETRY"] = "1"
 
-__version__ = "0.4.0"
+__version__ = "0.4.1"
 
 # The single source for the product name. QSettings identity and the window
 # title derive from it in code; the packaging spec's --macos-app-name and
