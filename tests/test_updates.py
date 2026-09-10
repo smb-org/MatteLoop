@@ -9,6 +9,7 @@ from threading import Event
 
 import pytest
 
+from matteloop import __version__
 from matteloop.jobs.models.download import DownloadHttpError
 from matteloop.updates import (
     GITHUB_LATEST_RELEASE_URL,
@@ -21,6 +22,13 @@ from matteloop.updates import (
     update_package_url,
 )
 from tests.update_fakes import FakeResponse, FakeTransport
+
+# The update check compares a candidate release against the version installed
+# right now, so a fixture pinned to a specific "newer" string stops being
+# newer the moment that release ships (#132's 0.4.0 bump broke it this way).
+# Derive the fixtures from the installed version instead of writing one down.
+_INSTALLED_MAJOR, _INSTALLED_MINOR, _ = (int(part) for part in __version__.split("."))
+NEWER_VERSION = f"{_INSTALLED_MAJOR}.{_INSTALLED_MINOR + 1}.0"
 
 
 class _Response:
@@ -72,10 +80,10 @@ class _Transport:
 def _package_fixture(
     package: bytes = b"nupkg-content",
     *,
-    version: str = "0.4.0",
+    version: str = NEWER_VERSION,
     package_response: FakeResponse | BaseException | None = None,
 ) -> tuple[FakeTransport, str]:
-    filename = "io.github.smb-org.matteloop-0.4.0-osx-arm64-full.nupkg"
+    filename = f"io.github.smb-org.matteloop-{version}-osx-arm64-full.nupkg"
     feed = json.dumps(
         {
             "Assets": [
@@ -119,7 +127,7 @@ def test_newer_release_is_reported_as_an_update(monkeypatch) -> None:
     reader, transport, response = _reader(
         json.dumps(
             {
-                "tag_name": "v0.4.0",
+                "tag_name": f"v{NEWER_VERSION}",
                 "assets": [
                     {
                         "name": "MatteLoop-win-x64-full.nupkg",
@@ -137,7 +145,7 @@ def test_newer_release_is_reported_as_an_update(monkeypatch) -> None:
     result = reader.check()
 
     assert result.outcome is UpdateOutcome.UPDATE
-    assert result.version == "0.4.0"
+    assert result.version == NEWER_VERSION
     assert result.size == 398_458_880
     assert transport.calls == [
         (
@@ -153,20 +161,22 @@ def test_newer_release_without_a_platform_package_has_no_download_size(
 ) -> None:
     monkeypatch.setattr(sys, "platform", "darwin")
     reader, _, _ = _reader(
-        b'{"tag_name":"v0.4.0","assets":[{"name":"MatteLoop-source.zip","size":123}]}'
+        f'{{"tag_name":"v{NEWER_VERSION}",'
+        f'"assets":[{{"name":"MatteLoop-source.zip","size":123}}]}}'.encode()
     )
 
     assert reader.check().size is None
 
 
 def test_equal_release_is_reported_as_no_update() -> None:
-    reader, _, _ = _reader(b'{"tag_name":"v0.3.0"}')
+    reader, _, _ = _reader(f'{{"tag_name":"v{__version__}"}}'.encode())
 
     assert reader.check().outcome is UpdateOutcome.NONE
 
 
 def test_older_release_is_reported_as_no_update() -> None:
-    reader, _, _ = _reader(b'{"tag_name":"v0.2.9"}')
+    older = f"{_INSTALLED_MAJOR}.{_INSTALLED_MINOR - 1}.9"
+    reader, _, _ = _reader(f'{{"tag_name":"v{older}"}}'.encode())
 
     assert reader.check().outcome is UpdateOutcome.NONE
 
@@ -215,17 +225,17 @@ def test_beta_reader_offers_a_prerelease_and_chooses_the_newest_version(
     reader, transport, response = _reader(
         json.dumps(
             [
-                {"tag_name": "v0.4.0-beta.1", "draft": False, "assets": []},
-                {"tag_name": "v0.4.0-beta.2", "draft": False, "assets": []},
-                {"tag_name": "v0.4.0-beta.10", "draft": True, "assets": []},
+                {"tag_name": f"v{NEWER_VERSION}-beta.1", "draft": False, "assets": []},
+                {"tag_name": f"v{NEWER_VERSION}-beta.2", "draft": False, "assets": []},
+                {"tag_name": f"v{NEWER_VERSION}-beta.10", "draft": True, "assets": []},
             ]
         ).encode()
     )
 
-    result = reader.check("beta", "0.3.0")
+    result = reader.check("beta", __version__)
 
     assert result.outcome is UpdateOutcome.UPDATE
-    assert result.version == "0.4.0-beta.2"
+    assert result.version == f"{NEWER_VERSION}-beta.2"
     assert transport.calls == [
         (
             releases_api_url(),
@@ -237,27 +247,33 @@ def test_beta_reader_offers_a_prerelease_and_chooses_the_newest_version(
 
 def test_stable_reader_does_not_offer_a_prerelease() -> None:
     reader, _, _ = _reader(
-        b'{"tag_name":"v0.4.0-beta.1","prerelease":true,"draft":false}'
+        f'{{"tag_name":"v{NEWER_VERSION}-beta.1","prerelease":true,'
+        f'"draft":false}}'.encode()
     )
 
-    assert reader.check("stable", "0.3.0").outcome is UpdateOutcome.NONE
+    assert reader.check("stable", __version__).outcome is UpdateOutcome.NONE
 
 
 def test_beta_installation_is_offered_the_next_stable_release() -> None:
     reader, _, _ = _reader(
-        b'[{"tag_name":"v0.4.0","prerelease":false,"draft":false}]'
+        f'[{{"tag_name":"v{NEWER_VERSION}","prerelease":false,"draft":false}}]'.encode()
     )
 
-    result = reader.check("beta", "0.4.0-beta.1")
+    result = reader.check("beta", f"{NEWER_VERSION}-beta.1")
 
     assert result.outcome is UpdateOutcome.UPDATE
-    assert result.version == "0.4.0"
+    assert result.version == NEWER_VERSION
 
 
 def test_stable_preference_never_offers_a_downgrade_from_a_beta() -> None:
-    reader, _, _ = _reader(b'{"tag_name":"v0.3.0","prerelease":false}')
+    reader, _, _ = _reader(
+        f'{{"tag_name":"v{__version__}","prerelease":false}}'.encode()
+    )
 
-    assert reader.check("stable", "0.4.0-beta.1").outcome is UpdateOutcome.NONE
+    assert (
+        reader.check("stable", f"{NEWER_VERSION}-beta.1").outcome
+        is UpdateOutcome.NONE
+    )
 
 
 def test_non_json_release_body_is_reported_as_failed() -> None:
@@ -268,7 +284,9 @@ def test_non_json_release_body_is_reported_as_failed() -> None:
 
 def test_release_body_over_the_cap_is_reported_as_failed() -> None:
     reader, _, response = _reader(
-        b'{"tag_name":"v0.4.0","body":"' + b"x" * (1024 * 1024) + b'"}'
+        f'{{"tag_name":"v{NEWER_VERSION}","body":"'.encode()
+        + b"x" * (1024 * 1024)
+        + b'"}'
     )
 
     assert reader.check().outcome is UpdateOutcome.FAILED
@@ -284,7 +302,7 @@ def test_http_error_is_reported_as_failed() -> None:
 
 
 def test_update_check_passes_its_cancellation_callback_to_transport() -> None:
-    reader, transport, _ = _reader(b'{"tag_name":"v0.4.0"}')
+    reader, transport, _ = _reader(f'{{"tag_name":"v{NEWER_VERSION}"}}'.encode())
     cancelled = Event()
 
     assert reader.check(cancelled=cancelled.is_set).outcome is UpdateOutcome.UPDATE
@@ -296,7 +314,7 @@ def test_update_check_passes_its_cancellation_callback_to_transport() -> None:
 
 def test_repository_environment_overrides_the_notice_feed(monkeypatch) -> None:
     monkeypatch.setenv("MATTELOOP_UPDATE_REPO", "qualification/MatteLoop")
-    reader, transport, _ = _reader(b'{"tag_name":"v0.4.0"}')
+    reader, transport, _ = _reader(f'{{"tag_name":"v{NEWER_VERSION}"}}'.encode())
 
     assert reader.check().outcome is UpdateOutcome.UPDATE
     assert transport.calls[0][0] == (
@@ -309,13 +327,13 @@ def test_a_failing_close_keeps_the_outcome_read_from_the_body() -> None:
         def close(self) -> None:
             raise OSError("connection reset while closing")
 
-    response = _UnclosableResponse(b'{"tag_name":"v0.4.0"}')
+    response = _UnclosableResponse(f'{{"tag_name":"v{NEWER_VERSION}"}}'.encode())
     reader = GitHubUpdateReader(_Transport(response))
 
     result = reader.check()
 
     assert result.outcome is UpdateOutcome.UPDATE
-    assert result.version == "0.4.0"
+    assert result.version == NEWER_VERSION
 
 
 def test_update_download_selects_the_full_asset_and_verifies_case_insensitive_sha256(
@@ -326,7 +344,7 @@ def test_update_download_selects_the_full_asset_and_verifies_case_insensitive_sh
 
     target = download_update(
         transport,
-        "0.4.0",
+        NEWER_VERSION,
         tmp_path,
         lambda completed, total: progress.append((completed, total)),
         lambda: False,
@@ -345,8 +363,8 @@ def test_update_download_checksum_mismatch_removes_the_part_file(
     transport, filename = _package_fixture(
         package_response=FakeResponse(b"different-content")
     )
-    feed_url = update_feed_url("0.4.0", platform="darwin")
-    package_url = update_package_url("0.4.0", filename)
+    feed_url = update_feed_url(NEWER_VERSION, platform="darwin")
+    package_url = update_package_url(NEWER_VERSION, filename)
     body = json.loads(transport.responses[feed_url].body)
     body["Assets"][1]["SHA256"] = hashlib.sha256(b"nupkg-content").hexdigest()
     transport.responses[feed_url] = FakeResponse(json.dumps(body).encode())
@@ -354,7 +372,7 @@ def test_update_download_checksum_mismatch_removes_the_part_file(
     with pytest.raises(ValueError, match="SHA256"):
         download_update(
             transport,
-            "0.4.0",
+            NEWER_VERSION,
             tmp_path,
             lambda _completed, _total: None,
             lambda: False,
@@ -375,7 +393,7 @@ def test_update_download_cancellation_removes_the_part_file(tmp_path: Path) -> N
     with pytest.raises(UpdateDownloadCancelled):
         download_update(
             transport,
-            "0.4.0",
+            NEWER_VERSION,
             tmp_path,
             lambda _completed, _total: None,
             cancellation.is_set,
@@ -392,7 +410,7 @@ def test_update_download_transport_error_removes_the_part_file(tmp_path: Path) -
     with pytest.raises(OSError, match="offline"):
         download_update(
             transport,
-            "0.4.0",
+            NEWER_VERSION,
             tmp_path,
             lambda _completed, _total: None,
             lambda: False,

@@ -1,6 +1,6 @@
 [app]
 title = MatteLoop
-version = 0.3.0
+version = 0.4.0
 project_dir = .
 input_file = packaging/entrypoint.py
 exec_directory = dist
@@ -32,9 +32,9 @@ extra_args =
 	--no-deployment-flag=self-execution
 	--assume-yes-for-downloads
 	--windows-console-mode=attach
-	--file-version=0.3.0
-	--product-version=0.3.0
-	--macos-app-version=0.3.0
+	--file-version=0.4.0
+	--product-version=0.4.0
+	--macos-app-version=0.4.0
 	--macos-app-name=MatteLoop
 	--macos-signed-app-name=io.github.smb-org.matteloop
 	--output-filename=matteloop
