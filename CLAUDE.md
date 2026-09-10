@@ -151,6 +151,36 @@ Then, still by hand:
 Never patch a version into a built artifact by hand. If a number is wrong in a
 bundle, it is wrong in one of the two files above, and the fix belongs there.
 
+## Shipping a beta (REQUIRED)
+
+A beta is an ordinary release marked **prerelease** on GitHub. There is no beta
+branch, no second Velopack channel, and no separate build: the same artifacts
+serve both audiences.
+
+1. **Tag it `vX.Y.Z-beta.N`.** The suffix grammar is semantic-version
+   precedence, so `0.4.0-beta.1` is *lower* than `0.4.0` and `beta.10` is
+   higher than `beta.2`. Anything after the hyphen must match
+   `[0-9A-Za-z.-]+`; a leading-zero numeric identifier is refused.
+2. **Raise the version as usual** (see above), with the one exception recorded
+   there: `__version__` and the bundle versions carry only the numeric core,
+   while the tag and `--packVersion` carry the suffix. `plan` compares the
+   tag's core with `__version__` and fails on a mismatch.
+3. **`publish` marks it automatically.** A tag containing a hyphen adds
+   `--prerelease` to `gh release create`; nothing else in the workflow changes.
+4. **Publish the draft** as for any release. The LGPL source archives ship with
+   a prerelease too — the licence does not care whether a release is final.
+
+What follows from the prerelease flag, and is worth knowing before promising
+anything to a beta tester:
+
+- **Stable installations never see it.** `/releases/latest` excludes drafts and
+  prereleases by GitHub's own definition; the beta channel reads `/releases`.
+- **There is no way back.** Downgrades are refused, so a bad beta is fixed by a
+  newer beta, never by an older release. Turning the preference off leaves the
+  installation on its beta until a stable release overtakes it.
+- **A beta and the stable release it precedes share their packages.** The only
+  difference is which endpoint the client reads.
+
 ## Working on issues (REQUIRED)
 
 Work that answers a GitHub issue goes onto its own branch and into a pull
