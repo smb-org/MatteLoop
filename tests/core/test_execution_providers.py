@@ -78,28 +78,66 @@ def test_onnxruntime_loader_reports_missing_secondary_telemetry_switch(
     assert "secondary telemetry switch unavailable" in caplog.text
 
 
-def test_onnxruntime_import_does_not_start_native_telemetry_threads() -> None:
+_THREAD_GROWTH_SCRIPT = """
+import psutil
+
+process = psutil.Process()
+before = process.num_threads()
+import onnxruntime
+print(process.num_threads() - before)
+"""
+
+
+def _thread_growth_on_import(*, disable_telemetry: bool) -> int:
+    """Return how many native threads importing the runtime starts."""
+    environment = os.environ.copy()
+    if disable_telemetry:
+        environment["ORT_DISABLE_TELEMETRY"] = "1"
+    else:
+        environment.pop("ORT_DISABLE_TELEMETRY", None)
+    completed = subprocess.run(
+        [sys.executable, "-I", "-c", textwrap.dedent(_THREAD_GROWTH_SCRIPT)],
+        capture_output=True,
+        check=False,
+        env=environment,
+        text=True,
+    )
+    assert completed.returncode == 0, completed.stderr
+    return int(completed.stdout.strip().splitlines()[-1])
+
+
+@pytest.mark.skipif(
+    sys.platform != "darwin",
+    reason=(
+        "the thread count only isolates telemetry on macOS: measured, importing "
+        "the runtime grows the process by 2 threads there and by none once the "
+        "switch is set, while Linux starts device-discovery threads either way "
+        "(1 to 4) and Windows reports telemetry through ETW (4 to 10)"
+    ),
+)
+def test_the_switch_keeps_the_runtime_from_starting_telemetry_threads() -> None:
     if importlib.util.find_spec("onnxruntime") is None:
         pytest.skip("onnxruntime is not installed")
 
+    assert _thread_growth_on_import(disable_telemetry=True) < (
+        _thread_growth_on_import(disable_telemetry=False)
+    )
+
+
+def test_importing_matteloop_disables_runtime_telemetry_before_any_import() -> None:
     script = """
     import os
-    import psutil
+    import sys
 
     import matteloop
 
-    process = psutil.Process()
-    before = process.num_threads()
-    import onnxruntime
-    after = process.num_threads()
-
-    assert os.environ["ORT_DISABLE_TELEMETRY"] == "1"
-    assert after == before, (before, after)
+    assert "onnxruntime" not in sys.modules
+    print(os.environ["ORT_DISABLE_TELEMETRY"])
     """
     environment = os.environ.copy()
     environment.pop("ORT_DISABLE_TELEMETRY", None)
     completed = subprocess.run(
-        [sys.executable, "-I", "-c", textwrap.dedent(script)],
+        [sys.executable, "-c", textwrap.dedent(script)],
         capture_output=True,
         check=False,
         env=environment,
@@ -109,6 +147,7 @@ def test_onnxruntime_import_does_not_start_native_telemetry_threads() -> None:
     assert completed.returncode == 0, (
         f"stdout:\n{completed.stdout}\nstderr:\n{completed.stderr}"
     )
+    assert completed.stdout.strip().splitlines()[-1] == "1"
 
 
 def test_provider_catalog_exposes_only_allowlisted_local_runtime_providers() -> None:
