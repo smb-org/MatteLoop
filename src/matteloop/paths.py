@@ -20,3 +20,8 @@ def cache_subdirectory(*parts: str) -> Path:
 def model_cache_root() -> Path:
     """Return MatteLoop's model cache."""
     return cache_subdirectory("models")
+
+
+def cut_workspace_root() -> Path:
+    """Return MatteLoop's durable cut-workspace root."""
+    return cache_subdirectory("workspace")

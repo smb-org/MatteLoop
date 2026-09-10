@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import errno
 import gc
-import hashlib
 import json
 import multiprocessing
 import os
@@ -2154,16 +2153,20 @@ def test_workspace_rejects_noncanonical_cache_keys(
     assert exc.value.code is ErrorCode.CUT_WORKSPACE_UNSAFE
 
 
-def test_workspace_rejects_symlinked_root_component(tmp_path: Path) -> None:
+def test_workspace_rejects_symlinked_root_component(
+    tmp_path: Path, cache_root: Path
+) -> None:
     outside = tmp_path / "outside"
     outside.mkdir()
-    (tmp_path / ".matteloop-work").symlink_to(outside, target_is_directory=True)
+    cache_root.mkdir()
+    (cache_root / "workspace").symlink_to(outside, target_is_directory=True)
 
     with pytest.raises(AppError) as exc:
         CutWorkspace.create_staging(tmp_path, "a" * 64, "job-1")
 
     assert exc.value.code is ErrorCode.CUT_WORKSPACE_UNSAFE
-    assert list(outside.iterdir()) == []
+    assert not tuple((outside / "cuts").iterdir())
+    assert not tuple((outside / "scratch").iterdir())
 
 
 @pytest.mark.skipif(os.name == "nt", reason="POSIX descriptor-race probe")
@@ -2183,7 +2186,7 @@ def test_component_binding_rejects_real_ancestor_swap(
     ) -> int:
         nonlocal swapped
         if (
-            path == ".matteloop-work"
+            path == root.name
             and kwargs.get("dir_fd") is not None
             and not swapped
         ):
@@ -2245,26 +2248,43 @@ def test_local_filesystem_policy_degrades_for_nonlocal_and_unknown_storage(
     assert workspace_module._windows_drive_type_is_local(4) is False
 
 
-def test_nonlocal_workspace_uses_deterministic_local_fallback(
+def test_workspace_layout_uses_shared_cache_root(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     cache_root = tmp_path / "user-cache"
     monkeypatch.setattr(paths_module, "user_cache_dir", lambda _app: str(cache_root))
     monkeypatch.setattr(
-        workspace_module,
-        "_default_local_filesystem_probe",
-        lambda _bound: False,
+        workspace_module, "_default_local_filesystem_probe", lambda _bound: False
     )
 
     layout = workspace_module._workspace_layout(tmp_path, create=True)
 
-    assert layout.fallback_used
-    assert layout.fallback is not None
-    assert layout.fallback.reason == "network-filesystem"
-    assert layout.workspace_root == cache_root / "workspaces" / (
-        hashlib.sha256(os.fsencode(str(tmp_path))).hexdigest()
-    )
+    assert not layout.fallback_used
+    assert layout.fallback is None
+    assert layout.workspace_root == cache_root / "workspace"
     assert layout.workspace_root != tmp_path / ".matteloop-work"
+
+
+def test_frame_replaced_mid_read_is_rejected(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    cuts = _promoted(tmp_path)
+    actual_lstat = workspace_module._BoundDirectory.lstat
+    replaced = False
+
+    def replace_before_named_lstat(bound: object, name: str) -> os.stat_result:
+        nonlocal replaced
+        if name == "frame-000000.png" and not replaced:
+            replaced = True
+            _rewrite_frame(cuts.path / name, (20, 30, 40, 255))
+        return actual_lstat(bound, name)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(
+        workspace_module._BoundDirectory, "lstat", replace_before_named_lstat
+    )
+
+    with pytest.raises(AppError, match="changed while it was read"):
+        validate_cut_set(cuts)
 
 
 @pytest.mark.parametrize(

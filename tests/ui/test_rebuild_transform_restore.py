@@ -122,19 +122,20 @@ def _previewed_state(path: Path) -> AppState:
     )
 
 
-def _promoted_cut(tmp_path: Path, key: str) -> CutWorkspace:
+def _promoted_cut(tmp_path: Path, cache_root: Path, key: str) -> CutWorkspace:
     """A promoted cut set as a restarted application would find it.
 
     The transform sidecar is addressed by ``cuts_root`` and ``cache_key``
     alone, so no cut frames or manifest are needed to store and restore one.
     """
-    cuts_root = tmp_path / ".matteloop-work" / "cuts"
+    workspace_root = cache_root / "workspace"
+    cuts_root = workspace_root / "cuts"
     cuts_root.mkdir(parents=True, exist_ok=True)
     return CutWorkspace(
         tmp_path,
-        tmp_path / ".matteloop-work",
+        workspace_root,
         cuts_root,
-        tmp_path / ".matteloop-work" / "scratch",
+        workspace_root / "scratch",
         key * 64,
         cuts_root / f"source-{key * 8}",
         WorkspaceLifecycle.PROMOTED,
@@ -163,12 +164,12 @@ def _rebuild_from_reuse_dialog(controller: SourceController, qtbot) -> None:
 
 
 def test_rebuilding_a_matched_cut_restores_its_stored_transform(
-    tmp_path, qtbot
+    tmp_path, qtbot, cache_root
 ) -> None:
     """A cold start holds no transform, so the sidecar is the only record of
     the trim/crop/resize the last render applied.
     """
-    workspace = _promoted_cut(tmp_path, "a")
+    workspace = _promoted_cut(tmp_path, cache_root, "a")
     stored = TransformSpec(first_frame=1, crop=CropSpec(8, 8, 64, 64))
     store_transform(workspace, stored, [])
     runtime = _MatchedCutRuntime(workspace)
@@ -183,12 +184,12 @@ def test_rebuilding_a_matched_cut_restores_its_stored_transform(
 
 
 def test_rebuilding_the_open_cut_keeps_unsaved_inspector_edits(
-    tmp_path, qtbot
+    tmp_path, qtbot, cache_root
 ) -> None:
     """The stored transform must never overwrite an edit the user has made to
     the cut currently on screen -- the same loss in the other direction.
     """
-    workspace = _promoted_cut(tmp_path, "a")
+    workspace = _promoted_cut(tmp_path, cache_root, "a")
     store_transform(workspace, TransformSpec(first_frame=1), [])
     runtime = _MatchedCutRuntime(workspace)
     store, controller = _controller(tmp_path, runtime)
@@ -205,9 +206,9 @@ def test_rebuilding_the_open_cut_keeps_unsaved_inspector_edits(
 
 
 def test_rebuilding_the_open_cut_uses_edits_made_during_the_reuse_probe(
-    tmp_path, qtbot
+    tmp_path, qtbot, cache_root
 ) -> None:
-    workspace = _promoted_cut(tmp_path, "a")
+    workspace = _promoted_cut(tmp_path, cache_root, "a")
     store_transform(workspace, TransformSpec(first_frame=1), [])
     runtime = _DelayedMatchedCutRuntime(workspace)
     store, controller = _controller(tmp_path, runtime)
@@ -227,11 +228,11 @@ def test_rebuilding_the_open_cut_uses_edits_made_during_the_reuse_probe(
 
 
 def test_declining_a_different_cut_keeps_unsaved_transform(
-    tmp_path, qtbot
+    tmp_path, qtbot, cache_root
 ) -> None:
     """A different cut cannot replace the open cut without confirmation."""
-    opened = _promoted_cut(tmp_path, "a")
-    matched = _promoted_cut(tmp_path, "b")
+    opened = _promoted_cut(tmp_path, cache_root, "a")
+    matched = _promoted_cut(tmp_path, cache_root, "b")
     stored = TransformSpec(first_frame=2)
     store_transform(matched, stored, [])
     runtime = _MatchedCutRuntime(matched)
@@ -257,9 +258,9 @@ def test_declining_a_different_cut_keeps_unsaved_transform(
 
 
 def test_rebuilding_a_cut_without_a_stored_transform_stays_identity(
-    tmp_path, qtbot
+    tmp_path, qtbot, cache_root
 ) -> None:
-    workspace = _promoted_cut(tmp_path, "a")
+    workspace = _promoted_cut(tmp_path, cache_root, "a")
     assert not transform_sidecar_path(workspace).exists()
     runtime = _MatchedCutRuntime(workspace)
     _store, controller = _controller(tmp_path, runtime)
@@ -274,11 +275,15 @@ def test_rebuilding_a_cut_without_a_stored_transform_stays_identity(
 
 @pytest.mark.parametrize("selects_open_cut", [False, True])
 def test_canceling_a_rebuild_keeps_the_open_cut_transform(
-    tmp_path, qtbot, selects_open_cut: bool
+    tmp_path, qtbot, cache_root, selects_open_cut: bool
 ) -> None:
     """Cancelling must cost nothing, whichever cut the picker offered."""
-    opened = _promoted_cut(tmp_path, "a")
-    matched = opened if selects_open_cut else _promoted_cut(tmp_path, "b")
+    opened = _promoted_cut(tmp_path, cache_root, "a")
+    matched = (
+        opened
+        if selects_open_cut
+        else _promoted_cut(tmp_path, cache_root, "b")
+    )
     store_transform(matched, TransformSpec(first_frame=2), [])
     output = tmp_path / "source.webp"
     output.write_bytes(b"existing")

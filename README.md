@@ -140,7 +140,8 @@ QT_QPA_PLATFORM=offscreen uv run pytest -q
 ```
 
 Model weights and generated workspaces are intentionally local and are never
-committed.
+committed. Durable cut sets and scratch live under MatteLoop's user cache at
+<platformdirs.user_cache_dir("matteloop")>/workspace/.
 
 The screenshots above are generated rather than collected, so a layout change
 never leaves them quietly out of date. Regenerate them with:

@@ -2675,8 +2675,8 @@ Stored frames and the saved transform will be removed. Recreating them requires 
     </message>
     <message>
         <location filename="../src/matteloop/ui/workspace_dialog.py" line="103"/>
-        <source>Choose a validated cut set for this output directory.</source>
-        <translation>Choose a validated cut set for this output directory.</translation>
+        <source>Choose a validated cut set.</source>
+        <translation>Choose a validated cut set.</translation>
     </message>
     <message>
         <location filename="../src/matteloop/ui/workspace_dialog.py" line="149"/>
@@ -2685,10 +2685,10 @@ Stored frames and the saved transform will be removed. Recreating them requires 
     </message>
     <message numerus="yes">
         <location filename="../src/matteloop/ui/workspace_dialog.py" line="172"/>
-        <source>%n promoted cut set(s) in %1</source>
+        <source>%n promoted cut set(s) in MatteLoop's cache (%1)</source>
         <translation>
-            <numerusform>%n promoted cut set in %1</numerusform>
-            <numerusform>%n promoted cut sets in %1</numerusform>
+            <numerusform>%n promoted cut set in MatteLoop's cache (%1)</numerusform>
+            <numerusform>%n promoted cut sets in MatteLoop's cache (%1)</numerusform>
         </translation>
     </message>
     <message>

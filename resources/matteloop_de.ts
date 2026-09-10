@@ -2675,8 +2675,8 @@ Gespeicherte Frames und die gespeicherte Transformation werden entfernt. Eine Ne
     </message>
     <message>
         <location filename="../src/matteloop/ui/workspace_dialog.py" line="103"/>
-        <source>Choose a validated cut set for this output directory.</source>
-        <translation>Wählen Sie ein validiertes Schnittset für diesen Ausgabeordner.</translation>
+        <source>Choose a validated cut set.</source>
+        <translation>Wählen Sie ein validiertes Schnittset.</translation>
     </message>
     <message>
         <location filename="../src/matteloop/ui/workspace_dialog.py" line="149"/>
@@ -2685,10 +2685,10 @@ Gespeicherte Frames und die gespeicherte Transformation werden entfernt. Eine Ne
     </message>
     <message numerus="yes">
         <location filename="../src/matteloop/ui/workspace_dialog.py" line="172"/>
-        <source>%n promoted cut set(s) in %1</source>
+        <source>%n promoted cut set(s) in MatteLoop's cache (%1)</source>
         <translation>
-            <numerusform>%n freigegebenes Schnittset in %1</numerusform>
-            <numerusform>%n freigegebene Schnittsets in %1</numerusform>
+            <numerusform>%n freigegebenes Schnittset im MatteLoop-Cache (%1)</numerusform>
+            <numerusform>%n freigegebene Schnittsets im MatteLoop-Cache (%1)</numerusform>
         </translation>
     </message>
     <message>

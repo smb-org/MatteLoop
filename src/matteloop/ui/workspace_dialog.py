@@ -24,6 +24,7 @@ from matteloop.jobs.workspace import (
     detect_external_edits,
     list_workspaces,
 )
+from matteloop.paths import cut_workspace_root
 from matteloop.ui.aligned_rows import (
     ROW_DATA_ROLE,
     AlignedRowDelegate,
@@ -102,7 +103,7 @@ class WorkspacePickerDialog(QDialog):
             QLabel(
                 QCoreApplication.translate(
                     "WorkspacePickerDialog",
-                    "Choose a validated cut set for this output directory.",
+                    "Choose a validated cut set.",
                 )
             )
         )
@@ -169,10 +170,10 @@ class WorkspacePickerDialog(QDialog):
             summary_count = len(self._summaries)
             self._message.setText(
                 self.tr(
-                    "%n promoted cut set(s) in %1",
+                    "%n promoted cut set(s) in MatteLoop's cache (%1)",
                     "",
                     summary_count,
-                ).replace("%1", str(output_directory))
+                ).replace("%1", str(cut_workspace_root() / "cuts"))
             )
         else:
             self._message.setText(

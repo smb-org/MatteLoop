@@ -1,10 +1,12 @@
 """Durable editable cut sets and private rebuild snapshots.
 
-The durable namespace is intentionally separate from disposable job scratch::
+The durable namespace is intentionally separate from the output directory and
+from disposable job scratch::
 
-    <output>/.matteloop-work/
-        cuts/<authoritative-cache-key>/   # explicit deletion only
-        scratch/<job-id>/                 # bounded, explicit cleanup
+    <platformdirs.user_cache_dir("matteloop")>/
+        workspace/
+            cuts/<authoritative-cache-key>/   # explicit deletion only
+            scratch/<job-id>/                 # bounded, explicit cleanup
 
 Every public operation revalidates the canonical local root and opens files
 without following links.  POSIX file access is relative to bound directory

@@ -77,6 +77,12 @@ Nothing else gates V1. When that sentence is true end to end, V1 is done.
   `Delete outdated` as the agreed handling for a rembg namespace move (issue
   #22). Bulk re-download returned in #29 with confirmation, cancellation, batch
   progress and per-model deletion after verification.
+- **Cut workspace location, 2026-09-10:** durable cut sets and disposable
+  scratch now live under MatteLoop's user cache at
+  `<platformdirs.user_cache_dir("matteloop")>/workspace/`, rather than inside
+  the selected output directory. The cut key is independent of that output
+  directory, so one shared root avoids duplicate sets and keeps synced output
+  folders free of cut intermediates.
 
 ---
 
