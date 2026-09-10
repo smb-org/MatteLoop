@@ -33,18 +33,22 @@ _ALLOWED = frozenset(ALLOWED_EXECUTION_PROVIDERS)
 
 
 def load_onnxruntime() -> Any:
-    """Import ONNX Runtime with its bundled telemetry disabled when possible."""
+    """Import ONNX Runtime and apply its secondary telemetry switch."""
     runtime = importlib.import_module("onnxruntime")
+    # matteloop.__init__ disables the SDK before this import; retain this
+    # secondary switch for runtimes whose Windows ETW path honours it.
     disable_telemetry = getattr(runtime, "disable_telemetry_events", None)
     if callable(disable_telemetry):
         try:
             disable_telemetry()
         except Exception as error:  # a runtime that refuses must still load
-            _LOGGER.warning("ONNX Runtime telemetry could not be disabled: %s", error)
+            _LOGGER.warning(
+                "ONNX Runtime secondary telemetry switch failed: %s", error
+            )
     else:
         _LOGGER.debug(
             "ONNX Runtime does not expose disable_telemetry_events; "
-            "telemetry could not be disabled"
+            "secondary telemetry switch unavailable"
         )
     return runtime
 

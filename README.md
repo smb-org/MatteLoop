@@ -8,9 +8,9 @@ the cut-out result on the right over a transparency checkerboard, and the
 inspector on the far right](assets/screenshots/main-window.png)
 
 Your video, model weights, every intermediate frame and the finished loop stay
-on your disk. MatteLoop makes no network request except the update check and
-the model download on first use; the segmentation runtime's own telemetry is
-switched off.
+on your disk. MatteLoop makes no network request except the update check, the
+update package download, and the model download on first use; the segmentation
+runtime's own telemetry is switched off.
 
 ## What it is for
 

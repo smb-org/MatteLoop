@@ -1,10 +1,17 @@
 from __future__ import annotations
 
+import importlib
+import importlib.util
 import logging
+import os
+import subprocess
+import sys
+import textwrap
 from types import SimpleNamespace
 
 import pytest
 
+import matteloop
 import matteloop.core.execution_providers as execution_providers
 from matteloop.core.execution_providers import (
     COREML_EXECUTION_PROVIDER,
@@ -19,7 +26,27 @@ from matteloop.core.execution_providers import (
 )
 
 
-def test_onnxruntime_loader_disables_telemetry_when_runtime_exposes_it(
+def test_importing_matteloop_disables_onnxruntime_telemetry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("ORT_DISABLE_TELEMETRY", raising=False)
+
+    importlib.reload(matteloop)
+
+    assert os.environ["ORT_DISABLE_TELEMETRY"] == "1"
+
+
+def test_importing_matteloop_preserves_explicit_onnxruntime_telemetry_setting(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ORT_DISABLE_TELEMETRY", "0")
+
+    importlib.reload(matteloop)
+
+    assert os.environ["ORT_DISABLE_TELEMETRY"] == "0"
+
+
+def test_onnxruntime_loader_applies_secondary_telemetry_switch(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls: list[bool] = []
@@ -34,7 +61,7 @@ def test_onnxruntime_loader_disables_telemetry_when_runtime_exposes_it(
     assert calls == [True]
 
 
-def test_onnxruntime_loader_keeps_runtime_usable_without_telemetry_api(
+def test_onnxruntime_loader_reports_missing_secondary_telemetry_switch(
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -48,7 +75,40 @@ def test_onnxruntime_loader_keeps_runtime_usable_without_telemetry_api(
     with caplog.at_level(logging.DEBUG, logger=execution_providers.__name__):
         assert execution_providers.load_onnxruntime() is runtime
 
-    assert "disable_telemetry_events" in caplog.text
+    assert "secondary telemetry switch unavailable" in caplog.text
+
+
+def test_onnxruntime_import_does_not_start_native_telemetry_threads() -> None:
+    if importlib.util.find_spec("onnxruntime") is None:
+        pytest.skip("onnxruntime is not installed")
+
+    script = """
+    import os
+    import psutil
+
+    import matteloop
+
+    process = psutil.Process()
+    before = process.num_threads()
+    import onnxruntime
+    after = process.num_threads()
+
+    assert os.environ["ORT_DISABLE_TELEMETRY"] == "1"
+    assert after == before, (before, after)
+    """
+    environment = os.environ.copy()
+    environment.pop("ORT_DISABLE_TELEMETRY", None)
+    completed = subprocess.run(
+        [sys.executable, "-I", "-c", textwrap.dedent(script)],
+        capture_output=True,
+        check=False,
+        env=environment,
+        text=True,
+    )
+
+    assert completed.returncode == 0, (
+        f"stdout:\n{completed.stdout}\nstderr:\n{completed.stderr}"
+    )
 
 
 def test_provider_catalog_exposes_only_allowlisted_local_runtime_providers() -> None:

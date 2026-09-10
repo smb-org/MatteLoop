@@ -1,4 +1,5 @@
 """Spawned rembg host with a bounded byte protocol and parent-owned frame slot.
+
 Ownership and lock/protocol order::
 
     parent                                   spawned child
