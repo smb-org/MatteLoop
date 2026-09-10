@@ -17,6 +17,7 @@ from matteloop.updates import (
     UpdateDownloadCancelled,
     UpdateOutcome,
     download_update,
+    release_notes_url,
     releases_api_url,
     update_feed_url,
     update_package_url,
@@ -319,6 +320,27 @@ def test_repository_environment_overrides_the_notice_feed(monkeypatch) -> None:
     assert reader.check().outcome is UpdateOutcome.UPDATE
     assert transport.calls[0][0] == (
         "https://api.github.com/repos/qualification/MatteLoop/releases/latest"
+    )
+
+
+def test_release_notes_url_uses_the_versioned_release_tag() -> None:
+    assert (
+        release_notes_url("0.4.1")
+        == "https://github.com/smb-org/MatteLoop/releases/tag/v0.4.1"
+    )
+
+
+def test_release_notes_url_uses_the_configured_repository(monkeypatch) -> None:
+    monkeypatch.setenv("MATTELOOP_UPDATE_REPO", "qualification/MatteLoop")
+
+    assert release_notes_url("0.4.1") == (
+        "https://github.com/qualification/MatteLoop/releases/tag/v0.4.1"
+    )
+
+
+def test_release_notes_url_preserves_prerelease_versions() -> None:
+    assert release_notes_url("0.5.0-beta.1") == (
+        "https://github.com/smb-org/MatteLoop/releases/tag/v0.5.0-beta.1"
     )
 
 

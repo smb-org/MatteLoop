@@ -40,6 +40,7 @@ from matteloop.ui.update_controller import (
 from matteloop.updates import (
     UpdateOutcome,
     UpdateResult,
+    releases_url,
     update_feed_url,
     update_package_url,
 )
@@ -372,6 +373,7 @@ def test_available_update_shows_versioned_offer(qtbot) -> None:
     assert window.update_dialog.size_label.text() == "Download size: 380 MB"
     assert window.update_dialog.size_label.isVisible()
     assert window.update_dialog.open_releases_button.text() == "Open releases page"
+    assert not window.update_dialog.release_notes_button.isVisible()
     assert window.update_dialog.not_now_button.text() == "Not now"
     assert (
         window.action_shelf.preferences_dialog.updates_status_label.text()
@@ -734,6 +736,46 @@ def test_open_releases_page_uses_the_release_url(monkeypatch, qtbot) -> None:
     del window
 
 
+def test_release_notes_button_uses_the_offered_version_url(monkeypatch, qtbot) -> None:
+    window, controller, _ = _controller(
+        qtbot,
+        _settings("open-release-notes-url"),
+        UpdateResult(UpdateOutcome.UPDATE, NEWER_VERSION),
+        manager=_Manager(),
+    )
+    opened: list[QUrl] = []
+    monkeypatch.setattr(QDesktopServices, "openUrl", opened.append)
+
+    controller.check_now()
+    qtbot.waitUntil(lambda: not controller.check_in_progress)
+    window.update_dialog.release_notes_button.click()
+
+    assert opened == [
+        QUrl(
+            f"https://github.com/smb-org/MatteLoop/releases/tag/v{NEWER_VERSION}"
+        )
+    ]
+    del window
+
+
+def test_release_notes_falls_back_to_the_releases_index_without_a_version(
+    monkeypatch, qtbot
+) -> None:
+    window, controller, _ = _controller(
+        qtbot,
+        _settings("open-release-notes-fallback"),
+        UpdateResult(UpdateOutcome.NONE),
+    )
+    opened: list[QUrl] = []
+    monkeypatch.setattr(QDesktopServices, "openUrl", opened.append)
+    controller._available_version = None
+
+    controller.open_release_notes()
+
+    assert opened == [QUrl(releases_url())]
+    del window
+
+
 def test_download_progress_reaches_the_offer_and_finishes_ready(
     monkeypatch, qtbot, tmp_path: Path
 ) -> None:
@@ -756,6 +798,7 @@ def test_download_progress_reaches_the_offer_and_finishes_ready(
 
     controller.check_now()
     qtbot.waitUntil(lambda: not controller.check_in_progress)
+    assert window.update_dialog.release_notes_button.isVisible()
     window.update_dialog.download_button.click()
     qtbot.waitUntil(
         lambda: window.update_dialog.message_label.text()
@@ -767,6 +810,7 @@ def test_download_progress_reaches_the_offer_and_finishes_ready(
         f"MatteLoop {NEWER_VERSION} is ready to install."
     )
     assert window.update_dialog.install_button.isVisible()
+    assert window.update_dialog.release_notes_button.isVisible()
 
 
 def test_download_progress_does_not_reopen_a_dismissed_offer(qtbot) -> None:
@@ -810,6 +854,7 @@ def test_failed_download_offers_try_again(monkeypatch, qtbot, tmp_path: Path) ->
     )
     assert window.update_dialog.download_button.text() == "Try again"
     assert window.update_dialog.open_releases_button.isVisible()
+    assert not window.update_dialog.release_notes_button.isVisible()
     window.update_dialog.close()
     qtbot.waitUntil(lambda: window.action_shelf.update_button.isVisible())
     window.action_shelf.update_button.click()

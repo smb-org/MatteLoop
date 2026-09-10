@@ -67,6 +67,13 @@ class UpdateDialog(QDialog):
         self.install_button.setAccessibleName(
             QCoreApplication.translate("UpdateBanner", "Install and restart")
         )
+        self.release_notes_button = QPushButton(
+            QCoreApplication.translate("UpdateBanner", "Release notes")
+        )
+        self.release_notes_button.setObjectName("update_release_notes")
+        self.release_notes_button.setAccessibleName(
+            QCoreApplication.translate("UpdateBanner", "Release notes")
+        )
         self.open_releases_button = QPushButton(
             QCoreApplication.translate("UpdateBanner", "Open releases page")
         )
@@ -98,6 +105,7 @@ class UpdateDialog(QDialog):
         actions.addStretch(1)
         actions.addWidget(self.download_button)
         actions.addWidget(self.install_button)
+        actions.addWidget(self.release_notes_button)
         actions.addWidget(self.open_releases_button)
         actions.addWidget(self.not_now_button)
         actions.addWidget(self.later_button)
@@ -117,6 +125,7 @@ class UpdateDialog(QDialog):
         buttons = (
             self.download_button,
             self.install_button,
+            self.release_notes_button,
             self.open_releases_button,
             self.not_now_button,
             self.later_button,
@@ -128,6 +137,7 @@ class UpdateDialog(QDialog):
         for button in (
             self.download_button,
             self.install_button,
+            self.release_notes_button,
             self.open_releases_button,
             self.not_now_button,
             self.later_button,
@@ -144,6 +154,7 @@ class UpdateDialog(QDialog):
         )
         if can_download:
             self.download_button.show()
+            self.release_notes_button.show()
         else:
             self.open_releases_button.show()
         self.not_now_button.show()
@@ -161,6 +172,7 @@ class UpdateDialog(QDialog):
     def show_ready_actions(self) -> None:
         self._hide_actions()
         self.install_button.show()
+        self.release_notes_button.show()
         self.later_button.show()
 
     def show_failed_actions(self) -> None:
