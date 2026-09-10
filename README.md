@@ -91,11 +91,10 @@ assets are `MatteLoop-v<version>-macos-arm64.zip`,
 installer and a portable archive. The portable archive extracts to a versioned
 folder, so two downloads never look alike. They are unsigned by decision:
 Windows warns through SmartScreen, so choose **More info**, then **Run
-anyway**; macOS
-refuses the first launch, so open **System Settings → Privacy & Security**,
-find the message naming MatteLoop, and choose **Open Anyway**. Linux artifacts
-are deferred, and the current native qualification covers macOS 15+ arm64
-only.
+anyway**; macOS refuses the first launch, so open **System Settings → Privacy &
+Security**, find the message naming MatteLoop, and choose **Open Anyway**.
+Linux artifacts are deferred, and the current native qualification covers
+macOS 15+ arm64 only.
 
 Use one MatteLoop instance per installation. The installer and portable
 archive update their own `current` installation in place.
