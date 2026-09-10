@@ -151,6 +151,100 @@ Then, still by hand:
 Never patch a version into a built artifact by hand. If a number is wrong in a
 bundle, it is wrong in one of the two files above, and the fix belongs there.
 
+## Shipping a beta (REQUIRED)
+
+A beta is an ordinary release marked **prerelease** on GitHub. There is no beta
+branch, no second Velopack channel, and no separate build: the same artifacts
+serve both audiences.
+
+1. **Tag it `vX.Y.Z-beta.N`.** The suffix grammar is semantic-version
+   precedence, so `0.4.0-beta.1` is *lower* than `0.4.0` and `beta.10` is
+   higher than `beta.2`. Anything after the hyphen must match
+   `[0-9A-Za-z.-]+`; a leading-zero numeric identifier is refused.
+2. **Raise the version as usual** (see above), with the one exception recorded
+   there: `__version__` and the bundle versions carry only the numeric core,
+   while the tag and `--packVersion` carry the suffix. `plan` compares the
+   tag's core with `__version__` and fails on a mismatch.
+3. **`publish` marks it automatically.** A tag containing a hyphen adds
+   `--prerelease` to `gh release create`; nothing else in the workflow changes.
+4. **Publish the draft** as for any release. The LGPL source archives ship with
+   a prerelease too — the licence does not care whether a release is final.
+
+What follows from the prerelease flag, and is worth knowing before promising
+anything to a beta tester:
+
+- **Stable installations never see it.** `/releases/latest` excludes drafts and
+  prereleases by GitHub's own definition; the beta channel reads `/releases`.
+- **There is no way back.** Downgrades are refused, so a bad beta is fixed by a
+  newer beta, never by an older release. Turning the preference off leaves the
+  installation on its beta until a stable release overtakes it.
+- **A beta and the stable release it precedes share their packages.** The only
+  difference is which endpoint the client reads.
+
+## Qualifying a change that ships (REQUIRED)
+
+A green pipeline says the checks ran. It does not say the artifact works — the
+`1.0` releases, the archive whose launcher had lost its executable bit, and the
+bundle a post-signing `Info.plist` edit turned into a "damaged application" all
+had green pipelines. Anything that changes what goes into a build is qualified
+against a real one before it lands.
+
+The release workflow can be exercised without releasing anything:
+
+- **Dispatch it on your branch.** `workflow_dispatch` reads the workflow from
+  the ref you dispatch, so a branch's own packaging steps run while `main` is
+  untouched. The `publish` job is gated on `refs/tags/v*`, so a dispatch
+  produces artifacts and no release.
+- **Publish qualification builds by hand.** Download the artifacts and create
+  the releases in a disposable public repository under the same organisation
+  with your own `gh`. The workflow never targets another repository, so no
+  cross-repository token is needed in Actions secrets.
+- **Point the build at it.** `MATTELOOP_UPDATE_REPO` (`owner/repository`) moves
+  both update readers, so a real packaged build can be qualified against
+  throwaway releases without a special build.
+- Delete the repository and the throwaway branch when the qualification is
+  done.
+
+`docs/designs/in-app-updates.md` records the update gate this was written for,
+including which items are scored and which are only recorded.
+
+## One network path (REQUIRED)
+
+Every HTTP request the application makes goes through
+`ui/download_transport.py`. It is not a convenience wrapper: it uses Qt's
+platform TLS backend, which means the machine's own trust store —
+SecureTransport and the keychain on macOS, schannel and the certificate store
+on Windows — including roots an administrator installed.
+
+That is not a detail. On a machine behind a TLS-interception proxy, which is an
+ordinary corporate setup, a client with its own compiled-in root list fails
+every request while the platform store succeeds. Velopack's SDK is exactly such
+a client: measured, it rejects the proxy's certificate and honours none of
+`SSL_CERT_FILE`, `SSL_CERT_DIR`, `CURL_CA_BUNDLE` or `REQUESTS_CA_BUNDLE`. The
+updater downloads through the Qt transport for that reason and leaves the SDK
+to apply what it finds on disk.
+
+Before adding a dependency that fetches anything, find out whose trust store it
+uses. If it carries its own, it does not get to make the request.
+
+## Platform-specific code (REQUIRED)
+
+Three ways a platform branch passes locally and fails elsewhere, each measured
+here:
+
+- **mypy narrows `sys.platform` to the host it runs on.** Values assigned
+  inside `if sys.platform == ...` branches and used after the join type-check on
+  the platform they were written on and nowhere else — on Linux both branches
+  are unreachable and every name is undefined. Return from inside each branch
+  rather than assigning across the join, and check the other platforms with
+  `mypy --platform linux` before trusting a local run.
+- **A test whose subject derives behaviour from `sys.platform` must pin it.**
+  Otherwise it passes on a maintainer's Mac and fails on a Linux runner, which
+  is exactly what happened to the update-channel tests.
+- **`os.access(directory, os.W_OK)` is meaningless on Windows.** It reflects the
+  read-only attribute, which directories ignore, so it is always true. Probe by
+  creating a file.
+
 ## Working on issues (REQUIRED)
 
 Work that answers a GitHub issue goes onto its own branch and into a pull
