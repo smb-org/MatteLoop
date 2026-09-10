@@ -12,6 +12,7 @@ from PySide6.QtCore import QSettings, Qt
 
 import matteloop.ui.preview_controller.controller as controller_module
 from matteloop.core.crop_state import CropChanged
+from matteloop.core.errors import AppError, ErrorCode
 from matteloop.core.specs import CropSpec
 from matteloop.core.state import (
     CancelRequested,
@@ -372,6 +373,79 @@ def test_job_dialog_rejects_user_close_until_terminal_event(qtbot) -> None:
 
     dialog.close_for_terminal()
     assert not dialog.isVisible()
+
+
+@pytest.mark.parametrize(
+    ("retry_action", "expected"),
+    (
+        (
+            "repair-or-regenerate-cuts",
+            "A stored cut set changed while it was being read. If another "
+            "program is editing its frames, wait for it to finish; otherwise "
+            "delete the set under Manage Workspaces and render again.",
+        ),
+        (
+            "regenerate-or-repair-cuts",
+            "A stored cut set changed while it was being read. If another "
+            "program is editing its frames, wait for it to finish; otherwise "
+            "delete the set under Manage Workspaces and render again.",
+        ),
+        (
+            "choose-local-output-directory",
+            "Choose an output folder on this computer that no sync client "
+            "manages, and check that MatteLoop's cache folder is writable.",
+        ),
+        (
+            "retry-output",
+            "The output file could not be written to the folder you chose. If "
+            "a sync client manages it, pause the client or choose a local "
+            "folder, then render again.",
+        ),
+        (
+            "choose-writable-output",
+            "The output file could not be written to the folder you chose. If "
+            "a sync client manages it, pause the client or choose a local "
+            "folder, then render again.",
+        ),
+        ("free-disk-space", "Free disk space, then render again."),
+        (
+            "free-disk-space-and-retry",
+            "Free disk space, then render again.",
+        ),
+    ),
+)
+def test_job_dialog_derives_next_step_from_retry_action(
+    qtbot, retry_action: str, expected: str
+) -> None:
+    dialog = PreviewJobDialog()
+    qtbot.addWidget(dialog)
+    error = AppError(
+        ErrorCode.CUT_SET_INVALID,
+        "render",
+        "error.render",
+        "failure",
+        retry_action,
+    )
+
+    dialog.show_failure(error)
+
+    assert dialog.failure_next_step.text() == expected
+
+
+def test_job_dialog_uses_default_next_step_for_unknown_retry_action(qtbot) -> None:
+    dialog = PreviewJobDialog()
+    qtbot.addWidget(dialog)
+    error = AppError(
+        ErrorCode.CUT_SET_INVALID,
+        "render",
+        "error.render",
+        "failure",
+        "unmapped-action",
+    )
+
+    dialog.show_failure(error)
+
+    assert dialog.failure_next_step.text() == "Try the render again."
 
 
 def test_model_download_dialog_shows_human_byte_totals(qtbot) -> None:

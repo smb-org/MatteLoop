@@ -34,6 +34,7 @@ from matteloop.jobs.context import ProgressEvent
 from matteloop.ui.compact_widgets import form_layout
 from matteloop.ui.copy import (
     model_display_name,
+    next_step_copy,
     progress_detail,
     provider_label,
     provider_notice,
@@ -567,7 +568,7 @@ class PreviewJobDialog(QDialog):
         )
         self.failure_reason.setText(detail)
         self.failure_next_step.setText(
-            QCoreApplication.translate("PreviewJobDialog", "Try the render again.")
+            next_step_copy(getattr(error, "retry_action", None))
         )
         self._show_failure_widgets()
 

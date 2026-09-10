@@ -257,6 +257,39 @@ def provider_notice(value: str) -> str:
     }.get(value, value)
 
 
+def next_step_copy(retry_action: object) -> str:
+    """Translate the recovery instruction selected by an application error."""
+    if isinstance(retry_action, str):
+        if retry_action in {
+            "repair-or-regenerate-cuts",
+            "regenerate-or-repair-cuts",
+        }:
+            return QCoreApplication.translate(
+                "PreviewJobDialog",
+                "A stored cut set changed while it was being read. If another "
+                "program is editing its frames, wait for it to finish; otherwise "
+                "delete the set under Manage Workspaces and render again.",
+            )
+        if retry_action == "choose-local-output-directory":
+            return QCoreApplication.translate(
+                "PreviewJobDialog",
+                "Choose an output folder on this computer that no sync client "
+                "manages, and check that MatteLoop's cache folder is writable.",
+            )
+        if retry_action in {"retry-output", "choose-writable-output"}:
+            return QCoreApplication.translate(
+                "PreviewJobDialog",
+                "The output file could not be written to the folder you chose. "
+                "If a sync client manages it, pause the client or choose a local "
+                "folder, then render again.",
+            )
+        if retry_action in {"free-disk-space", "free-disk-space-and-retry"}:
+            return QCoreApplication.translate(
+                "PreviewJobDialog", "Free disk space, then render again."
+            )
+    return QCoreApplication.translate("PreviewJobDialog", "Try the render again.")
+
+
 def progress_detail(value: str) -> str:
     """Translate known render progress details while preserving their counts."""
     exact = {
