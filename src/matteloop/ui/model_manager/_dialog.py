@@ -17,12 +17,14 @@ from PySide6.QtWidgets import (
 
 from matteloop.core.parameters import V1_MODEL_IDS
 from matteloop.jobs.models.catalog import ModelCatalog
+from matteloop.paths import cut_workspace_root
 from matteloop.ui.aligned_rows import AlignedRowDelegate, install_aligned_row
 from matteloop.ui.source_presentation import format_source_file_size
 
 from ._entries import (
     MODEL_ENTRY_ROLE,
     ModelEntry,
+    _directory_size,
     _model_entry,
     _obsolete_directory_size,
     present_model,
@@ -83,6 +85,11 @@ class ModelManagerDialog(QDialog):
         self.total_size_label.setObjectName("model_cache_total")
         self.total_size_label.setAccessibleName(
             QCoreApplication.translate("ModelManagerDialog", "Total model cache size")
+        )
+        self.cut_sets_size_label = QLabel()
+        self.cut_sets_size_label.setObjectName("cut_sets_total")
+        self.cut_sets_size_label.setAccessibleName(
+            QCoreApplication.translate("ModelManagerDialog", "Cut sets on disk")
         )
         self.cache_location_label = QLabel(str(self._cache_root))
         self.cache_location_label.setObjectName("model_cache_location")
@@ -185,6 +192,7 @@ class ModelManagerDialog(QDialog):
         )
         layout.addWidget(self._message)
         layout.addWidget(self.total_size_label)
+        layout.addWidget(self.cut_sets_size_label)
         layout.addWidget(self.cache_location_label)
         layout.addWidget(self.model_list, 1)
         layout.addWidget(self.outdated_notice_label)
@@ -342,6 +350,13 @@ class ModelManagerDialog(QDialog):
         ) % format_source_file_size(total)
         self.total_size_label.setText(total_text)
         self.total_size_label.setAccessibleDescription(total_text)
+        cuts_root = cut_workspace_root() / "cuts"
+        cuts_text = QCoreApplication.translate(
+            "ModelManagerDialog", "Cut sets on disk: %s"
+        ) % format_source_file_size(_directory_size(cuts_root))
+        self.cut_sets_size_label.setText(cuts_text)
+        self.cut_sets_size_label.setToolTip(str(cuts_root))
+        self.cut_sets_size_label.setAccessibleDescription(str(cuts_root))
         entry_count = len(self._entries)
         message = self.tr(
             "%n V1 model(s); cache: %1", "", entry_count

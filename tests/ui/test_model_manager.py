@@ -9,6 +9,7 @@ from PySide6.QtCore import QTimer, QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QApplication, QMessageBox
 
+import matteloop.paths as paths_module
 from matteloop.core.errors import AppError, ErrorCode
 from matteloop.core.parameters import ParameterState
 from matteloop.core.state import (
@@ -166,6 +167,32 @@ def test_model_manager_lists_cache_metadata_with_shared_aligned_rows(
     assert "cached locally" in dialog.model_list.item(index).toolTip()
     assert "active model" in dialog.model_list.item(index).toolTip()
     assert dialog.total_size_label.text() == "Total on disk: 13.0 B"
+
+
+def test_model_manager_reports_cut_set_disk_usage_separately(
+    tmp_path: Path, cache_root: Path, qtbot
+) -> None:
+    target = _model_path(tmp_path, "u2netp")
+    target.parent.mkdir(parents=True)
+    target.write_bytes(b"cached-weight")
+    cuts_root = paths_module.cut_workspace_root() / "cuts"
+    cut_set = cuts_root / "portrait-12345678"
+    cut_set.mkdir(parents=True)
+    (cut_set / "frame-000001.png").write_bytes(b"cut-frame")
+    dialog = ModelManagerDialog(ModelCatalog.load_resource(), tmp_path)
+    qtbot.addWidget(dialog)
+
+    dialog.refresh()
+
+    assert dialog.total_size_label.text() == "Total on disk: 13.0 B"
+    assert dialog.cut_sets_size_label.text() == "Cut sets on disk: 9.0 B"
+    assert dialog.cut_sets_size_label.objectName() == "cut_sets_total"
+    assert dialog.cut_sets_size_label.accessibleName() == "Cut sets on disk"
+    assert dialog.cut_sets_size_label.toolTip() == str(cuts_root)
+    assert dialog.cut_sets_size_label.accessibleDescription() == str(cuts_root)
+    assert dialog.layout().indexOf(dialog.cut_sets_size_label) == (
+        dialog.layout().indexOf(dialog.total_size_label) + 1
+    )
 
 
 def test_model_manager_removes_only_confirmed_selected_weight_in_background(
