@@ -1,0 +1,37 @@
+# Actions caches are scoped per ref, so a pull request's own caches can only
+# ever be restored by that same pull request — once it closes, merged or not,
+# they are unreachable forever. Left alone they sit in the quota until it
+# fills, and eviction is least-recently-used, which can take out the default
+# branch's caches: the only ones every build actually depends on.
+
+name: PR cache cleanup
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  delete-caches:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - name: Delete this pull request's caches
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          REF: refs/pull/${{ github.event.pull_request.number }}/merge
+        run: |
+          # `run:` executes under `bash -e`, and a failing command substitution
+          # aborts the step before the guard below can see the empty result.
+          ids="$(gh cache list --ref "$REF" --limit 100 --json id --jq '.[].id' || true)"
+          if [ -z "$ids" ]; then
+            echo "No caches on $REF"
+            exit 0
+          fi
+          echo "$ids" | while IFS= read -r id; do
+            gh cache delete "$id"
+          done
