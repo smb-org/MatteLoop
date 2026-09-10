@@ -336,28 +336,33 @@ class SourceController(QObject):
     def shutdown(self) -> bool:
         """Stop accepting results while the application is closing."""
         complete = True
-        self._closed = True
-        self._pending_provider = None
-        if self._unsubscribe is not None:
-            unsubscribe = self._unsubscribe
-            self._unsubscribe = None
-            unsubscribe()
-        self._frame_timer.stop()
-        self._cancel_frame_threads()
-        for thread, _worker in tuple(self._frame_threads):
-            if not thread.wait(_THREAD_SHUTDOWN_TIMEOUT_MS):
-                complete = False
-        self._model_manager.close()
-        complete = self._transform_stage.shutdown() and complete
-        complete = self._render_controller.shutdown() and complete
-        complete = self._preview_controller.shutdown() and complete
-        threads = tuple(self._threads.items())
-        for _request_id, (thread, _load_worker) in threads:
-            thread.quit()
-        for _request_id, (thread, _load_worker) in threads:
-            if not thread.wait(_THREAD_SHUTDOWN_TIMEOUT_MS):
-                complete = False
-        self._shutdown_complete = complete
+        try:
+            self._closed = True
+            self._pending_provider = None
+            if self._unsubscribe is not None:
+                unsubscribe = self._unsubscribe
+                self._unsubscribe = None
+                unsubscribe()
+            self._frame_timer.stop()
+            self._cancel_frame_threads()
+            for thread, _worker in tuple(self._frame_threads):
+                if not thread.wait(_THREAD_SHUTDOWN_TIMEOUT_MS):
+                    complete = False
+            self._model_manager.close()
+            complete = self._transform_stage.shutdown() and complete
+            complete = self._render_controller.shutdown() and complete
+            complete = self._preview_controller.shutdown() and complete
+            threads = tuple(self._threads.items())
+            for _request_id, (thread, _load_worker) in threads:
+                thread.quit()
+            for _request_id, (thread, _load_worker) in threads:
+                if not thread.wait(_THREAD_SHUTDOWN_TIMEOUT_MS):
+                    complete = False
+        except BaseException:
+            complete = False
+            raise
+        finally:
+            self._shutdown_complete = complete
         return complete
 
     def _build_model_manager(self) -> ModelManagerController:

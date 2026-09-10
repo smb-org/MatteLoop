@@ -7,7 +7,7 @@ from threading import Event, Thread, get_ident
 
 import pytest
 from PIL import Image
-from PySide6.QtCore import QSettings
+from PySide6.QtCore import QObject, QSettings, QThread
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox
 
@@ -204,6 +204,52 @@ def test_shutdown_reports_when_a_load_outlives_its_bounded_wait(
 
     adapter.release.set()
     qtbot.waitUntil(lambda: controller.active_load_count == 0, timeout=1000)
+
+
+def test_shutdown_records_frame_timeout_before_cleanup_failure(
+    monkeypatch, qtbot
+) -> None:
+    class StalledFrameThread(QThread):
+        def __init__(self) -> None:
+            super().__init__()
+            self.started = Event()
+            self.release = Event()
+
+        def run(self) -> None:
+            self.started.set()
+            self.release.wait(5)
+
+    monkeypatch.setattr(
+        "matteloop.ui.controller._THREAD_SHUTDOWN_TIMEOUT_MS", 25
+    )
+    controller = SourceController(
+        ReducerStore(), parent=QApplication.instance()
+    )
+    thread = StalledFrameThread()
+    worker = QObject()
+    controller._frame_threads.append((thread, worker))
+    thread.start()
+    qtbot.waitUntil(thread.started.is_set, timeout=1000)
+
+    cleanup_error = AppError(
+        ErrorCode.SOURCE_CORRUPT,
+        "source.cleanup",
+        "source.cleanup.failed",
+        "cleanup failed",
+        "retry",
+    )
+
+    def fail_cleanup() -> None:
+        raise cleanup_error
+
+    monkeypatch.setattr(controller._model_manager, "close", fail_cleanup)
+    with pytest.raises(AppError, match="cleanup failed"):
+        controller.shutdown()
+
+    assert not controller.shutdown_complete
+    thread.release.set()
+    assert thread.wait(1000)
+    controller._frame_threads.clear()
 
 
 def test_source_load_failure_is_an_app_error_with_recovery_focus(qtbot) -> None:

@@ -381,10 +381,11 @@ class UpdateController(QObject):
         if thread is None:
             return True
         thread.quit()
-        if not thread.wait(_DOWNLOAD_SHUTDOWN_TIMEOUT_MS):
-            _LOGGER.warning("MatteLoop update check did not stop after cancel")
-            return False
-        return True
+        if thread.wait(_DOWNLOAD_SHUTDOWN_TIMEOUT_MS):
+            return True
+        thread.setParent(QCoreApplication.instance())
+        _LOGGER.warning("MatteLoop update check thread outlived shutdown")
+        return False
 
     @Slot()
     def cancel_download(self) -> bool:
@@ -394,9 +395,11 @@ class UpdateController(QObject):
         thread = self._download_thread
         if thread is not None:
             thread.quit()
-            if not thread.wait(_DOWNLOAD_SHUTDOWN_TIMEOUT_MS):
-                _LOGGER.warning("MatteLoop update download did not stop after cancel")
-                return False
+            if thread.wait(_DOWNLOAD_SHUTDOWN_TIMEOUT_MS):
+                return True
+            thread.setParent(QCoreApplication.instance())
+            _LOGGER.warning("MatteLoop update download thread outlived shutdown")
+            return False
         return True
 
     @Slot()
@@ -503,9 +506,8 @@ class UpdateController(QObject):
     @Slot()
     def shutdown(self) -> bool:
         """Cancel update work and wait briefly for its workers to stop."""
-        check_complete = self._cancel_check()
-        download_complete = self.cancel_download()
-        self._shutdown_complete = check_complete and download_complete
+        self._shutdown_complete = False
+        self._shutdown_complete = all((self._cancel_check(), self.cancel_download()))
         return self._shutdown_complete
 
     @Slot()

@@ -3,12 +3,14 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import subprocess
 import sys
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from fractions import Fraction
 from pathlib import Path, PureWindowsPath
+from textwrap import dedent
 from threading import Event
 from types import ModuleType
 
@@ -537,6 +539,92 @@ def test_shutdown_cancels_and_joins_an_inflight_update_check(qtbot) -> None:
     assert controller.shutdown()
     qtbot.waitUntil(lambda: not controller.check_in_progress)
     assert reader.cancelled.is_set()
+
+
+def test_uncooperative_update_check_does_not_abort_process_on_shutdown() -> None:
+    script = dedent(
+        """
+        import time
+        from threading import Event, Thread
+
+        from PySide6.QtCore import QCoreApplication, QEvent, QSettings
+        from PySide6.QtWidgets import QApplication
+
+        from matteloop.core.state import AppState
+        from matteloop.ui.main_window import MainWindow
+        from matteloop.ui.store import ReducerStore
+        from matteloop.ui.update_controller import UpdateController
+        from matteloop.updates import UpdateOutcome, UpdateResult
+
+        import matteloop.ui.update_controller as update_controller_module
+
+        update_controller_module._DOWNLOAD_SHUTDOWN_TIMEOUT_MS = 25
+
+        class Services:
+            def dispatch(self, _command):
+                pass
+
+            def confirm_discard_unsaved_transform(self, _parent):
+                return True
+
+        class Reader:
+            def __init__(self):
+                self.started = Event()
+                self.release = Event()
+                self.finished = Event()
+
+            def check(self, _channel="stable", _current_version=None, cancelled=None):
+                self.started.set()
+                self.release.wait(2)
+                self.finished.set()
+                return UpdateResult(UpdateOutcome.NONE)
+
+        app = QApplication([])
+        settings = QSettings(
+            QSettings.IniFormat,
+            QSettings.UserScope,
+            "matteloop-test",
+            "uncooperative-check-subprocess",
+        )
+        settings.clear()
+        window = MainWindow(ReducerStore(AppState()), Services(), settings)
+        reader = Reader()
+        controller = UpdateController(window, settings, reader)
+        controller.check_now()
+        deadline = time.monotonic() + 2
+        while not reader.started.is_set() and time.monotonic() < deadline:
+            app.processEvents()
+            time.sleep(0.01)
+        if not reader.started.is_set():
+            raise AssertionError("the check worker did not start")
+        thread = controller._check_thread
+        if thread is None:
+            raise AssertionError("the check thread was not retained")
+        if controller.shutdown():
+            raise AssertionError("an uncooperative check reported success")
+        Thread(
+            target=lambda: (time.sleep(0.05), reader.release.set()), daemon=True
+        ).start()
+        controller.deleteLater()
+        window.deleteLater()
+        QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+        if not reader.finished.wait(2):
+            raise AssertionError("the uncooperative reader did not finish")
+        if not thread.wait(1000):
+            raise AssertionError("the orphaned check thread did not finish")
+        """
+    )
+    environment = os.environ.copy()
+    environment["QT_QPA_PLATFORM"] = "offscreen"
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        cwd=Path(__file__).parents[2],
+        env=environment,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+    assert result.returncode == 0, result.stderr
 
 
 def test_manual_check_shows_an_update_when_startup_checks_are_disabled(qtbot) -> None:
