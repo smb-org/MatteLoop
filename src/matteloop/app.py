@@ -17,7 +17,7 @@ from importlib import metadata
 from pathlib import Path
 from typing import Any
 
-from matteloop import __version__, application_title
+from matteloop import APPLICATION_NAME, __version__, application_title
 from matteloop.core.execution_providers import (
     load_onnxruntime,
     onnxruntime_repair_command,
@@ -123,10 +123,16 @@ def _finish_gui_shutdown(exit_code: int) -> int:
 
 
 def _configure_application_identity(application: Any) -> None:
-    """Name the application for QSettings, the window manager and --version."""
-    application.setApplicationName("MatteLoop")
-    application.setApplicationDisplayName("MatteLoop")
-    application.setOrganizationName("MatteLoop")
+    """Name the application for QSettings, the window manager and --version.
+
+    The display name is deliberately left unset: on Windows, Qt appends
+    applicationDisplayName to every window title, so setting it here made
+    the title bar read "MatteLoop 0.4.0 - MatteLoop" (issue #133). macOS
+    does not compose the two, and gets its menu-bar name from the bundle's
+    CFBundleName (--macos-app-name) independently of Qt's display name.
+    """
+    application.setApplicationName(APPLICATION_NAME)
+    application.setOrganizationName(APPLICATION_NAME)
     application.setApplicationVersion(__version__)
 
 

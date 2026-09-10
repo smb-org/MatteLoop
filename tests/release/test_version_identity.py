@@ -12,8 +12,12 @@ from types import SimpleNamespace
 import pytest
 from PySide6.QtCore import QSettings
 
-from matteloop import __version__, application_title
-from matteloop.app import _collect_provider_diagnostics, main
+from matteloop import APPLICATION_NAME, __version__, application_title
+from matteloop.app import (
+    _collect_provider_diagnostics,
+    _configure_application_identity,
+    main,
+)
 from matteloop.core.state import AppState
 from matteloop.ui.main_window import MainWindow
 from scripts.build import BUNDLE_IDENTIFIER, verify_macos_bundle_signature
@@ -85,7 +89,48 @@ def test_native_packaging_version_matches_the_package_version() -> None:
     assert f"--product-version={configured_version}" in args
     assert f"--macos-app-version={configured_version}" in args
     assert f"--macos-signed-app-name={BUNDLE_IDENTIFIER}" in args
-    assert "--macos-app-name=MatteLoop" in args
+    assert f"--macos-app-name={APPLICATION_NAME}" in args
+
+
+def test_native_packaging_carries_windows_file_metadata() -> None:
+    """Windows Explorer showed defaults (`matteloop`/`matteloop.exe`/empty
+    copyright) because nothing set them; #133."""
+    parser = configparser.ConfigParser(
+        comment_prefixes=("/",), strict=False, allow_no_value=True
+    )
+    parser.read(
+        REPOSITORY_ROOT / "packaging" / "pysidedeploy.spec", encoding="utf-8"
+    )
+    args = set(shlex.split(parser.get("nuitka", "extra_args")))
+
+    # Derived from the same source as the window title and QSettings
+    # identity, not repeated as a bare literal.
+    assert f"--product-name={APPLICATION_NAME}" in args
+    assert any(arg.startswith("--file-description=") for arg in args)
+    assert "--copyright=Copyright (C) 2026 MatteLoop contributors" in args
+
+
+def test_application_identity_sets_the_name_only_once() -> None:
+    """On Windows, Qt appends applicationDisplayName to every window
+    title; leaving it set doubled the title bar's product name (#133)."""
+    application = SimpleNamespace(
+        setApplicationName=lambda name: setattr(application, "applicationName", name),
+        setApplicationDisplayName=lambda name: setattr(
+            application, "applicationDisplayName", name
+        ),
+        setOrganizationName=lambda name: setattr(
+            application, "organizationName", name
+        ),
+        setApplicationVersion=lambda version: setattr(
+            application, "applicationVersion", version
+        ),
+        applicationDisplayName="",
+    )
+
+    _configure_application_identity(application)
+
+    assert application.applicationName == APPLICATION_NAME
+    assert application.applicationDisplayName == ""
 
 
 def test_velopack_runtime_dependency_is_pinned_in_project_and_lock() -> None:

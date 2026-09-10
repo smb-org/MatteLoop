@@ -17,10 +17,15 @@ os.environ["ORT_DISABLE_TELEMETRY"] = "1"
 
 __version__ = "0.4.0"
 
+# The single source for the product name. QSettings identity and the window
+# title derive from it in code; the packaging spec's --macos-app-name and
+# --product-name are checked against it by test_version_identity.py.
+APPLICATION_NAME = "MatteLoop"
+
 
 def application_title() -> str:
     """Return the user-visible application title for this build."""
-    return f"MatteLoop {__version__}"
+    return f"{APPLICATION_NAME} {__version__}"
 
 # Pillow warns above this value and errors above twice this value. Align the
 # warning boundary with the largest legal MatteLoop canvas without disabling the
