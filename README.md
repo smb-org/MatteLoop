@@ -9,8 +9,11 @@ inspector on the far right](assets/screenshots/main-window.png)
 
 Your video, model weights, every intermediate frame and the finished loop stay
 on your disk. MatteLoop makes no network request except the update check, the
-update package download, and the model download on first use; the segmentation
-runtime's own telemetry is switched off.
+update package download, and the model download on first use. The segmentation
+runtime's own telemetry is switched off on macOS and Linux; on Windows it is
+switched off after the runtime loads, but a startup diagnostic event is
+written to Windows' event tracing before that and may be collected under the
+device's diagnostic data policy.
 
 ## What it is for
 

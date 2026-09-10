@@ -7,6 +7,7 @@ import os
 import subprocess
 import sys
 import textwrap
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -36,14 +37,14 @@ def test_importing_matteloop_disables_onnxruntime_telemetry(
     assert os.environ["ORT_DISABLE_TELEMETRY"] == "1"
 
 
-def test_importing_matteloop_preserves_explicit_onnxruntime_telemetry_setting(
+def test_importing_matteloop_overrides_an_inherited_telemetry_opt_in(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("ORT_DISABLE_TELEMETRY", "0")
 
     importlib.reload(matteloop)
 
-    assert os.environ["ORT_DISABLE_TELEMETRY"] == "0"
+    assert os.environ["ORT_DISABLE_TELEMETRY"] == "1"
 
 
 def test_onnxruntime_loader_applies_secondary_telemetry_switch(
@@ -78,50 +79,89 @@ def test_onnxruntime_loader_reports_missing_secondary_telemetry_switch(
     assert "secondary telemetry switch unavailable" in caplog.text
 
 
-_THREAD_GROWTH_SCRIPT = """
-import psutil
+# ONNX Runtime independently latches full telemetry suppression whenever any well-known
+# CI/build-pipeline variable is set (onnxruntime/core/platform/telemetry_environment.h,
+# IsRunningInCI()/IsRunningUnitTests()), regardless of ORT_DISABLE_TELEMETRY. A child
+# process that inherits the ambient CI environment this test runs under would suppress
+# telemetry either way and make the control/treatment runs indistinguishable, so both
+# runs below scrub these.
+_CI_ENVIRONMENT_VARIABLES = (
+    "CI",
+    "TF_BUILD",
+    "GITHUB_ACTIONS",
+    "GITLAB_CI",
+    "CIRCLECI",
+    "TRAVIS",
+    "JENKINS_URL",
+    "CODEBUILD_BUILD_ID",
+    "BUILDKITE",
+    "TEAMCITY_VERSION",
+    "APPVEYOR",
+    "BITBUCKET_BUILD_NUMBER",
+    "SYSTEM_TEAMFOUNDATIONCOLLECTIONURI",
+    "ORT_RUNNING_UNIT_TESTS",
+)
 
-process = psutil.Process()
-before = process.num_threads()
-import onnxruntime
-print(process.num_threads() - before)
-"""
+_IMPORT_ONNXRUNTIME_SCRIPT = "import onnxruntime\n"
 
 
-def _thread_growth_on_import(*, disable_telemetry: bool) -> int:
-    """Return how many native threads importing the runtime starts."""
+def _telemetry_store_path(home: Path) -> Path:
+    """Where PosixTelemetry writes its device-id/telemetry cache for a given $HOME.
+
+    Mirrors DeviceId::GetStorageDirectory(): macOS ignores XDG_CACHE_HOME and uses
+    "$HOME/Library/Application Support"; everywhere else (as configured below, via
+    XDG_CACHE_HOME) it is "$HOME/.cache".
+    """
+    if sys.platform == "darwin":
+        base = home / "Library" / "Application Support"
+    else:
+        base = home / ".cache"
+    return base / "Microsoft" / "DeveloperTools" / ".onnxruntime" / "onnxruntime.db"
+
+
+def _import_onnxruntime_with(*, disable_telemetry: bool, home: Path) -> None:
+    """Import onnxruntime in a scrubbed subprocess rooted at a throwaway $HOME."""
+    home.mkdir()
     environment = os.environ.copy()
+    for name in _CI_ENVIRONMENT_VARIABLES:
+        environment.pop(name, None)
     if disable_telemetry:
         environment["ORT_DISABLE_TELEMETRY"] = "1"
     else:
         environment.pop("ORT_DISABLE_TELEMETRY", None)
+    environment["HOME"] = str(home)
+    environment["XDG_CACHE_HOME"] = str(home / ".cache")
     completed = subprocess.run(
-        [sys.executable, "-I", "-c", textwrap.dedent(_THREAD_GROWTH_SCRIPT)],
+        [sys.executable, "-I", "-c", _IMPORT_ONNXRUNTIME_SCRIPT],
         capture_output=True,
         check=False,
         env=environment,
         text=True,
     )
     assert completed.returncode == 0, completed.stderr
-    return int(completed.stdout.strip().splitlines()[-1])
 
 
 @pytest.mark.skipif(
-    sys.platform != "darwin",
-    reason=(
-        "the thread count only isolates telemetry on macOS: measured, importing "
-        "the runtime grows the process by 2 threads there and by none once the "
-        "switch is set, while Linux starts device-discovery threads either way "
-        "(1 to 4) and Windows reports telemetry through ETW (4 to 10)"
-    ),
+    sys.platform == "win32",
+    reason="ORT_DISABLE_TELEMETRY is POSIX-only; Windows telemetry uses ETW",
 )
-def test_the_switch_keeps_the_runtime_from_starting_telemetry_threads() -> None:
+def test_the_switch_keeps_the_runtime_from_creating_a_telemetry_store(
+    tmp_path: Path,
+) -> None:
     if importlib.util.find_spec("onnxruntime") is None:
         pytest.skip("onnxruntime is not installed")
 
-    assert _thread_growth_on_import(disable_telemetry=True) < (
-        _thread_growth_on_import(disable_telemetry=False)
+    without_switch_home = tmp_path / "without-switch"
+    _import_onnxruntime_with(disable_telemetry=False, home=without_switch_home)
+    baseline_store = _telemetry_store_path(without_switch_home)
+    assert baseline_store.exists(), (
+        "control run created no telemetry store, so this machine cannot exercise "
+        "the mechanism under test; strengthen the setup rather than the environment"
     )
+
+    with_switch_home = tmp_path / "with-switch"
+    _import_onnxruntime_with(disable_telemetry=True, home=with_switch_home)
+    assert not _telemetry_store_path(with_switch_home).exists()
 
 
 def test_importing_matteloop_disables_runtime_telemetry_before_any_import() -> None:
