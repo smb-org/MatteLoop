@@ -100,6 +100,11 @@ def releases_url() -> str:
     return f"{update_repository_url()}/releases"
 
 
+def release_notes_url(version: str) -> str:
+    """Return the browser URL for one version's release notes."""
+    return f"{update_repository_url()}/releases/tag/v{version}"
+
+
 class UpdateOutcome(Enum):
     """The three outcomes of a release check."""
 

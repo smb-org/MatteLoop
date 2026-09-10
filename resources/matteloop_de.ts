@@ -687,7 +687,7 @@
 <context>
     <name>ModelManagerController</name>
     <message numerus="yes">
-        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="133"/>
+        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="135"/>
         <source>Download %n model weight(s) (%1)? Each outdated copy from rembg %2 is deleted once its replacement has been verified. Other files in the %2 %3 stay until you use Delete outdated.</source>
         <translation>
             <numerusform>%n Modellgewicht (%1) herunterladen? Jede veraltete Kopie von rembg %2 wird gelöscht, sobald ihr Ersatz verifiziert wurde. Andere Dateien im %2 %3 bleiben erhalten, bis Sie „Veraltete löschen“ verwenden.</numerusform>
@@ -695,7 +695,7 @@
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="292"/>
+        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="294"/>
         <source>Re-downloading %n outdated model weight(s)…</source>
         <translation>
             <numerusform>%n veraltetes Modellgewicht wird erneut heruntergeladen…</numerusform>
@@ -703,7 +703,7 @@
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="392"/>
+        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="394"/>
         <source>%s Re-downloaded %n of %1 outdated model weight(s).</source>
         <translation>
             <numerusform>%s %n von %1 veraltetem Modellgewicht erneut heruntergeladen.</numerusform>
@@ -711,7 +711,7 @@
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="402"/>
+        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="404"/>
         <source>Download cancelled. Re-downloaded %n of %1 outdated model weight(s).</source>
         <translation>
             <numerusform>Download abgebrochen. %n von %1 veraltetem Modellgewicht erneut heruntergeladen.</numerusform>
@@ -719,7 +719,7 @@
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="409"/>
+        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="411"/>
         <source>Re-downloaded %n outdated model weight(s).</source>
         <translation>
             <numerusform>%n veraltetes Modellgewicht erneut heruntergeladen.</numerusform>
@@ -727,7 +727,7 @@
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="457"/>
+        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="459"/>
         <source>Removed %n outdated model version(s) from the cache.</source>
         <translation>
             <numerusform>%n veraltete Modellversion aus dem Cache entfernt.</numerusform>
@@ -748,145 +748,145 @@
         <translation>Ordner</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="129"/>
+        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="131"/>
         <source>Re-download outdated model weights?</source>
         <translation>Veraltete Modellgewichte erneut herunterladen?</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="153"/>
-        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="203"/>
+        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="155"/>
+        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="205"/>
         <source>Cannot remove a model while a job is running.</source>
         <translation>Ein Modell kann während eines laufenden Auftrags nicht entfernt werden.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="157"/>
-        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="211"/>
-        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="259"/>
+        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="159"/>
+        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="213"/>
+        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="261"/>
         <source>Model removal is unavailable in this runtime.</source>
         <translation>Das Entfernen von Modellen ist in dieser Laufzeit nicht verfügbar.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="169"/>
-        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="250"/>
+        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="171"/>
+        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="252"/>
         <source>Cannot download a model while a job is running.</source>
         <translation>Ein Modell kann während eines laufenden Auftrags nicht heruntergeladen werden.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="192"/>
+        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="194"/>
         <source>Downloading %s…</source>
         <translation>%s wird heruntergeladen…</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="221"/>
+        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="223"/>
         <source>Delete all weights from rembg %s?</source>
         <translation>Alle Gewichte von rembg %s löschen?</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="225"/>
+        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="227"/>
         <source>This removes the whole %s %s: %s on disk. Weights this version needs are downloaded again on demand.</source>
         <translation>Dies entfernt den gesamten %s %s: %s auf der Festplatte. Von dieser Version benötigte Gewichte werden bei Bedarf erneut heruntergeladen.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="319"/>
+        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="321"/>
         <source>Removing outdated model weights…</source>
         <translation>Veraltete Modellgewichte werden entfernt…</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="349"/>
+        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="351"/>
         <source> (%s of %s)</source>
         <translation> (%s von %s)</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="354"/>
+        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="356"/>
         <source>Downloading %s%s…</source>
         <translation>%s%s wird heruntergeladen…</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="367"/>
+        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="369"/>
         <source>Downloaded %s%s.</source>
         <translation>%s%s heruntergeladen.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="381"/>
+        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="383"/>
         <source>Could not download %s: %s.</source>
         <translation>%s konnte nicht heruntergeladen werden: %s.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="422"/>
+        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="424"/>
         <source>Downloaded %s.</source>
         <translation>%s heruntergeladen.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="435"/>
+        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="437"/>
         <source>Download cancelled.</source>
         <translation>Download abgebrochen.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="439"/>
+        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="441"/>
         <source>Could not download the weight: %s</source>
         <translation>Das Gewicht konnte nicht heruntergeladen werden: %s</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="446"/>
+        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="448"/>
         <source>Could not download model</source>
         <translation>Modell konnte nicht heruntergeladen werden</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="467"/>
+        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="469"/>
         <source>Could not remove outdated weights: %s: %s</source>
         <translation>Veraltete Gewichte konnten nicht entfernt werden: %s: %s</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="484"/>
+        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="486"/>
         <source>Remove model weight?</source>
         <translation>Modellgewicht entfernen?</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="485"/>
+        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="487"/>
         <source>Remove %s&apos;s downloaded weight?
 This frees %s.</source>
         <translation>Heruntergeladenes Gewicht von %s entfernen?
 Dadurch werden %s freigegeben.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="527"/>
+        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="529"/>
         <source>No weight could be removed at %s.</source>
         <translation>Bei %s konnte kein Gewicht entfernt werden.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="537"/>
+        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="539"/>
         <source>Removed %s; freed %s.</source>
         <translation>%s entfernt; %s freigegeben.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="544"/>
+        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="546"/>
         <source>Model removed</source>
         <translation>Modell entfernt</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="545"/>
+        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="547"/>
         <source>Removed %s&apos;s downloaded weight.
 Freed %s.</source>
         <translation>Heruntergeladenes Gewicht von %s entfernt.
 %s freigegeben.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="558"/>
+        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="560"/>
         <source>Could not remove the selected weight: %s</source>
         <translation>Das ausgewählte Gewicht konnte nicht entfernt werden: %s</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="565"/>
+        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="567"/>
         <source>Could not remove model</source>
         <translation>Modell konnte nicht entfernt werden</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="588"/>
+        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="590"/>
         <source>Could not open the model folder: %s</source>
         <translation>Der Modellordner konnte nicht geöffnet werden: %s</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="596"/>
+        <location filename="../src/matteloop/ui/model_manager/_controller.py" line="598"/>
         <source>Model folder: %s</source>
         <translation>Modellordner: %s</translation>
     </message>
@@ -1238,13 +1238,13 @@ Freed %s.</source>
         <translation>Video wird gerendert</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/preview_controller/controller.py" line="306"/>
+        <location filename="../src/matteloop/ui/preview_controller/controller.py" line="305"/>
         <location filename="../src/matteloop/ui/preview_controller/dialog.py" line="338"/>
         <source>Previewing selected frame</source>
         <translation>Ausgewähltes Bild wird in der Vorschau angezeigt</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/preview_controller/controller.py" line="312"/>
+        <location filename="../src/matteloop/ui/preview_controller/controller.py" line="311"/>
         <location filename="../src/matteloop/ui/preview_controller/dialog.py" line="52"/>
         <location filename="../src/matteloop/ui/preview_controller/dialog.py" line="343"/>
         <source>Preparing model</source>
@@ -1991,17 +1991,17 @@ Freed %s.</source>
         <translation>Einstellungen schließen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/update_controller.py" line="247"/>
+        <location filename="../src/matteloop/ui/update_controller.py" line="277"/>
         <source>Checking for updates…</source>
         <translation>Nach Updates wird gesucht …</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/update_controller.py" line="288"/>
+        <location filename="../src/matteloop/ui/update_controller.py" line="321"/>
         <source>No update found.</source>
         <translation>Kein Update gefunden.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/update_controller.py" line="297"/>
+        <location filename="../src/matteloop/ui/update_controller.py" line="330"/>
         <source>Couldn’t check for updates. Try again later.</source>
         <translation>Updates konnten nicht geprüft werden. Versuchen Sie es später erneut.</translation>
     </message>
@@ -2009,17 +2009,17 @@ Freed %s.</source>
 <context>
     <name>SourceController</name>
     <message>
-        <location filename="../src/matteloop/ui/controller.py" line="379"/>
+        <location filename="../src/matteloop/ui/controller.py" line="397"/>
         <source>Open video</source>
         <translation>Video öffnen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/controller.py" line="381"/>
+        <location filename="../src/matteloop/ui/controller.py" line="399"/>
         <source>Video files (*.mp4 *.mov *.webm *.mkv)</source>
         <translation>Videodateien (*.mp4 *.mov *.webm *.mkv)</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/controller.py" line="535"/>
+        <location filename="../src/matteloop/ui/controller.py" line="553"/>
         <source>Choose output directory</source>
         <translation>Ausgabeordner auswählen</translation>
     </message>
@@ -2175,19 +2175,19 @@ Freed %s.</source>
 <context>
     <name>TimelineWidget</name>
     <message>
-        <location filename="../src/matteloop/ui/timeline.py" line="221"/>
+        <location filename="../src/matteloop/ui/timeline.py" line="220"/>
         <source>Video timeline</source>
         <translation>Videotimeline</translation>
     </message>
     <message>
         <location filename="../src/matteloop/ui/timeline.py" line="248"/>
-        <location filename="../src/matteloop/ui/timeline.py" line="564"/>
+        <location filename="../src/matteloop/ui/timeline.py" line="574"/>
         <source>Frame —</source>
         <translation>Bild —</translation>
     </message>
     <message>
         <location filename="../src/matteloop/ui/timeline.py" line="252"/>
-        <location filename="../src/matteloop/ui/timeline.py" line="567"/>
+        <location filename="../src/matteloop/ui/timeline.py" line="577"/>
         <source>IN —   OUT —</source>
         <translation>IN —   OUT —</translation>
     </message>
@@ -2227,27 +2227,27 @@ Freed %s.</source>
         <translation>Zeitleiste</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/timeline.py" line="574"/>
+        <location filename="../src/matteloop/ui/timeline.py" line="584"/>
         <source>Frame %s</source>
         <translation>Bild %s</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/timeline.py" line="578"/>
+        <location filename="../src/matteloop/ui/timeline.py" line="588"/>
         <source>IN %s   OUT %s</source>
         <translation>IN %s   OUT %s</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/timeline.py" line="586"/>
+        <location filename="../src/matteloop/ui/timeline.py" line="596"/>
         <source>Outside export range</source>
         <translation>Außerhalb des Exportbereichs</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/timeline.py" line="591"/>
+        <location filename="../src/matteloop/ui/timeline.py" line="601"/>
         <source>Preview frame playhead %s, %s; %s%s</source>
         <translation>Vorschau-Abspielposition %s, %s; %s%s</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/timeline.py" line="598"/>
+        <location filename="../src/matteloop/ui/timeline.py" line="608"/>
         <source>; Outside export range</source>
         <translation>; Außerhalb des Exportbereichs</translation>
     </message>
@@ -2475,12 +2475,12 @@ Freed %s.</source>
 <context>
     <name>TransformStage</name>
     <message>
-        <location filename="../src/matteloop/ui/transform_stage.py" line="241"/>
+        <location filename="../src/matteloop/ui/transform_stage.py" line="242"/>
         <source>Discard unsaved transform changes?</source>
         <translation>Ungespeicherte Transformationsänderungen verwerfen?</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/transform_stage.py" line="244"/>
+        <location filename="../src/matteloop/ui/transform_stage.py" line="245"/>
         <source>The current cut has unsaved transform changes. Discard them and continue?</source>
         <translation>Das aktuelle Schnittset enthält ungespeicherte Transformationsänderungen. Sollen sie verworfen und fortgefahren werden?</translation>
     </message>
@@ -2510,8 +2510,8 @@ Freed %s.</source>
     <message>
         <location filename="../src/matteloop/ui/update_dialog.py" line="57"/>
         <location filename="../src/matteloop/ui/update_dialog.py" line="61"/>
-        <location filename="../src/matteloop/ui/update_dialog.py" line="140"/>
-        <location filename="../src/matteloop/ui/update_dialog.py" line="143"/>
+        <location filename="../src/matteloop/ui/update_dialog.py" line="150"/>
+        <location filename="../src/matteloop/ui/update_dialog.py" line="153"/>
         <source>Download update</source>
         <translation>Update herunterladen</translation>
     </message>
@@ -2524,60 +2524,66 @@ Freed %s.</source>
     <message>
         <location filename="../src/matteloop/ui/update_dialog.py" line="71"/>
         <location filename="../src/matteloop/ui/update_dialog.py" line="75"/>
-        <source>Open releases page</source>
-        <translation>Release-Seite öffnen</translation>
+        <source>Release notes</source>
+        <translation>Versionshinweise</translation>
     </message>
     <message>
         <location filename="../src/matteloop/ui/update_dialog.py" line="78"/>
         <location filename="../src/matteloop/ui/update_dialog.py" line="82"/>
-        <source>Not now</source>
-        <translation>Jetzt nicht</translation>
+        <source>Open releases page</source>
+        <translation>Release-Seite öffnen</translation>
     </message>
     <message>
         <location filename="../src/matteloop/ui/update_dialog.py" line="85"/>
         <location filename="../src/matteloop/ui/update_dialog.py" line="89"/>
+        <source>Not now</source>
+        <translation>Jetzt nicht</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/update_dialog.py" line="92"/>
+        <location filename="../src/matteloop/ui/update_dialog.py" line="96"/>
         <source>Later</source>
         <translation>Später</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/update_controller.py" line="501"/>
+        <location filename="../src/matteloop/ui/update_controller.py" line="584"/>
         <source>The update couldn’t be downloaded.</source>
         <translation>Das Update konnte nicht heruntergeladen werden.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/update_dialog.py" line="154"/>
-        <location filename="../src/matteloop/ui/update_dialog.py" line="157"/>
+        <location filename="../src/matteloop/ui/update_dialog.py" line="165"/>
+        <location filename="../src/matteloop/ui/update_dialog.py" line="168"/>
         <source>Cancel</source>
         <translation>Abbrechen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/update_dialog.py" line="169"/>
-        <location filename="../src/matteloop/ui/update_dialog.py" line="172"/>
+        <location filename="../src/matteloop/ui/update_dialog.py" line="181"/>
+        <location filename="../src/matteloop/ui/update_dialog.py" line="184"/>
         <source>Try again</source>
         <translation>Erneut versuchen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/update_controller.py" line="509"/>
+        <location filename="../src/matteloop/ui/update_controller.py" line="592"/>
         <source>MatteLoop cannot update itself from this location.</source>
         <translation>MatteLoop kann sich von diesem Speicherort aus nicht selbst aktualisieren.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/update_controller.py" line="593"/>
+        <location filename="../src/matteloop/ui/update_controller.py" line="674"/>
         <source>MatteLoop %1 is available.</source>
         <translation>MatteLoop %1 ist verfügbar.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/update_controller.py" line="599"/>
+        <location filename="../src/matteloop/ui/update_controller.py" line="680"/>
         <source>Downloading MatteLoop %1 (%2 %)…</source>
         <translation>MatteLoop %1 wird heruntergeladen (%2 %) …</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/update_controller.py" line="605"/>
+        <location filename="../src/matteloop/ui/update_controller.py" line="686"/>
         <source>MatteLoop %1 is ready to install.</source>
         <translation>MatteLoop %1 ist bereit zur Installation.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/update_controller.py" line="612"/>
+        <location filename="../src/matteloop/ui/update_controller.py" line="693"/>
         <source>Download size: %1 MB</source>
         <translation>Downloadgröße: %1 MB</translation>
     </message>

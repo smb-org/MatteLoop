@@ -40,6 +40,7 @@ from matteloop.updates import (
     UpdateOutcome,
     UpdateResult,
     download_update,
+    release_notes_url,
     releases_url,
     update_repository_url,
 )
@@ -212,6 +213,7 @@ class UpdateController(QObject):
         dialog = self._window.update_dialog
         dialog.download_button.clicked.connect(self._download_button_clicked)
         dialog.install_button.clicked.connect(self.install_and_restart)
+        dialog.release_notes_button.clicked.connect(self.open_release_notes)
         dialog.open_releases_button.clicked.connect(self.open_releases_page)
         dialog.not_now_button.clicked.connect(self.dismiss_offer)
         dialog.later_button.clicked.connect(self.dismiss_offer)
@@ -535,6 +537,13 @@ class UpdateController(QObject):
     @Slot()
     def open_releases_page(self) -> None:
         QDesktopServices.openUrl(QUrl(releases_url()))
+
+    @Slot()
+    def open_release_notes(self) -> None:
+        """Open the offered version's release notes, or the index if unknown."""
+        version = self._available_version
+        url = release_notes_url(version) if version else releases_url()
+        QDesktopServices.openUrl(QUrl(url))
 
     def _state_changed(self, _state: AppState) -> None:
         self._refresh_install_button()
