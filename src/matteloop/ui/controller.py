@@ -217,6 +217,7 @@ class SourceController(QObject):
         self._frame_timer.setInterval(125)
         self._frame_timer.timeout.connect(self._decode_current_playhead)
         self._closed = False
+        self._shutdown_complete = True
 
     def set_dialog_parent(self, parent: QWidget) -> None:
         """Set the window used as the parent for native source dialogs."""
@@ -235,6 +236,11 @@ class SourceController(QObject):
             except RuntimeError:
                 self._threads.pop(request_id, None)
         return active
+
+    @property
+    def shutdown_complete(self) -> bool:
+        """Report whether the last bounded shutdown joined every worker."""
+        return self._shutdown_complete
 
     @property
     def render_controller(self) -> RenderController:
@@ -327,27 +333,37 @@ class SourceController(QObject):
         elif isinstance(command, OpenOutputFolderRequested):
             self._render_controller.dispatch(command)
 
-    def shutdown(self) -> None:
+    def shutdown(self) -> bool:
         """Stop accepting results while the application is closing."""
-        self._closed = True
-        self._pending_provider = None
-        if self._unsubscribe is not None:
-            unsubscribe = self._unsubscribe
-            self._unsubscribe = None
-            unsubscribe()
-        self._frame_timer.stop()
-        self._cancel_frame_threads()
-        for thread, _worker in tuple(self._frame_threads):
-            thread.wait(_THREAD_SHUTDOWN_TIMEOUT_MS)
-        self._model_manager.close()
-        self._transform_stage.shutdown()
-        self._render_controller.shutdown()
-        self._preview_controller.shutdown()
-        threads = tuple(self._threads.items())
-        for _request_id, (thread, _load_worker) in threads:
-            thread.quit()
-        for _request_id, (thread, _load_worker) in threads:
-            thread.wait(_THREAD_SHUTDOWN_TIMEOUT_MS)
+        complete = True
+        try:
+            self._closed = True
+            self._pending_provider = None
+            if self._unsubscribe is not None:
+                unsubscribe = self._unsubscribe
+                self._unsubscribe = None
+                unsubscribe()
+            self._frame_timer.stop()
+            self._cancel_frame_threads()
+            for thread, _worker in tuple(self._frame_threads):
+                if not thread.wait(_THREAD_SHUTDOWN_TIMEOUT_MS):
+                    complete = False
+            self._model_manager.close()
+            complete = self._transform_stage.shutdown() and complete
+            complete = self._render_controller.shutdown() and complete
+            complete = self._preview_controller.shutdown() and complete
+            threads = tuple(self._threads.items())
+            for _request_id, (thread, _load_worker) in threads:
+                thread.quit()
+            for _request_id, (thread, _load_worker) in threads:
+                if not thread.wait(_THREAD_SHUTDOWN_TIMEOUT_MS):
+                    complete = False
+        except BaseException:
+            complete = False
+            raise
+        finally:
+            self._shutdown_complete = complete
+        return complete
 
     def _build_model_manager(self) -> ModelManagerController:
         runtime = self._preview_controller.runtime

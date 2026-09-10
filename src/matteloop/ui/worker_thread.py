@@ -30,7 +30,43 @@ releases the GIL, which the tail needs.
 
 from __future__ import annotations
 
+import logging
+
 from PySide6.QtCore import QObject, QThread, Slot
+
+_LOGGER = logging.getLogger(__name__)
+_RETAINED_THREADS: list[tuple[QThread, QObject | None]] = []
+
+
+def wait_for_thread_shutdown(
+    thread: QThread,
+    timeout_ms: int,
+    *,
+    description: str,
+    worker: QObject | None = None,
+) -> bool:
+    """Wait briefly, retaining a thread that outlives its owner."""
+    try:
+        if thread.wait(timeout_ms):
+            return True
+    except RuntimeError:
+        return False
+
+    thread.setParent(None)
+    retained = (thread, worker)
+    _RETAINED_THREADS.append(retained)
+
+    def release() -> None:
+        try:
+            _RETAINED_THREADS.remove(retained)
+        except ValueError:
+            pass
+
+    thread.finished.connect(release)
+    if thread.isFinished():
+        release()
+    _LOGGER.warning("%s outlived shutdown", description)
+    return False
 
 
 class WorkerThread(QThread):

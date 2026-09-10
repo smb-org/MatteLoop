@@ -8,7 +8,8 @@ Repo: smb-org/MatteLoop
 Status: REVIEWED — maintainer decisions folded in the same day; Phase 1 is in
 implementation; Phases 2–3 are implemented and wait on the qualification gate
 in "The gate" — Stage 0 and A1 passed, A2 is re-run on the rebuilt download
-path. No open questions remain.
+path. The maintainer accepts the helper's residual elevation prompt, subject to
+the advisory check before download and a writability re-check when arming.
 
 ## Problem statement
 
@@ -136,15 +137,26 @@ away:
   Windows says so in its own code. #74 asked for the working installation to
   be retained; **the maintainer has accepted this window instead**, on the
   ground that nothing the user owns lives inside the application package, so a
-  manual reinstall from the releases page is always a complete recovery. The
-  gate still measures it (A3, B7) to learn how large the window is, the
-  failure mode is named in the release notes, and the project must not build a
-  journal to compensate (G3).
+  manual reinstall from the releases page is always a complete recovery.
+  **Measured at A3:** the window is two consecutive `rename()` calls on one
+  filesystem; the extraction — the slow part — finishes before either. A
+  watcher polling every 2 ms and killing the helper the instant the bundle
+  vanished never hit it, and the installation came up as the new version. The
+  exposure is microseconds of metadata operations, not a 380 MB copy; it gets
+  one sentence in the release notes, not a warning, and the project must not
+  build a journal to compensate (G3). B7 measures the same on Windows.
+- *An unwritable install root ends in an elevation prompt, not a failure —
+  measured at A3.* With the installation directory made read-only, the helper
+  did not give up; Velopack showed "Administrator Permission Required —
+  MatteLoop needs administrator permission to install version 0.3.1." The
+  review had noted the helper's permission-error elevation path and the design
+  treated it as theoretical. It is not; the decision at the end of this
+  document accepts the residual case with two conditions.
 - *"Wait for exit" is a 60 s wait that continues on timeout.* On Windows the
   helper then force-stops every process running from the install root. A
   worker that outlived the bounded shutdown waits can be killed. This is a gate
-  requirement (A4, B6); the only acceptable outcome is that the helper defers
-  or refuses. **Two MatteLoop instances from one installation are not
+  requirement (A4, B6); the only acceptable outcome is that MatteLoop refuses
+  to arm the helper. **Two MatteLoop instances from one installation are not
   supported** — the README says so — so the second-instance case is out of the
   gate and no single-instance mechanism is designed.
 - *No signing without an identity.* `vpk` adds `UpdateMac` and `sq.version` to
@@ -184,9 +196,11 @@ from Preferences at any time, including from source. Checks and downloads are
 single-flight: a second request while one is in progress is ignored.
 
 **Where the manual check lives.** Preferences gains a row *Updates* below
-*Compute acceleration*: the checkbox, a status label and a *Check for updates*
-button. The application has no menu bar and one item does not justify adding
-one.
+*Compute acceleration*: the beta/stable selector, the startup checkbox, a
+status label and a *Check for updates* button. The selector is persisted as
+`updates/channel`. Turning beta off does not downgrade an installation; it
+stays on its beta until a stable release overtakes it. The application has no
+menu bar and one item does not justify adding one.
 
 **What the user sees.** When a startup check finds a newer release, the
 controller opens a window-modal `UpdateDialog` naming the version and offering
@@ -228,6 +242,10 @@ that is deleted; a package exists in the packages directory only after its
 SHA-256 matched. The download keeps running if a job starts; it is I/O and
 touches neither the segmentation process nor the work directory.
 
+The release check uses the same cancellation path. On quit, its worker is
+cancelled, its thread is asked to quit, and the thread is joined before the
+application can arm an install.
+
 **Install.** *Install and restart* checks `store.state.job.phase is
 JobState.IDLE` (the button is also disabled otherwise, refreshed from a store
 subscription as `SettingsDialog.load` refreshes the provider picker), records
@@ -241,6 +259,11 @@ window still visible, the pending info is dropped and the dialog returns to
 *Ready*. A *Ready* state is rebuilt at the next launch from
 `get_update_pending_restart()`, so *Later* loses nothing.
 
+The source controller reports whether all of its bounded worker waits finished,
+and the update controller reports the same for its check and download. The
+helper is armed only when both reports are complete; an incomplete shutdown
+refuses to arm and leaves the downloaded package pending for the next launch.
+
 What this does **not** guarantee, and the gate must measure: that the helper
 waits for a worker that outlives the bounded shutdown (Decision 1). The
 in-process IDLE check is necessary and insufficient for that case. A second
@@ -253,20 +276,32 @@ failed manual check reports in the Preferences label. A failed download is the
 does not recognise after it was written (Decision 3) — and *Try again*
 repeats it while *Open releases page* is the way out. A failure inside the helper after
 exit cannot be shown by this process; the next launch runs the check again,
-and the dialog's *Open releases page* is the recovery path. If the swap itself
-failed half-way (Decision 1), there is no next launch: on macOS the Dock icon
-or the Finder entry no longer opens anything, on Windows the shortcut reports a
-missing target. What the user does is download the current release from the
-releases page and install it as on day one — settings, weights, cuts and
-exports are untouched because none of them live in the package. The release
-notes for the first self-updating release say exactly this. Before the
-download, two advisory checks select *Open releases
-page* instead of *Download update*, because the outcome is known: the
-executable path contains `/AppTranslocation/` (macOS), or the Velopack helper
-and manifest are not where the layout in Decision 3 puts them (a source run, a
-raw `.dist` copy), or the install root is not writable. They are advisory; a
-layout that looks right is not proof that a swap will succeed, and no further
-pre-flight is built.
+and the dialog's *Open releases page* is the recovery path. In the
+microseconds-wide case where the swap itself fails between its two renames
+(Decision 1), nothing launches; the user downloads the current release and
+installs it as on day one, and loses nothing, because nothing of theirs lives
+in the package. One sentence in the first release notes covers it.
+
+Before the download, advisory checks select *Open releases page* instead of
+*Download update* where the outcome is known: the executable path contains
+`/AppTranslocation/` (macOS), the Velopack helper and manifest are not where
+the layout in Decision 3 puts them (a source run, a raw `.dist` copy), or the
+install root is not writable. They are advisory in a stronger sense than "the
+swap may still fail": **a failure after the download can end in an elevation
+prompt from Velopack's helper** — measured at A3, a read-only install root
+produced "Administrator Permission Required" rather than a failed swap. The
+checks reduce the chance of reaching that prompt (a root that is unwritable
+before the download is caught). Immediately before the quit path arms the
+helper, the controller repeats the same install-root writability check. If the
+root is no longer writable, it does not arm the helper and shows *Failed* with
+"MatteLoop cannot update itself from this location." and *Open releases page*
+when the user requests the install. During `aboutToQuit`, the event loop is no
+longer available for that presentation, so the controller logs a warning
+instead, leaves the package pending, and lets the next launch present the
+state. This closes the permission-change gap between download and quit without
+adding other pre-flight machinery. The prompt cannot be prevented entirely
+from inside the application: permissions may change after that re-check, or
+the helper may encounter a permission the check does not model.
 
 A translocated install therefore offers the browser rather than updating
 itself, and that is a deliberate simplification. #77 measured that the
@@ -299,6 +334,7 @@ variable.
 | UpdateBanner | Install and restart | Installieren und neu starten |
 | UpdateBanner | Later | Später |
 | UpdateBanner | The update couldn’t be downloaded. | Das Update konnte nicht heruntergeladen werden. |
+| UpdateBanner | MatteLoop cannot update itself from this location. | MatteLoop kann sich von diesem Speicherort aus nicht selbst aktualisieren. |
 | UpdateBanner | Try again | Erneut versuchen |
 | SettingsDialog | Updates | Updates |
 | SettingsDialog | Check for updates when MatteLoop starts | Beim Start von MatteLoop nach Updates suchen |
@@ -317,16 +353,19 @@ There is one source of truth for what is released — the GitHub release — one
 network path that reads it — the Qt transport — and one thing the SDK does:
 apply.
 
-**The notice comes from the API.** One request to
-`https://api.github.com/repos/smb-org/MatteLoop/releases/latest` through the
+**The notice comes from the API.** A stable check requests
+`https://api.github.com/repos/smb-org/MatteLoop/releases/latest`; a beta check
+requests `/releases` and selects the newest non-draft release. Both use the
 existing Qt transport, whose `open` gains an optional `headers` keyword
 (forwarded into the response and set on the request before `get`; small, but
 both signatures and the call sites change). The body is capped at 1 MiB and
-parsed with `json`. `tag_name` must match `^v(\d+)\.(\d+)\.(\d+)$`; anything
-else is "no update". Newer is a tuple comparison against `__version__` parsed
-the same way. HTTP or parse failures are "couldn't check", distinct from
-"none". This reader lives in `src/matteloop/updates.py`, has no Qt
-dependency, and is the whole of Phase 1.
+parsed with `json`. `tag_name` must match
+`^v(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$`; malformed prerelease
+identifiers are rejected. Newer is real semantic-version precedence against
+the running Velopack version: finals outrank prereleases of the same core,
+and numeric prerelease identifiers compare numerically. HTTP or parse failures
+are "couldn't check", distinct from "none". This reader lives in
+`src/matteloop/updates.py`, has no Qt dependency, and is the whole of Phase 1.
 
 **The package comes through the same transport.** On *Download update*, in
 the worker: fetch `releases.<channel>.json` from
@@ -373,11 +412,12 @@ not report — an applied or superseded one — so an update never leaves a 300 
 orphan; the SDK's own startup cleanup looks in its auto-located directory and
 never sees this one.
 
-**Drafts and prereleases stay out** without code: a draft is invisible to an
-unauthenticated client and `/releases/latest` excludes drafts and prereleases
-by GitHub's definition; the feed is fetched only for the tag that request
-returned. A release is complete the moment the maintainer publishes the draft;
-every asset appears at once.
+**Stable and beta visibility is deliberate.** GitHub's `/releases/latest`
+excludes drafts and prereleases, so the stable reader needs no beta filtering
+from the endpoint. The beta reader uses `/releases`, skips drafts and compares
+all valid release tags semantically. The feed is fetched only for the tag that
+request returned. A release is complete the moment the maintainer publishes
+the draft; every asset appears at once.
 
 **Assets per release**, all on the tagged release:
 
@@ -407,9 +447,11 @@ policy for moving the macOS floor is designed here; when that day comes it is
 its own decision.
 
 **Version consistency.** The workflow's `plan` job asserts on a tag push that
-`src/matteloop/__init__.py` contains `__version__ = "<tag without v>"` and
-fails within seconds otherwise — the check that would have caught the `1.0`
-releases.
+the numeric core of the tag matches
+`src/matteloop/__init__.py`'s `__version__` and fails within seconds otherwise
+— the check that would have caught the `1.0` releases. A prerelease suffix is
+passed to `vpk` as the package version, while the bundle metadata remains
+numeric because macOS and Windows reject the suffix there.
 
 ## Decision 4 — The release workflow
 
@@ -547,10 +589,11 @@ downloads and would be conspicuously untrue of a `.nupkg`. Before Phase 2
 ships a package, both change to:
 
 > MatteLoop publishes each application and update package with access to its
-> matching source companions at
-> `https://github.com/smb-org/MatteLoop/releases/tag/v<version>`. The media and
-> Qt source archives and checksums are separate downloads; they are not required
-> to run or update the application. Packages retain the applicable licence
+> matching source companions on the releases page:
+> `https://github.com/smb-org/MatteLoop/releases`. Open the release matching your
+> package's version to find them. The media and Qt source archives and checksums
+> are separate downloads; they are not required to run or update the application.
+> Packages retain the applicable licence
 > notices and library-replacement instructions. Redistribution must preserve the
 > applicable licences and provide the required corresponding source through a
 > permitted method. For network distribution under GPLv3 §6(d), source may be
@@ -653,15 +696,21 @@ not the full Velopack apply.
 - A2. **A → B through the real updater.** Publish B; A finds it, downloads it,
   installs on quit, relaunches as B with settings, cuts and a downloaded model
   intact.
-- A3. **Failed swap.** Force the second rename to fail on a disposable install
-  (make the staged bundle immovable with `chflags uchg`, or the
-  `/Applications` entry unwritable). Record what is left on disk and whether A
-  still launches. 1.2.0 is expected to leave a broken installation; that
-  outcome is accepted (Decision 1) and does not stop the updater — the item
-  measures the window and supplies the observed facts for the recovery text.
+- A3. **Failed swap — measured.** Two variants on a disposable install.
+  *Killing the helper between its renames:* a 2 ms poll that killed the helper
+  the instant the bundle disappeared never caught the gap; the apply completed
+  and the installation came up as 0.3.1. The no-rollback window is two
+  adjacent `rename()` calls after extraction, accepted and sized (Decision 1).
+  *Read-only install root:* the helper did not fail; it showed "Administrator
+  Permission Required — MatteLoop needs administrator permission to install
+  version 0.3.1." The prompt was cancelled, no elevation was granted, the
+  permissions were restored, the installation was unchanged. This is a design
+  finding, not a record: it contradicts the advisory-check paragraph in
+  Decision 2 as first written; the accepted residual case and its arming
+  re-check are recorded below.
 - A4. **Work at quit.** Quit for install with a worker blocked the way the
-  #111 harness blocks one. **Requirement: the helper defers or refuses;
-  nothing is killed.**
+  #111 harness blocks one. **Requirement: MatteLoop refuses to arm the helper;
+  the package stays pending and nothing is killed.**
 - A5. **Network.** Offline mid-download: A stays usable, the next launch shows
   no pending package. Behind an interception proxy: **measured and answered
   on the first run** — the SDK's own network path fails with `UnknownIssuer`
@@ -672,10 +721,11 @@ not the full Velopack apply.
   *Open releases page*, not a crash and not a failed swap.
 - Record `PackagesDir`.
 
-*Stage A passes* when A1 and A2 succeed exactly as written and A4 shows
-deferral or refusal; A3, A5 and A6 are recorded, not scored. If A2 fails, or
-A4 fails on 1.2.0 and a newer Velopack in reach does not fix it, stop at
-Phase 1 on both platforms.
+*Stage A passes* when A1 and A2 succeed exactly as written and the scored A4
+shutdown-incomplete case refuses to arm the helper while retaining the pending
+package. A3, A5 and A6 are recorded, not scored. If A2 fails, or A4 fails on
+1.2.0 and a newer Velopack in reach does not fix it, stop at Phase 1 on both
+platforms.
 
 *Status after the first run (2026-09-09).* Stage 0 passed on the `macos-15`
 runner. A1 passed: the packed bundle runs and its smoke test passes inside the
@@ -704,11 +754,14 @@ machine:
 - B5. **Hooks.** `Setup.exe` first run and the post-update relaunch pass
   through `App().run()` without `argparse` seeing `--veloapp-*`.
 - B6. **Work at quit** as A4 — this is the platform whose helper force-stops
-  processes in the install root.
+  processes in the install root. The scored pass condition is the same:
+  MatteLoop refuses to arm the helper when shutdown is incomplete, retaining
+  the pending package.
 - B7. **Failed swap** as A3, by holding a file under `current\` open.
 
 *Stage B passes* when B1, B2, B3 and B5 succeed, B4 preserves the weights and
-B6 shows deferral or refusal; B7 is recorded. Nothing about the framework is
+the scored B6 shutdown-incomplete case refuses to arm the helper while
+retaining the pending package. B7 is recorded. Nothing about the framework is
 "final" before both stages are done, and nothing Windows-related is public
 before Stage A is.
 
@@ -747,14 +800,16 @@ behaviour proves nothing, and no test is written to pretend otherwise.
 
 - Stage 0 fails on the `macos-15` runner — the renamed-in bundle does not
   execute (#77). The branch applies.
-- Stage A fails: A2 does not update through the real feed, or A4 kills a
-  stalled worker and no Velopack version in reach passes it. Stop at Phase 1
-  on both platforms; Windows is never started.
-- A3 or B7 shows a window larger than "the swap failed": for instance the
-  helper deleting the old bundle *before* attempting the second rename, or
-  leaving a half-copied `current\` that launches and misbehaves. The accepted
-  failure mode is "nothing launches, reinstall"; a bundle that starts and is
-  wrong is a different failure and is not accepted.
+- Stage A fails: A2 does not update through the real feed, or A4 does not
+  refuse to arm with a stalled worker and no Velopack version in reach passes
+  it. Stop at Phase 1 on both platforms; Windows is never started.
+- B7 shows a window on Windows larger than the two renames A3 measured on
+  macOS — for instance a half-copied `current\` that launches and misbehaves.
+  The accepted failure mode is "nothing launches, reinstall"; a bundle that
+  starts and is wrong is a different failure and is not accepted.
+- The accepted residual elevation case becomes common despite the advisory and
+  arming checks. Revisit the decision against that measurement; the prompt
+  cannot be prevented entirely from inside the application.
 - The packed full bundle does not launch through the first-install route
   because `vpk`'s additions broke the seal in a way the nested-file failure did
   not. Re-plan means measuring `--signAppIdentity -` against the known nested
@@ -776,7 +831,8 @@ behaviour proves nothing, and no test is written to pretend otherwise.
 ## Decisions recorded from the maintainer (2026-09-09)
 
 - The failed-rename window is accepted; recovery is a manual reinstall from
-  the releases page (Decision 1, gate items A3 and B7).
+  the releases page (Decision 1). A3 has since sized it at two adjacent
+  syscalls; B7 measures Windows.
 - Two instances from one installation are not supported (Decision 5).
 - The portable Windows distribution stays; #134 remains open until the
   archive layout is checked at the gate (Decision 3, gate item B3).
@@ -793,6 +849,27 @@ behaviour proves nothing, and no test is written to pretend otherwise.
   interception (measured), so the Qt transport fetches the feed and the
   package and the SDK only applies, through an explicit locator (Decisions 2
   and 3). A2 is re-run on the rebuilt path.
+
+## Decision on the elevation prompt
+
+**Decision.** Accept Velopack's elevation prompt for the rare case where the
+installation root is not writable by the user. The prompt is Velopack's, not
+MatteLoop's; cancelling it leaves the installed version untouched, as measured
+at A3. This decision has two conditions:
+
+1. The existing advisory writability check remains before the download, making
+   the case rarer.
+2. When `aboutToQuit` arms the install, the controller repeats that same
+   writability check; if it fails, the helper is not armed, the controller logs
+   a warning because the event loop is already gone, and the pending package is
+   left for the next launch to present. The pre-check remains the user-facing
+   *Open releases page* path for a manual install.
+
+The prompt cannot be prevented entirely from inside the application, because a
+permission can change after the arming check or fall outside what the check
+models. The documentation tells users that MatteLoop never needs administrator
+rights to update itself, and to cancel the prompt and install by hand if it
+appears.
 
 ## Open questions
 

@@ -66,7 +66,7 @@ from matteloop.ui.theme import (
     TEXT_COLOR,
 )
 from matteloop.ui.timeline_presentation import TimelinePresentation
-from matteloop.ui.worker_thread import WorkerThread
+from matteloop.ui.worker_thread import WorkerThread, wait_for_thread_shutdown
 
 _FILMSTRIP_HEIGHT = 78
 _TELEMETRY_HEIGHT = 42
@@ -230,6 +230,7 @@ class TimelineWidget(QFrame):
         self._thumbnail_thread: QThread | None = None
         self._thumbnail_worker: ThumbnailWorker | None = None
         self._thumbnail_threads: list[tuple[QThread, ThumbnailWorker]] = []
+        self._shutdown_complete = True
         self._thumbnail_generation = 0
         self._thumbnail_signature: tuple[object, ...] | None = None
         self._thumbnail_times: tuple[Fraction, ...] = ()
@@ -502,13 +503,25 @@ class TimelineWidget(QFrame):
                 return
         super().keyPressEvent(event)
 
-    def shutdown(self) -> None:
+    @property
+    def shutdown_complete(self) -> bool:
+        return self._shutdown_complete
+
+    def shutdown(self) -> bool:
         self._cancel_thumbnails()
-        for thread, _worker in tuple(self._thumbnail_threads):
-            thread.wait(_THREAD_SHUTDOWN_TIMEOUT_MS)
+        complete = True
+        for thread, worker in tuple(self._thumbnail_threads):
+            complete = wait_for_thread_shutdown(
+                thread,
+                _THREAD_SHUTDOWN_TIMEOUT_MS,
+                description="timeline thumbnail worker",
+                worker=worker,
+            ) and complete
         self._thumbnail_threads.clear()
         self._thumbnail_thread = None
         self._thumbnail_worker = None
+        self._shutdown_complete = complete
+        return complete
 
     def _emit_position(self, position: QPointF, target: str) -> None:
         geometry = self._geometry

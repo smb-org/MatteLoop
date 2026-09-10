@@ -99,11 +99,20 @@ macOS 15+ arm64 only.
 Use one MatteLoop instance per installation. The installer and portable
 archive update their own `current` installation in place.
 
+On macOS, `~/Applications` is a legitimate install location and the better
+choice for a user without administrator rights: it ends translocation just as
+`/Applications` does and always belongs to the user.
+
+MatteLoop never needs administrator rights to update itself. If such a prompt
+appears, the application is installed somewhere the user cannot write — cancel
+it and install the new version by hand.
+
 MatteLoop tells you when a new release is available: it checks once at startup
 and opens an update offer with the version and download action. Dismissing the
 offer leaves an update arrow beside the Preferences gear so it can be reopened.
 Preferences carries a manual check and the switch that turns the startup one
-off.
+off. It can also opt into beta releases. Turning beta off never downgrades the
+installation: it stays on its beta until a stable release overtakes it.
 
 ## Run from source
 

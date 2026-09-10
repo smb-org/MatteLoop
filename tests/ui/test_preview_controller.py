@@ -488,7 +488,7 @@ def test_shutdown_gives_up_on_a_worker_close_cannot_release(
 
     started = monotonic()
     try:
-        controller.shutdown()
+        assert not controller.shutdown()
         assert monotonic() - started < 2.0
     finally:
         runtime.release.set()

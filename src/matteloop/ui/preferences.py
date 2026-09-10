@@ -10,6 +10,7 @@ from matteloop.ui.inspector_disclosure import read_bool
 
 _PREFIX = "parameters/"
 UPDATES_CHECK_ON_STARTUP_KEY = "updates/check_on_startup"
+UPDATES_CHANNEL_KEY = "updates/channel"
 _KEYS = (
     "model_id",
     "edge_mode",
@@ -75,3 +76,16 @@ def load_check_on_startup(settings: QSettings) -> bool:
 def persist_check_on_startup(settings: QSettings, enabled: bool) -> None:
     """Persist the update startup preference as one QSettings primitive."""
     settings.setValue(UPDATES_CHECK_ON_STARTUP_KEY, enabled)
+
+
+def load_update_channel(settings: QSettings) -> str:
+    """Read the update maturity preference, defaulting to stable releases."""
+    value = settings.value(UPDATES_CHANNEL_KEY)
+    return value if isinstance(value, str) and value in {"stable", "beta"} else "stable"
+
+
+def persist_update_channel(settings: QSettings, channel: str) -> None:
+    """Persist one of the two supported update maturity choices."""
+    if channel not in {"stable", "beta"}:
+        raise ValueError("unsupported update channel")
+    settings.setValue(UPDATES_CHANNEL_KEY, channel)

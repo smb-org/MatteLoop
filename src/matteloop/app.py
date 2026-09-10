@@ -99,7 +99,7 @@ def _run_gui() -> int:
     )
     application.aboutToQuit.connect(controller.shutdown)
     window.show()
-    _start_update_controller(window, settings, application, store)
+    _start_update_controller(window, settings, application, store, controller)
     return application.exec()
 
 
@@ -112,7 +112,11 @@ def _configure_application_identity(application: Any) -> None:
 
 
 def _start_update_controller(
-    window: Any, settings: Any, application: Any, store: Any
+    window: Any,
+    settings: Any,
+    application: Any,
+    store: Any,
+    source_controller: Any,
 ) -> None:
     """Wire the update controller, including its bounded quit path."""
     from matteloop.ui.download_transport import QtNetworkDownloadTransport
@@ -127,6 +131,10 @@ def _start_update_controller(
         parent=application,
         store=store,
         transport=transport,
+        source_shutdown_complete=lambda: (
+            source_controller.shutdown_complete
+            and window.timeline_widget.shutdown_complete
+        ),
     )
     update_controller.start()
     application.aboutToQuit.connect(update_controller.shutdown)

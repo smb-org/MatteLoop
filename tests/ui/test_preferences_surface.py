@@ -191,6 +191,26 @@ def test_preferences_exposes_and_persists_the_update_startup_setting(qtbot) -> N
     assert settings.value("updates/check_on_startup") is False
 
 
+def test_preferences_exposes_and_persists_the_update_channel(qtbot) -> None:
+    settings = _settings("update-channel")
+    dialog = SettingsDialog(
+        ReducerStore(AppState()), Services(), settings=settings
+    )
+    qtbot.addWidget(dialog)
+
+    assert dialog.update_channel_selector.currentData() == "stable"
+    assert dialog.update_channel_selector.itemText(0) == "Stable"
+    assert dialog.update_channel_selector.itemText(1) == "Beta"
+    assert "does not downgrade" in dialog.update_channel_note.text()
+
+    dialog.update_channel_selector.setCurrentIndex(1)
+
+    assert settings.value("updates/channel") == "beta"
+
+    dialog.load()
+    assert dialog.update_channel_selector.currentData() == "beta"
+
+
 def test_preferences_changes_provider_before_a_video_is_loaded(qtbot) -> None:
     settings = _settings("provider-before-source")
     store = ReducerStore(AppState())

@@ -39,7 +39,12 @@ from matteloop.ui.i18n import (
     translate_language_name,
 )
 from matteloop.ui.ports import StateStore, WindowServices
-from matteloop.ui.preferences import load_check_on_startup, persist_check_on_startup
+from matteloop.ui.preferences import (
+    load_check_on_startup,
+    load_update_channel,
+    persist_check_on_startup,
+    persist_update_channel,
+)
 
 
 class SettingsDialog(QDialog):
@@ -101,6 +106,8 @@ class SettingsDialog(QDialog):
                 "SettingsDialog", "Check for updates when MatteLoop starts"
             )
         )
+        self._build_update_channel_widgets()
+
         self.updates_status_label = QLabel()
         self.updates_status_label.setObjectName("updates_status")
         self.updates_status_label.setAccessibleName(
@@ -119,6 +126,35 @@ class SettingsDialog(QDialog):
         self.button_box.setAccessibleName(
             QCoreApplication.translate("SettingsDialog", "Preferences actions")
         )
+
+    def _build_update_channel_widgets(self) -> None:
+        self.update_channel_label = QLabel(
+            QCoreApplication.translate("SettingsDialog", "Update channel")
+        )
+        self.update_channel_selector = QComboBox()
+        self.update_channel_selector.setObjectName("updates_channel")
+        self.update_channel_selector.setAccessibleName(
+            QCoreApplication.translate("SettingsDialog", "Update channel")
+        )
+        self.update_channel_selector.addItem(
+            QCoreApplication.translate("SettingsDialog", "Stable"), "stable"
+        )
+        self.update_channel_selector.addItem(
+            QCoreApplication.translate("SettingsDialog", "Beta"), "beta"
+        )
+        self.update_channel_label.setBuddy(self.update_channel_selector)
+        self.update_channel_note = QLabel(
+            QCoreApplication.translate(
+                "SettingsDialog",
+                "Turning beta off does not downgrade this installation; it stays on its beta until a stable release overtakes it.",  # noqa: E501
+            )
+        )
+        self.update_channel_note.setObjectName("updates_channel_note")
+        self.update_channel_note.setAccessibleName(
+            QCoreApplication.translate("SettingsDialog", "Update channel explanation")
+        )
+        self.update_channel_note.setProperty("secondary", True)
+        self.update_channel_note.setWordWrap(True)
 
     def _build_layout(self) -> None:
         self.description_label = QLabel()
@@ -184,7 +220,15 @@ class SettingsDialog(QDialog):
         updates_layout = QVBoxLayout(updates_row)
         updates_layout.setContentsMargins(0, 0, 0, 0)
         updates_layout.setSpacing(4)
-        updates_layout.addWidget(self.updates_check_on_startup)
+        updates_preferences_row = QWidget()
+        updates_preferences_layout = QHBoxLayout(updates_preferences_row)
+        updates_preferences_layout.setContentsMargins(0, 0, 0, 0)
+        updates_preferences_layout.addWidget(self.updates_check_on_startup)
+        updates_preferences_layout.addStretch(1)
+        updates_preferences_layout.addWidget(self.update_channel_label)
+        updates_preferences_layout.addWidget(self.update_channel_selector)
+        updates_layout.addWidget(updates_preferences_row)
+        updates_layout.addWidget(self.update_channel_note)
         updates_layout.addWidget(self.updates_status_label)
         check_row = QWidget()
         check_layout = QHBoxLayout(check_row)
@@ -200,6 +244,9 @@ class SettingsDialog(QDialog):
         self.language_selector.currentIndexChanged.connect(self._language_changed)
         self.provider_picker.currentIndexChanged.connect(self._provider_changed)
         self.updates_check_on_startup.toggled.connect(self._updates_changed)
+        self.update_channel_selector.currentIndexChanged.connect(
+            self._update_channel_changed
+        )
         self.button_box.rejected.connect(self.reject)
         close_button = self.button_box.button(QDialogButtonBox.StandardButton.Close)
         if close_button is not None:
@@ -209,7 +256,10 @@ class SettingsDialog(QDialog):
         self.setTabOrder(self.language_selector, self.provider_picker)
         self.setTabOrder(self.provider_picker, self.updates_check_on_startup)
         self.setTabOrder(
-            self.updates_check_on_startup, self.check_for_updates_button
+            self.updates_check_on_startup, self.update_channel_selector
+        )
+        self.setTabOrder(
+            self.update_channel_selector, self.check_for_updates_button
         )
         if close_button is not None:
             self.setTabOrder(self.check_for_updates_button, close_button)
@@ -242,6 +292,12 @@ class SettingsDialog(QDialog):
             self.updates_check_on_startup.setChecked(
                 load_check_on_startup(self._settings)
             )
+        with QSignalBlocker(self.update_channel_selector):
+            self.update_channel_selector.setCurrentIndex(
+                self.update_channel_selector.findData(
+                    load_update_channel(self._settings)
+                )
+            )
 
     def _provider_changed(self, _index: int) -> None:
         provider = self.provider_picker.currentData()
@@ -255,3 +311,8 @@ class SettingsDialog(QDialog):
 
     def _updates_changed(self, enabled: bool) -> None:
         persist_check_on_startup(self._settings, enabled)
+
+    def _update_channel_changed(self, index: int) -> None:
+        channel = self.update_channel_selector.itemData(index)
+        if isinstance(channel, str):
+            persist_update_channel(self._settings, channel)

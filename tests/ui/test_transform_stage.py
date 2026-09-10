@@ -13,6 +13,7 @@ from pathlib import Path
 from PIL import Image
 from PySide6.QtCore import Qt
 
+import matteloop.ui.transform_stage as transform_stage_module
 from matteloop.core.crop_state import CropChanged
 from matteloop.core.parameters import (
     AlphaThresholdChanged,
@@ -460,6 +461,29 @@ def test_shutdown_cancels_a_live_facts_computation_instead_of_waiting_for_it(
     qtbot.wait(50)  # pump the event loop so a queued signal would land here
     assert outcomes == [], "a cancelled worker must not report succeeded or failed"
     assert controller.facts is None
+
+
+def test_shutdown_retains_an_unreleased_facts_thread(
+    tmp_path, qtbot, monkeypatch
+) -> None:
+    monkeypatch.setattr(transform_stage_module, "_THREAD_SHUTDOWN_TIMEOUT_MS", 25)
+    artifact = _seed_cut(tmp_path, "seed-facts-timeout")
+    store = ReducerStore(_ready_state(tmp_path / "source.mp4"))
+    reader = _StallEveryReadReader()
+    controller = TransformStageController(store, frame_reader=reader)
+
+    store.dispatch(GlobalTrimChanged(True))
+    store.dispatch(AlphaThresholdChanged(Decimal("50")))
+    controller.open_artifact(artifact)
+    assert reader.started.wait(5), "the facts worker never reached the first frame"
+    thread = controller._thread  # noqa: SLF001
+    assert thread is not None
+
+    assert not controller.shutdown()
+    assert thread.parent() is None
+
+    reader.release.set()
+    assert thread.wait(1000)
 
 
 class _StallEveryReadReader:

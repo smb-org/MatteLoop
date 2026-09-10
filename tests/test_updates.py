@@ -16,6 +16,7 @@ from matteloop.updates import (
     UpdateDownloadCancelled,
     UpdateOutcome,
     download_update,
+    releases_api_url,
     update_feed_url,
     update_package_url,
 )
@@ -51,6 +52,7 @@ class _Transport:
         self.response = response
         self.failure = failure
         self.calls: list[tuple[str, Mapping[str, str] | None]] = []
+        self.cancellations: list[Callable[[], bool]] = []
 
     def open(
         self,
@@ -59,6 +61,7 @@ class _Transport:
         *,
         headers: Mapping[str, str] | None = None,
     ) -> _Response:
+        self.cancellations.append(_cancelled)
         self.calls.append((url, headers))
         if self.failure is not None:
             raise self.failure
@@ -174,6 +177,89 @@ def test_non_semver_release_tag_is_reported_as_no_update() -> None:
     assert reader.check().outcome is UpdateOutcome.NONE
 
 
+@pytest.mark.parametrize(
+    ("lower", "higher"),
+    [
+        ("v0.4.0-beta.1", "v0.4.0"),
+        ("v0.4.0", "v0.4.1-beta.1"),
+        ("v0.4.0-beta.1", "v0.4.0-beta.2"),
+        ("v0.4.0-beta.2", "v0.4.0-beta.10"),
+    ],
+)
+def test_release_tags_use_semantic_version_precedence(
+    lower: str, higher: str
+) -> None:
+    from matteloop.updates import _parse_tag
+
+    lower_version = _parse_tag(lower)
+    higher_version = _parse_tag(higher)
+
+    assert lower_version is not None
+    assert higher_version is not None
+    assert lower_version < higher_version
+
+
+@pytest.mark.parametrize(
+    "tag", ["v0.4.0-beta..1", "v0.4.0-beta.01", "v0.4.0-beta_1"]
+)
+def test_malformed_prerelease_tags_are_refused(tag: str) -> None:
+    from matteloop.updates import _parse_tag
+
+    assert _parse_tag(tag) is None
+
+
+def test_beta_reader_offers_a_prerelease_and_chooses_the_newest_version(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(sys, "platform", "darwin")
+    reader, transport, response = _reader(
+        json.dumps(
+            [
+                {"tag_name": "v0.4.0-beta.1", "draft": False, "assets": []},
+                {"tag_name": "v0.4.0-beta.2", "draft": False, "assets": []},
+                {"tag_name": "v0.4.0-beta.10", "draft": True, "assets": []},
+            ]
+        ).encode()
+    )
+
+    result = reader.check("beta", "0.3.0")
+
+    assert result.outcome is UpdateOutcome.UPDATE
+    assert result.version == "0.4.0-beta.2"
+    assert transport.calls == [
+        (
+            releases_api_url(),
+            {"Accept": "application/vnd.github+json", "User-Agent": "MatteLoop"},
+        )
+    ]
+    assert response.closed
+
+
+def test_stable_reader_does_not_offer_a_prerelease() -> None:
+    reader, _, _ = _reader(
+        b'{"tag_name":"v0.4.0-beta.1","prerelease":true,"draft":false}'
+    )
+
+    assert reader.check("stable", "0.3.0").outcome is UpdateOutcome.NONE
+
+
+def test_beta_installation_is_offered_the_next_stable_release() -> None:
+    reader, _, _ = _reader(
+        b'[{"tag_name":"v0.4.0","prerelease":false,"draft":false}]'
+    )
+
+    result = reader.check("beta", "0.4.0-beta.1")
+
+    assert result.outcome is UpdateOutcome.UPDATE
+    assert result.version == "0.4.0"
+
+
+def test_stable_preference_never_offers_a_downgrade_from_a_beta() -> None:
+    reader, _, _ = _reader(b'{"tag_name":"v0.3.0","prerelease":false}')
+
+    assert reader.check("stable", "0.4.0-beta.1").outcome is UpdateOutcome.NONE
+
+
 def test_non_json_release_body_is_reported_as_failed() -> None:
     reader, _, _ = _reader(b"not json")
 
@@ -195,6 +281,17 @@ def test_http_error_is_reported_as_failed() -> None:
     )
 
     assert reader.check().outcome is UpdateOutcome.FAILED
+
+
+def test_update_check_passes_its_cancellation_callback_to_transport() -> None:
+    reader, transport, _ = _reader(b'{"tag_name":"v0.4.0"}')
+    cancelled = Event()
+
+    assert reader.check(cancelled=cancelled.is_set).outcome is UpdateOutcome.UPDATE
+    assert len(transport.cancellations) == 1
+    assert not transport.cancellations[0]()
+    cancelled.set()
+    assert transport.cancellations[0]()
 
 
 def test_repository_environment_overrides_the_notice_feed(monkeypatch) -> None:

@@ -62,6 +62,9 @@ or tool source outside NuGet is downloaded. A normal macOS install root is
 Windows archive keeps the same `current\matteloop.exe` layout wherever it is
 extracted. Velopack's macOS package cache is
 `~/Library/Caches/velopack/io.github.smb-org.matteloop/`.
+MatteLoop never needs administrator rights to update itself. If such a prompt
+appears, the application is installed somewhere the user cannot write — cancel
+it and install the new version by hand.
 
 The update feed and its full packages stay on the same GitHub release as the
 application and its matching source archives. The feed must never move to
@@ -355,6 +358,9 @@ sign, notarize, or move the feed to another host. A later publication must keep
 the matching application/update packages, source archives and checksums on the
 same durable release endpoint; an expiring Actions artifact is not that
 endpoint.
+Release tags may carry a prerelease suffix such as `v0.4.0-beta.1`; the suffix
+is passed to Velopack while the bundle metadata remains numeric for macOS and
+Windows.
 
 ## Models and first launch
 

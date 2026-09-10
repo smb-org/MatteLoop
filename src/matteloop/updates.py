@@ -11,6 +11,7 @@ import sys
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
+from functools import total_ordering
 from pathlib import Path
 
 from matteloop import __version__
@@ -22,7 +23,10 @@ from matteloop.jobs.models.download import (
 
 _LOGGER = logging.getLogger(__name__)
 _MAX_RESPONSE_BYTES = 1024 * 1024
-_VERSION_PATTERN = re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")
+_VERSION_PATTERN = re.compile(
+    r"^v(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$"
+)
+_PRERELEASE_IDENTIFIER_PATTERN = re.compile(r"^[0-9A-Za-z-]+$")
 GITHUB_LATEST_RELEASE_URL = (
     "https://api.github.com/repos/smb-org/MatteLoop/releases/latest"
 )
@@ -86,6 +90,11 @@ def latest_release_url() -> str:
     return f"https://api.github.com/repos/{update_repository()}/releases/latest"
 
 
+def releases_api_url() -> str:
+    """Return the API URL for all releases in the configured repository."""
+    return f"https://api.github.com/repos/{update_repository()}/releases"
+
+
 def releases_url() -> str:
     """Return the browser URL for the configured repository's releases."""
     return f"{update_repository_url()}/releases"
@@ -106,6 +115,36 @@ class UpdateResult:
     outcome: UpdateOutcome
     version: str | None = None
     size: int | None = None
+
+
+@total_ordering
+@dataclass(frozen=True, slots=True)
+class _SemanticVersion:
+    """The semver fields needed to compare release tags."""
+
+    core: tuple[int, int, int]
+    prerelease: tuple[str, ...] = ()
+
+    def __lt__(self, other: object) -> bool:
+        if not isinstance(other, _SemanticVersion):
+            return NotImplemented
+        if self.core != other.core:
+            return self.core < other.core
+        if not self.prerelease:
+            return False
+        if not other.prerelease:
+            return True
+        for left, right in zip(self.prerelease, other.prerelease):
+            if left == right:
+                continue
+            left_numeric = left.isdigit()
+            right_numeric = right.isdigit()
+            if left_numeric and right_numeric:
+                return int(left) < int(right)
+            if left_numeric != right_numeric:
+                return left_numeric
+            return left < right
+        return len(self.prerelease) < len(other.prerelease)
 
 
 def download_update(
@@ -215,13 +254,17 @@ def _full_asset(feed: object, version: str) -> dict[str, object]:
     raise ValueError(f"Velopack feed contains no full package for {version}")
 
 
-def _read_response(response: DownloadResponse) -> bytes:
+def _read_response(
+    response: DownloadResponse, cancelled: CancellationCheck | None = None
+) -> bytes:
     chunks: list[bytes] = []
     total = 0
     while total <= _MAX_RESPONSE_BYTES:
         chunk = response.read(_MAX_RESPONSE_BYTES + 1 - total)
         if type(chunk) is not bytes:
             raise OSError("update transport returned a non-bytes chunk")
+        if cancelled is not None:
+            _raise_if_cancelled(cancelled)
         if not chunk:
             return b"".join(chunks)
         chunks.append(chunk)
@@ -254,29 +297,36 @@ class GitHubUpdateReader:
             raise TypeError("transport must implement the bounded download protocol")
         self._transport = transport
 
-    def check(self) -> UpdateResult:
+    def check(
+        self,
+        channel: str = "stable",
+        current_version: str | None = None,
+        cancelled: CancellationCheck | None = None,
+    ) -> UpdateResult:
         """Return whether GitHub advertises a newer compatible version."""
+        cancellation = cancelled or (lambda: False)
         response: DownloadResponse | None = None
         result = UpdateResult(UpdateOutcome.FAILED)
         try:
             response = self._transport.open(
-                latest_release_url(),
-                lambda: False,
+                _release_api_url(channel),
+                cancellation,
                 headers=_REQUEST_HEADERS,
             )
-            payload = json.loads(_read_response(response))
-            tag = payload.get("tag_name") if isinstance(payload, dict) else None
-            release_version = _parse_tag(tag)
-            if release_version is None:
+            payload = json.loads(_read_response(response, cancellation))
+            selected = _select_release(payload, channel)
+            if selected is None:
                 result = UpdateResult(UpdateOutcome.NONE)
-            elif release_version > _current_version():
-                result = UpdateResult(
-                    UpdateOutcome.UPDATE,
-                    _version_text(release_version),
-                    _full_package_size(payload, platform=sys.platform),
-                )
             else:
-                result = UpdateResult(UpdateOutcome.NONE)
+                release_version, release = selected
+                if release_version <= _current_version(current_version):
+                    result = UpdateResult(UpdateOutcome.NONE)
+                else:
+                    result = UpdateResult(
+                        UpdateOutcome.UPDATE,
+                        _version_text(release_version),
+                        _full_package_size(release, platform=sys.platform),
+                    )
         except Exception as error:
             _LOGGER.info("GitHub update check failed: %s", error)
         finally:
@@ -307,21 +357,67 @@ def _full_package_size(payload: object, *, platform: str) -> int | None:
     return None
 
 
-def _parse_tag(tag: object) -> tuple[int, int, int] | None:
+def _release_api_url(channel: str) -> str:
+    if channel == "stable":
+        return latest_release_url()
+    if channel == "beta":
+        return releases_api_url()
+    raise ValueError("unsupported update channel")
+
+
+def _select_release(
+    payload: object, channel: str
+) -> tuple[_SemanticVersion, dict[str, object]] | None:
+    if channel == "stable":
+        if not isinstance(payload, dict):
+            return None
+        if payload.get("draft") is True or payload.get("prerelease") is True:
+            return None
+        version = _parse_tag(payload.get("tag_name"))
+        return (version, payload) if version is not None else None
+    if channel != "beta" or not isinstance(payload, list):
+        return None
+    newest: tuple[_SemanticVersion, dict[str, object]] | None = None
+    for candidate in payload:
+        if not isinstance(candidate, dict) or candidate.get("draft") is True:
+            continue
+        version = _parse_tag(candidate.get("tag_name"))
+        if version is not None and (newest is None or version > newest[0]):
+            newest = (version, candidate)
+    return newest
+
+
+def _parse_tag(tag: object) -> _SemanticVersion | None:
     if not isinstance(tag, str):
         return None
     match = _VERSION_PATTERN.fullmatch(tag)
     if match is None:
         return None
-    return (int(match.group(1)), int(match.group(2)), int(match.group(3)))
+    prerelease_text = match.group(4)
+    prerelease = () if prerelease_text is None else tuple(prerelease_text.split("."))
+    if any(not _valid_prerelease_identifier(identifier) for identifier in prerelease):
+        return None
+    return _SemanticVersion(
+        (int(match.group(1)), int(match.group(2)), int(match.group(3))),
+        prerelease,
+    )
 
 
-def _current_version() -> tuple[int, int, int]:
-    match = _VERSION_PATTERN.fullmatch(f"v{__version__}")
-    if match is None:
+def _valid_prerelease_identifier(identifier: str) -> bool:
+    if _PRERELEASE_IDENTIFIER_PATTERN.fullmatch(identifier) is None:
+        return False
+    return not (identifier.isdigit() and len(identifier) > 1 and identifier[0] == "0")
+
+
+def _current_version(version: str | None = None) -> _SemanticVersion:
+    current = __version__ if version is None else version
+    tag = current if current.startswith("v") else f"v{current}"
+    parsed = _parse_tag(tag)
+    if parsed is None:
         raise ValueError("MatteLoop version is not semantic")
-    return (int(match.group(1)), int(match.group(2)), int(match.group(3)))
+    return parsed
 
 
-def _version_text(version: tuple[int, int, int]) -> str:
-    return ".".join(str(part) for part in version)
+def _version_text(version: _SemanticVersion) -> str:
+    text = ".".join(str(part) for part in version.core)
+    return text if not version.prerelease else f"{text}-{'.'.join(version.prerelease)}"

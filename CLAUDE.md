@@ -137,9 +137,13 @@ or the README.
 
 Then, still by hand:
 
-3. The tag, `vX.Y.Z`, matching exactly. The release workflow is
-   `workflow_dispatch`, so nothing enforces that the tag and the built version
-   agree — a mismatch here is what shipped `1.0` in two releases.
+3. The tag, `vX.Y.Z`, matching exactly. For a prerelease, the tag and
+   `--packVersion` carry the suffix, while the bundle versions do not:
+   `CFBundleShortVersionString` accepts only one to three integers and the
+   Windows resource is a numeric quad. The release workflow compares the tag's
+   numeric core with `__version__` and passes the full tag version to Velopack.
+   The historical `workflow_dispatch` gap did not enforce that the tag and
+   built version agreed; that mismatch is what shipped `1.0` in two releases.
 4. Release notes: what is new. The README never carries version history.
 5. **A minor release checks the README and the screenshots** before the bump
    (see *Keeping the README honest*). A patch needs no pass.

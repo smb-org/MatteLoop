@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 from threading import Thread
 from uuid import uuid4
 
@@ -47,9 +46,7 @@ from matteloop.ui.preview_controller.worker import (
     _notification_job_id,
     _PreviewWorker,
 )
-from matteloop.ui.worker_thread import WorkerThread
-
-LOGGER = logging.getLogger(__name__)
+from matteloop.ui.worker_thread import WorkerThread, wait_for_thread_shutdown
 
 # Long enough that a worker released by close() always finishes, short enough
 # that one it cannot release does not hold the application open.
@@ -150,7 +147,7 @@ class PreviewController(QObject):
             return
         self._start(job_id, source_id, request_id, inputs)
 
-    def shutdown(self) -> None:
+    def shutdown(self) -> bool:
         self._closed = True
         for context in tuple(self._contexts.values()):
             context.request_cancel()
@@ -160,22 +157,24 @@ class PreviewController(QObject):
             except RuntimeError:
                 self._threads.pop(job_id, None)
         self._runtime.close()
-        for job_id, (thread, _worker) in tuple(self._threads.items()):
+        complete = True
+        for job_id, (thread, worker) in tuple(self._threads.items()):
             try:
                 # Generous but finite: closing the runtime releases a worker
                 # stalled in segmentation, but one still preparing a model can
                 # sit in a download or a synchronous pipe read that close()
                 # does not interrupt. Waiting forever would trade a five-second
                 # shutdown for one that never ends.
-                if not thread.wait(_SHUTDOWN_JOIN_TIMEOUT_MS):
-                    LOGGER.warning(
-                        "preview worker %s did not finish within %d ms",
-                        job_id,
-                        _SHUTDOWN_JOIN_TIMEOUT_MS,
-                    )
+                complete = wait_for_thread_shutdown(
+                    thread,
+                    _SHUTDOWN_JOIN_TIMEOUT_MS,
+                    description=f"preview worker {job_id}",
+                    worker=worker,
+                ) and complete
             except RuntimeError:
-                pass
+                complete = False
             self._threads.pop(job_id, None)
+        return complete
 
     def _start(
         self,
