@@ -1,5 +1,11 @@
 from __future__ import annotations
 
+import logging
+from types import SimpleNamespace
+
+import pytest
+
+import matteloop.core.execution_providers as execution_providers
 from matteloop.core.execution_providers import (
     COREML_EXECUTION_PROVIDER,
     CPU_EXECUTION_PROVIDER,
@@ -11,6 +17,38 @@ from matteloop.core.execution_providers import (
     provider_options_from_runtime,
     select_provider,
 )
+
+
+def test_onnxruntime_loader_disables_telemetry_when_runtime_exposes_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[bool] = []
+    runtime = SimpleNamespace(disable_telemetry_events=lambda: calls.append(True))
+    monkeypatch.setattr(
+        execution_providers.importlib,
+        "import_module",
+        lambda name: runtime if name == "onnxruntime" else None,
+    )
+
+    assert execution_providers.load_onnxruntime() is runtime
+    assert calls == [True]
+
+
+def test_onnxruntime_loader_keeps_runtime_usable_without_telemetry_api(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    runtime = SimpleNamespace()
+    monkeypatch.setattr(
+        execution_providers.importlib,
+        "import_module",
+        lambda name: runtime if name == "onnxruntime" else None,
+    )
+
+    with caplog.at_level(logging.DEBUG, logger=execution_providers.__name__):
+        assert execution_providers.load_onnxruntime() is runtime
+
+    assert "disable_telemetry_events" in caplog.text
 
 
 def test_provider_catalog_exposes_only_allowlisted_local_runtime_providers() -> None:

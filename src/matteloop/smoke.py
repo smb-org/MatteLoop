@@ -20,6 +20,7 @@ import av
 import numpy as np
 from PIL import Image, ImageDraw
 
+from matteloop.core.execution_providers import load_onnxruntime
 from matteloop.core.rgba import RgbaOwnershipTracker
 from matteloop.core.webp import encode_lossless_webp, validate_webp
 from matteloop.jobs.source import decode_frame, probe_source
@@ -139,7 +140,7 @@ def _assert_ownership_bounds(rgba_owners: RgbaOwnershipTracker) -> None:
 
 
 def _check_windows_directml_runtime() -> None:
-    import onnxruntime  # type: ignore[import-untyped]
+    onnxruntime = load_onnxruntime()
 
     if "DmlExecutionProvider" not in onnxruntime.get_available_providers():
         raise RuntimeError(

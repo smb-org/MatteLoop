@@ -18,7 +18,10 @@ from pathlib import Path
 from typing import Any
 
 from matteloop import __version__, application_title
-from matteloop.core.execution_providers import onnxruntime_repair_command
+from matteloop.core.execution_providers import (
+    load_onnxruntime,
+    onnxruntime_repair_command,
+)
 
 _LOGGER = logging.getLogger(__name__)
 _ONNXRUNTIME_DISTRIBUTIONS = (
@@ -142,9 +145,7 @@ def _start_update_controller(
 
 
 def _load_onnxruntime() -> object:
-    import onnxruntime  # type: ignore[import-untyped]
-
-    return onnxruntime
+    return load_onnxruntime()
 
 
 def _onnxruntime_flavor(device: str) -> str:
@@ -164,8 +165,7 @@ def _onnxruntime_distribution() -> tuple[str, str]:
     # Frozen bundles (Nuitka standalone) carry no dist-info for onnxruntime,
     # so fall back to facts read straight off the loaded module.
     try:
-        import onnxruntime
-
+        onnxruntime = load_onnxruntime()
         version = str(onnxruntime.__version__)
         device = str(onnxruntime.get_device())
     except Exception:

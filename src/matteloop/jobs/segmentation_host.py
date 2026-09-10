@@ -1,5 +1,4 @@
 """Spawned rembg host with a bounded byte protocol and parent-owned frame slot.
-
 Ownership and lock/protocol order::
 
     parent                                   spawned child
@@ -48,6 +47,7 @@ from matteloop.core.execution_providers import (
     CPU_EXECUTION_PROVIDER,
     DML_EXECUTION_PROVIDER,
     is_allowed_provider,
+    load_onnxruntime,
     provider_base_label,
 )
 from matteloop.jobs.models.cache_fs import (
@@ -1413,7 +1413,7 @@ def _instantiate_verified_rembg_session(
     if type(model_bytes) is not bytes:
         raise _model_preparation_error("verified model content is not immutable bytes")
     if ort_module is None:
-        import onnxruntime as ort_module  # type: ignore[import-untyped,no-redef]
+        ort_module = load_onnxruntime()
     if session_classes is None:
         session_classes = load_rembg_session_classes()
     session_class = _resolve_rembg_session_class(

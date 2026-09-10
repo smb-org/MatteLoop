@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import importlib
+import logging
 import platform
 import sys
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import TypeGuard
+from typing import Any, TypeGuard
+
+_LOGGER = logging.getLogger(__name__)
 
 CPU_EXECUTION_PROVIDER = "CPUExecutionProvider"
 COREML_EXECUTION_PROVIDER = "CoreMLExecutionProvider"
@@ -26,6 +30,23 @@ ALLOWED_EXECUTION_PROVIDERS = (
     DML_EXECUTION_PROVIDER,
 )
 _ALLOWED = frozenset(ALLOWED_EXECUTION_PROVIDERS)
+
+
+def load_onnxruntime() -> Any:
+    """Import ONNX Runtime with its bundled telemetry disabled when possible."""
+    runtime = importlib.import_module("onnxruntime")
+    disable_telemetry = getattr(runtime, "disable_telemetry_events", None)
+    if callable(disable_telemetry):
+        try:
+            disable_telemetry()
+        except Exception as error:  # a runtime that refuses must still load
+            _LOGGER.warning("ONNX Runtime telemetry could not be disabled: %s", error)
+    else:
+        _LOGGER.debug(
+            "ONNX Runtime does not expose disable_telemetry_events; "
+            "telemetry could not be disabled"
+        )
+    return runtime
 
 
 def onnxruntime_repair_command(*, platform_name: str | None = None) -> str:
@@ -87,7 +108,7 @@ def provider_options_from_runtime(
     """Read the installed runtime's provider list without creating a session."""
     try:
         if runtime is None:
-            import onnxruntime as runtime  # type: ignore[import-untyped,no-redef]
+            runtime = load_onnxruntime()
         available = getattr(runtime, "get_available_providers")()
         device = getattr(runtime, "get_device", lambda: None)()
         return provider_options(available, device=str(device), model_id=model_id)
