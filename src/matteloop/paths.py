@@ -9,6 +9,8 @@ from platformdirs import user_cache_dir
 PRODUCT_NAME = "MatteLoop"
 PACKAGE_NAME = "matteloop"
 CACHE_NAME = "matteloop"
+# Legacy workspace directory name under old output folders; retained for the
+# migration that offers to move those sets into the cache.
 WORKSPACE_NAME = ".matteloop-work"
 
 

@@ -110,7 +110,7 @@ class CutWorkspace:
             _validate_path_value(value)
         expected_root = _durable_workspace_root()
         if not _same_lexical_path(self.workspace_root, expected_root):
-            raise _unsafe_error("workspace root is not bound to the output directory")
+            raise _unsafe_error("workspace root is not canonical")
         if not _same_lexical_path(self.cuts_root, self.workspace_root / "cuts"):
             raise _unsafe_error("cuts root is not canonical")
         if not _same_lexical_path(self.scratch_root, self.workspace_root / "scratch"):
