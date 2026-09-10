@@ -35,8 +35,9 @@ _ALLOWED = frozenset(ALLOWED_EXECUTION_PROVIDERS)
 def load_onnxruntime() -> Any:
     """Import ONNX Runtime and apply its secondary telemetry switch."""
     runtime = importlib.import_module("onnxruntime")
-    # matteloop.__init__ disables the SDK before this import; retain this
-    # secondary switch for runtimes whose Windows ETW path honours it.
+    # matteloop.__init__ stops the POSIX SDK before this import. Windows reads no
+    # such variable, so this call is the only switch there: it suppresses the
+    # per-session events, but ProcessInfo has already reached ETW during the import.
     disable_telemetry = getattr(runtime, "disable_telemetry_events", None)
     if callable(disable_telemetry):
         try:
