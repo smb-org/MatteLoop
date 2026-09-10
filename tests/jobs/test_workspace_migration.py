@@ -12,7 +12,7 @@ from PIL import Image
 
 import matteloop.jobs.workspace_migration as migration_module
 from matteloop.core.state import JobKind
-from matteloop.jobs.workspace import CutManifest
+from matteloop.jobs.workspace import CutManifest, CutWorkspace, validate_cut_set
 from matteloop.paths import WORKSPACE_NAME, cut_workspace_root
 from tests.jobs.render_support import job, render_service, request
 
@@ -77,16 +77,46 @@ def test_legacy_cut_set_is_moved_and_verified(tmp_path: Path, cache_root: Path) 
     output, legacy_path, cache_key = _rendered_set(
         tmp_path, cache_root, job_id="moved"
     )
+    source_bytes = {
+        path.name: path.read_bytes()
+        for path in legacy_path.iterdir()
+        if path.is_file()
+    }
 
     result = _outcome(output)
 
     assert result.status is migration_module.MigrationStatus.MOVED
     target = cut_workspace_root() / "cuts" / legacy_path.name
-    assert target.exists()
     assert not legacy_path.exists()
-    assert target.joinpath("manifest.json").is_file()
-    assert target.joinpath("frame-000000.png").is_file()
+    assert {
+        path.name: path.read_bytes()
+        for path in target.iterdir()
+        if path.is_file()
+    } == source_bytes
+    reopened = CutWorkspace.open(output, cache_key)
+    assert validate_cut_set(reopened).to_json_bytes() == source_bytes["manifest.json"]
     assert result.entry.cache_key == cache_key
+
+
+def test_migration_fsyncs_each_published_file(
+    tmp_path: Path, cache_root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    output, _legacy_path, _cache_key = _rendered_set(
+        tmp_path, cache_root, job_id="fsync"
+    )
+    actual_fsync_file = migration_module._fsync_file
+    synced: list[str] = []
+
+    def record_fsync(path: Path) -> None:
+        synced.append(path.name)
+        actual_fsync_file(path)
+
+    monkeypatch.setattr(migration_module, "_fsync_file", record_fsync)
+
+    result = _outcome(output)
+
+    assert result.status is migration_module.MigrationStatus.MOVED
+    assert synced == ["manifest.json", "frame-000000.png", "frame-000001.png"]
 
 
 def test_identical_collision_removes_legacy_copy_and_carries_pin(
@@ -135,6 +165,44 @@ def test_different_collision_keeps_both_copies_without_copying(
     )
 
 
+def test_later_frame_collision_keeps_both_copies(
+    tmp_path: Path, cache_root: Path
+) -> None:
+    output, legacy_path, _cache_key, promoted = _copy_to_legacy(
+        tmp_path, cache_root, job_id="different-later"
+    )
+    _rewrite_frame(legacy_path / "frame-000001.png", (9, 8, 7, 255))
+    target_before = (promoted / "frame-000001.png").read_bytes()
+
+    result = _outcome(output)
+
+    assert result.status is migration_module.MigrationStatus.KEPT_BOTH
+    assert legacy_path.exists()
+    assert (promoted / "frame-000001.png").read_bytes() == target_before
+
+
+def test_unequal_frame_count_collision_keeps_both_copies(
+    tmp_path: Path, cache_root: Path
+) -> None:
+    output, legacy_path, _cache_key, promoted = _copy_to_legacy(
+        tmp_path, cache_root, job_id="different-count"
+    )
+    legacy_manifest = CutManifest.from_json_bytes(
+        (legacy_path / "manifest.json").read_bytes()
+    )
+    (legacy_path / "frame-000001.png").unlink()
+    (legacy_path / "manifest.json").write_bytes(
+        replace(legacy_manifest, frames=legacy_manifest.frames[:-1]).to_json_bytes()
+    )
+
+    result = _outcome(output)
+
+    assert result.status is migration_module.MigrationStatus.KEPT_BOTH
+    assert legacy_path.exists()
+    assert (legacy_path / "frame-000001.png").exists() is False
+    assert (promoted / "frame-000001.png").exists()
+
+
 def test_frame_rewritten_between_scan_and_copy_leaves_source_and_no_temp(
     tmp_path: Path, cache_root: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -162,6 +230,55 @@ def test_frame_rewritten_between_scan_and_copy_leaves_source_and_no_temp(
         for path in (cut_workspace_root() / "cuts").iterdir()
         if path.name.startswith(".migrating-")
     )
+
+
+def test_edit_after_copy_keeps_source_for_normal_migration(
+    tmp_path: Path, cache_root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    output, legacy_path, cache_key = _rendered_set(
+        tmp_path, cache_root, job_id="edited-after-copy"
+    )
+    original_copy_sidecar = migration_module._copy_sidecar_if_needed
+
+    def edit_after_copy(source_root: Path, target_root: Path, key: str) -> None:
+        original_copy_sidecar(source_root, target_root, key)
+        _rewrite_frame(legacy_path / "frame-000001.png", (4, 5, 6, 255))
+
+    monkeypatch.setattr(
+        migration_module, "_copy_sidecar_if_needed", edit_after_copy
+    )
+    result = _outcome(output)
+
+    assert result.status is migration_module.MigrationStatus.MOVED_SOURCE_REMAINS
+    assert legacy_path.exists()
+    assert (legacy_path / "frame-000001.png").read_bytes() != (
+        cut_workspace_root() / "cuts" / legacy_path.name / "frame-000001.png"
+    ).read_bytes()
+    assert validate_cut_set(
+        CutWorkspace.open(output, cache_key)
+    ).cache_key == cache_key
+
+
+def test_edit_after_collision_equality_keeps_both_copies(
+    tmp_path: Path, cache_root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    output, legacy_path, _cache_key, promoted = _copy_to_legacy(
+        tmp_path, cache_root, job_id="edited-after-collision"
+    )
+    original_copy_sidecar = migration_module._copy_sidecar_if_needed
+
+    def edit_after_equality(source_root: Path, target_root: Path, key: str) -> None:
+        original_copy_sidecar(source_root, target_root, key)
+        _rewrite_frame(legacy_path / "frame-000001.png", (4, 5, 6, 255))
+
+    monkeypatch.setattr(
+        migration_module, "_copy_sidecar_if_needed", edit_after_equality
+    )
+    result = _outcome(output)
+
+    assert result.status is migration_module.MigrationStatus.KEPT_BOTH
+    assert legacy_path.exists()
+    assert promoted.exists()
 
 
 def test_stale_migration_directory_is_removed_on_next_run(
@@ -229,6 +346,46 @@ def test_transform_sidecar_travels_with_moved_set(
     assert not sidecar.exists()
 
 
+def test_interrupted_sidecar_copy_is_atomic_and_retry_arrives(
+    tmp_path: Path, cache_root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    output, legacy_path, cache_key = _rendered_set(
+        tmp_path, cache_root, job_id="sidecar-interrupted"
+    )
+    sidecar = legacy_path.parent / f".transform-{cache_key}.json"
+    good_sidecar = b"transform-sidecar"
+    sidecar.write_bytes(good_sidecar)
+    actual_copy2 = migration_module.shutil.copy2
+    target_sidecar = cut_workspace_root() / "cuts" / sidecar.name
+
+    def interrupt_sidecar_copy(
+        source: object, destination: object, *args: object, **kwargs: object
+    ) -> str:
+        if Path(source) == sidecar:
+            Path(destination).write_bytes(b"partial")
+            raise OSError("interrupted sidecar copy")
+        return actual_copy2(source, destination, *args, **kwargs)
+
+    monkeypatch.setattr(migration_module.shutil, "copy2", interrupt_sidecar_copy)
+    first = _outcome(output)
+
+    assert first.status is migration_module.MigrationStatus.MOVED_SOURCE_REMAINS
+    assert legacy_path.exists()
+    assert not target_sidecar.exists()
+    assert not tuple(
+        path
+        for path in target_sidecar.parent.iterdir()
+        if path.name.startswith(f".{target_sidecar.name}-")
+    )
+
+    monkeypatch.setattr(migration_module.shutil, "copy2", actual_copy2)
+    second = _outcome(output)
+
+    assert second.status is migration_module.MigrationStatus.REDUNDANT_REMOVED
+    assert target_sidecar.read_bytes() == good_sidecar
+    assert not sidecar.exists()
+
+
 def test_empty_legacy_workspace_root_is_removed_after_migration(
     tmp_path: Path, cache_root: Path
 ) -> None:
@@ -256,26 +413,79 @@ def test_legacy_workspace_root_with_stranger_file_is_preserved(
     assert (output / WORKSPACE_NAME).exists()
 
 
-def test_fallback_workspace_set_is_renamed_without_copying_frames(
+def test_stranger_file_inside_scratch_is_preserved(
+    tmp_path: Path, cache_root: Path
+) -> None:
+    output, _legacy_path, _cache_key = _rendered_set(
+        tmp_path, cache_root, job_id="scratch-stranger"
+    )
+    scratch = output / WORKSPACE_NAME / "scratch"
+    scratch.mkdir()
+    stranger = scratch / "notes.txt"
+    stranger.write_bytes(b"keep me")
+
+    _outcome(output)
+
+    assert stranger.read_bytes() == b"keep me"
+    assert (output / WORKSPACE_NAME).exists()
+
+
+def test_fallback_workspace_set_migrates_through_copy_path(
     tmp_path: Path, cache_root: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     output, legacy_path, _cache_key = _rendered_set(
         tmp_path, cache_root, job_id="fallback", fallback=True
     )
 
-    def reject_frame_copy(
+    actual_copy2 = migration_module.shutil.copy2
+    copied_frames: list[str] = []
+
+    def record_frame_copy(
         source: object, destination: object, *args: object, **kwargs: object
     ) -> str:
         if Path(source).name.startswith("frame-"):
-            raise AssertionError("fallback migration copied a frame")
-        return shutil.copy2(source, destination, *args, **kwargs)
+            copied_frames.append(Path(source).name)
+        return actual_copy2(source, destination, *args, **kwargs)
 
-    monkeypatch.setattr(migration_module.shutil, "copy2", reject_frame_copy)
+    monkeypatch.setattr(migration_module.shutil, "copy2", record_frame_copy)
     result = _outcome(output)
 
     assert result.status is migration_module.MigrationStatus.MOVED
     assert not legacy_path.exists()
     assert (cut_workspace_root() / "cuts" / legacy_path.name).exists()
+    assert copied_frames == ["frame-000000.png", "frame-000001.png"]
+
+
+def test_cancellation_is_observed_between_sets_not_during_a_set(
+    tmp_path: Path, cache_root: Path
+) -> None:
+    first_output, first_path, _first_key = _rendered_set(
+        tmp_path, cache_root, job_id="cancel-first"
+    )
+    second_output, second_path, _second_key = _rendered_set(
+        tmp_path, cache_root, job_id="cancel-second"
+    )
+    entries = (
+        migration_module.find_legacy_cut_sets(first_output)[0],
+        migration_module.find_legacy_cut_sets(second_output)[0],
+    )
+    cancellation_checks = 0
+
+    def cancel_before_second_set() -> bool:
+        nonlocal cancellation_checks
+        cancellation_checks += 1
+        return cancellation_checks == 2
+
+    results = tuple(
+        migration_module.migrate_cut_set(entry, cancelled=cancel_before_second_set)
+        for entry in entries
+    )
+
+    assert results[0].status is migration_module.MigrationStatus.MOVED
+    assert results[1].status is migration_module.MigrationStatus.CANCELLED
+    assert cancellation_checks == 2
+    assert not first_path.exists()
+    assert second_path.exists()
 
 
 def test_unreadable_legacy_set_is_reported_and_never_deleted(

@@ -9,7 +9,6 @@ verified.
 
 from __future__ import annotations
 
-import errno
 import hashlib
 import os
 import shutil
@@ -40,7 +39,22 @@ _MIGRATION_HEADROOM_BYTES: Final = 256 * 1024**2
 
 class _FrameRecord(Protocol):
     @property
+    def index(self) -> int: ...
+
+    @property
     def filename(self) -> str: ...
+
+    @property
+    def width(self) -> int: ...
+
+    @property
+    def height(self) -> int: ...
+
+    @property
+    def size_bytes(self) -> int: ...
+
+    @property
+    def mtime_ns(self) -> int: ...
 
     @property
     def sha256(self) -> str: ...
@@ -168,10 +182,6 @@ def migrate_cut_set(
             return MigrationOutcome(entry, MigrationStatus.NO_SPACE)
 
     temporary = cache_cuts / f".migrating-{cache_key}-{uuid.uuid4().hex}"
-    if entry.source_kind is _LegacySource.FALLBACK:
-        return _rename_or_copy_fallback(
-            entry, manifest, source_frames, temporary, cache_cuts
-        )
     return _copy_verify_and_publish(
         entry, manifest, source_frames, temporary, cache_cuts
     )
@@ -280,13 +290,7 @@ def _resolve_collision(
         )
     except Exception as error:
         return MigrationOutcome(entry, MigrationStatus.FAILED, str(error))
-    source_hashes = tuple(
-        (frame.filename, frame.sha256) for frame in source_frames
-    )
-    target_hashes = tuple(
-        (frame.filename, frame.sha256) for frame in target_frames
-    )
-    if source_hashes != target_hashes:
+    if _frame_tuples(source_frames) != _frame_tuples(target_frames):
         return MigrationOutcome(
             entry,
             MigrationStatus.KEPT_BOTH,
@@ -301,6 +305,12 @@ def _resolve_collision(
         _copy_sidecar_if_needed(
             entry.source_root, target.parent, target_manifest.cache_key
         )
+        if not _source_matches(entry, source_frames):
+            return MigrationOutcome(
+                entry,
+                MigrationStatus.KEPT_BOTH,
+                "already in the cache with different frames",
+            )
         _remove_source(entry, manifest.cache_key)
     except Exception as error:
         return MigrationOutcome(entry, MigrationStatus.MOVED_SOURCE_REMAINS, str(error))
@@ -312,24 +322,6 @@ def _no_space(cache_cuts: Path, entry: LegacyCutSet) -> bool:
     return usage.free < entry.size_bytes + _MIGRATION_HEADROOM_BYTES
 
 
-def _rename_or_copy_fallback(
-    entry: LegacyCutSet,
-    manifest: _ManifestRecord,
-    source_frames: tuple[_FrameRecord, ...],
-    temporary: Path,
-    cache_cuts: Path,
-) -> MigrationOutcome:
-    try:
-        os.rename(entry.path, temporary)
-    except OSError as error:
-        if error.errno != errno.EXDEV:
-            return MigrationOutcome(entry, MigrationStatus.FAILED, str(error))
-        return _copy_verify_and_publish(
-            entry, manifest, source_frames, temporary, cache_cuts
-        )
-    return _publish_temporary(entry, manifest, temporary, cache_cuts, renamed=True)
-
-
 def _copy_verify_and_publish(
     entry: LegacyCutSet,
     manifest: _ManifestRecord,
@@ -339,9 +331,13 @@ def _copy_verify_and_publish(
 ) -> MigrationOutcome:
     try:
         temporary.mkdir()
-        shutil.copy2(entry.path / _MANIFEST_FILENAME, temporary / _MANIFEST_FILENAME)
+        copied_manifest_path = temporary / _MANIFEST_FILENAME
+        shutil.copy2(entry.path / _MANIFEST_FILENAME, copied_manifest_path)
+        _fsync_file(copied_manifest_path)
         for frame in source_frames:
-            shutil.copy2(entry.path / frame.filename, temporary / frame.filename)
+            copied_frame = temporary / frame.filename
+            shutil.copy2(entry.path / frame.filename, copied_frame)
+            _fsync_file(copied_frame)
         _fsync_directory(temporary)
     except Exception as error:
         return MigrationOutcome(entry, MigrationStatus.FAILED, str(error))
@@ -350,7 +346,7 @@ def _copy_verify_and_publish(
         copied_frames, _identities = _scan_cut_set(
             temporary, copied_manifest, copied_identity, compare_recorded=False
         )
-        if copied_frames != source_frames:
+        if _frame_tuples(copied_frames) != _frame_tuples(source_frames):
             raise ValueError("changed while it was copied")
     except Exception as error:
         try:
@@ -358,25 +354,20 @@ def _copy_verify_and_publish(
         except OSError:
             pass
         return MigrationOutcome(entry, MigrationStatus.FAILED, str(error))
-    return _publish_temporary(entry, manifest, temporary, cache_cuts, renamed=False)
+    return _publish_temporary(
+        entry, manifest, source_frames, temporary, cache_cuts
+    )
 
 
 def _publish_temporary(
     entry: LegacyCutSet,
     manifest: _ManifestRecord,
+    source_frames: tuple[_FrameRecord, ...],
     temporary: Path,
     cache_cuts: Path,
-    *,
-    renamed: bool,
 ) -> MigrationOutcome:
     target = cache_cuts / entry.name
     if target.exists():
-        if renamed:
-            restore_error = _restore_renamed_source(entry, temporary)
-            if restore_error is not None:
-                return MigrationOutcome(
-                    entry, MigrationStatus.MOVED_SOURCE_REMAINS, restore_error
-                )
         return MigrationOutcome(
             entry,
             MigrationStatus.KEPT_BOTH,
@@ -385,22 +376,17 @@ def _publish_temporary(
     try:
         os.rename(temporary, target)
     except OSError as error:
-        if renamed:
-            restore_error = _restore_renamed_source(entry, temporary)
-            if restore_error is not None:
-                return MigrationOutcome(
-                    entry,
-                    MigrationStatus.MOVED_SOURCE_REMAINS,
-                    restore_error,
-                )
         return MigrationOutcome(entry, MigrationStatus.FAILED, str(error))
     try:
         _fsync_directory(cache_cuts)
         _copy_sidecar_if_needed(entry.source_root, cache_cuts, manifest.cache_key)
-        if not renamed:
-            _remove_source(entry, manifest.cache_key)
-        else:
-            _remove_source_sidecar(entry.source_root, manifest.cache_key)
+        if not _source_matches(entry, source_frames):
+            return MigrationOutcome(
+                entry,
+                MigrationStatus.MOVED_SOURCE_REMAINS,
+                "changed while it was copied",
+            )
+        _remove_source(entry, manifest.cache_key)
         if entry.source_kind is _LegacySource.OUTPUT:
             _cleanup_legacy_root(entry.source_root)
     except Exception as error:
@@ -408,12 +394,41 @@ def _publish_temporary(
     return MigrationOutcome(entry, MigrationStatus.MOVED)
 
 
-def _restore_renamed_source(entry: LegacyCutSet, temporary: Path) -> str | None:
+def _frame_tuples(
+    frames: tuple[_FrameRecord, ...],
+) -> tuple[tuple[int, str, int, int, int, int, str], ...]:
+    return tuple(
+        (
+            frame.index,
+            frame.filename,
+            frame.width,
+            frame.height,
+            frame.size_bytes,
+            frame.mtime_ns,
+            frame.sha256,
+        )
+        for frame in frames
+    )
+
+
+def _source_matches(
+    entry: LegacyCutSet, expected_frames: tuple[_FrameRecord, ...]
+) -> bool:
     try:
-        os.rename(temporary, entry.path)
-    except OSError as error:
-        return f"could not restore the source after publication failed: {error}"
-    return None
+        manifest, identity = _read_manifest(entry.path)
+        if manifest.cache_key != entry.cache_key:
+            return False
+        current_frames, _identities = _scan_cut_set(
+            entry.path, manifest, identity, compare_recorded=False
+        )
+    except Exception:
+        return False
+    return _frame_tuples(current_frames) == _frame_tuples(expected_frames)
+
+
+def _fsync_file(path: Path) -> None:
+    with path.open("r+b") as copied:
+        os.fsync(copied.fileno())
 
 
 def _copy_sidecar_if_needed(
@@ -421,10 +436,22 @@ def _copy_sidecar_if_needed(
 ) -> None:
     source = _sidecar(source_root, cache_key)
     target = _sidecar(target_root, cache_key)
-    if target.exists() or not source.exists():
+    if not source.exists():
         return
-    shutil.copy2(source, target)
-    _fsync_directory(target_root)
+    temporary = target.with_name(f".{target.name}-{uuid.uuid4().hex}.tmp")
+    try:
+        shutil.copy2(source, temporary)
+        _fsync_file(temporary)
+        try:
+            os.rename(temporary, target)
+        except FileExistsError:
+            os.replace(temporary, target)
+        _fsync_directory(target_root)
+    finally:
+        try:
+            temporary.unlink()
+        except FileNotFoundError:
+            pass
 
 
 def _remove_source(entry: LegacyCutSet, cache_key: str) -> None:
@@ -447,13 +474,15 @@ def _sidecar(root: Path, cache_key: str) -> Path:
 
 def _cleanup_legacy_root(cuts_root: Path) -> None:
     try:
-        cuts_root.rmdir()
+        os.rmdir(cuts_root)
     except OSError:
         pass
     scratch = cuts_root.parent / "scratch"
-    if scratch.exists():
-        _remove_tree(scratch)
     try:
-        cuts_root.parent.rmdir()
+        os.rmdir(scratch)
+    except OSError:
+        pass
+    try:
+        os.rmdir(cuts_root.parent)
     except OSError:
         pass
