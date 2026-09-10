@@ -69,6 +69,23 @@ def wait_for_thread_shutdown(
     return False
 
 
+SHUTDOWN_TIMEOUT_MS = 5000
+
+
+def wait_for_shutdown_worker(
+    thread: QThread, worker: QObject | None, description: str
+) -> bool:
+    """Wait out a worker at quit on the shared budget, retaining it if it stalls."""
+    return wait_for_thread_shutdown(
+        thread, SHUTDOWN_TIMEOUT_MS, description=description, worker=worker
+    )
+
+
+def threads_outliving_shutdown() -> int:
+    """Count the workers retained because their bounded wait timed out."""
+    return len(_RETAINED_THREADS)
+
+
 class WorkerThread(QThread):
     """Run ``worker.run`` in a new thread and delete both when it is done."""
 

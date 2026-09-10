@@ -190,7 +190,7 @@ def test_shutdown_reports_when_a_load_outlives_its_bounded_wait(
             return SourceLoadResult(object(), Image.new("RGBA", (2, 2), "red"))
 
     monkeypatch.setattr(
-        "matteloop.ui.controller._THREAD_SHUTDOWN_TIMEOUT_MS", 25
+        "matteloop.ui.worker_thread.SHUTDOWN_TIMEOUT_MS", 25
     )
     adapter = StalledAdapter()
     controller = SourceController(
@@ -220,7 +220,7 @@ def test_shutdown_records_frame_timeout_before_cleanup_failure(
             self.release.wait(5)
 
     monkeypatch.setattr(
-        "matteloop.ui.controller._THREAD_SHUTDOWN_TIMEOUT_MS", 25
+        "matteloop.ui.worker_thread.SHUTDOWN_TIMEOUT_MS", 25
     )
     controller = SourceController(
         ReducerStore(), parent=QApplication.instance()

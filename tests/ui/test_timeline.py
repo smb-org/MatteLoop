@@ -138,7 +138,7 @@ def test_timeline_shutdown_retains_an_unreleased_thumbnail_thread(
             self.started.set()
             self.release.wait(5)
 
-    monkeypatch.setattr("matteloop.ui.timeline._THREAD_SHUTDOWN_TIMEOUT_MS", 25)
+    monkeypatch.setattr("matteloop.ui.worker_thread.SHUTDOWN_TIMEOUT_MS", 25)
     widget = TimelineWidget()
     qtbot.addWidget(widget)
     thread = _StalledThread()

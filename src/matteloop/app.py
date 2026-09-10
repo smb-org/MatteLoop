@@ -103,7 +103,23 @@ def _run_gui() -> int:
     application.aboutToQuit.connect(controller.shutdown)
     window.show()
     _start_update_controller(window, settings, application, store, controller)
-    return application.exec()
+    return _finish_gui_shutdown(application.exec())
+
+
+def _finish_gui_shutdown(exit_code: int) -> int:
+    """Skip Qt teardown when a worker outlived its bounded shutdown wait."""
+    from matteloop.ui.worker_thread import threads_outliving_shutdown
+
+    outliving = threads_outliving_shutdown()
+    if not outliving:
+        return exit_code
+    _LOGGER.warning(
+        "MatteLoop exiting immediately: %d worker(s) outlived their bounded "
+        "shutdown wait",
+        outliving,
+    )
+    logging.shutdown()
+    os._exit(exit_code)
 
 
 def _configure_application_identity(application: Any) -> None:

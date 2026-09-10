@@ -19,7 +19,7 @@ from matteloop.ui.source_presentation import (
     format_model_download_detail,
     format_source_file_size,
 )
-from matteloop.ui.worker_thread import WorkerThread
+from matteloop.ui.worker_thread import WorkerThread, wait_for_shutdown_worker
 
 from ._dialog import ModelManagerDialog
 from ._entries import ModelEntry, manager_active_id
@@ -112,7 +112,9 @@ class ModelManagerController(QObject):
         thread = self._remove_thread
         if thread is not None:
             thread.quit()
-            thread.wait()
+            wait_for_shutdown_worker(
+                thread, self._remove_worker, "model manager worker"
+            )
             self._remove_thread = None
             self._cancel = None
             self.dialog.set_busy(False)

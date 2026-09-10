@@ -66,13 +66,12 @@ from matteloop.ui.theme import (
     TEXT_COLOR,
 )
 from matteloop.ui.timeline_presentation import TimelinePresentation
-from matteloop.ui.worker_thread import WorkerThread, wait_for_thread_shutdown
+from matteloop.ui.worker_thread import WorkerThread, wait_for_shutdown_worker
 
 _FILMSTRIP_HEIGHT = 78
 _TELEMETRY_HEIGHT = 42
 _SCRUB_DEBOUNCE_MS = 125
 _LARGE_FRAME_STEP = 10
-_THREAD_SHUTDOWN_TIMEOUT_MS = 5000
 
 
 @dataclass(frozen=True, slots=True)
@@ -511,12 +510,10 @@ class TimelineWidget(QFrame):
         self._cancel_thumbnails()
         complete = True
         for thread, worker in tuple(self._thumbnail_threads):
-            complete = wait_for_thread_shutdown(
-                thread,
-                _THREAD_SHUTDOWN_TIMEOUT_MS,
-                description="timeline thumbnail worker",
-                worker=worker,
-            ) and complete
+            complete = (
+                wait_for_shutdown_worker(thread, worker, "timeline thumbnail worker")
+                and complete
+            )
         self._thumbnail_threads.clear()
         self._thumbnail_thread = None
         self._thumbnail_worker = None

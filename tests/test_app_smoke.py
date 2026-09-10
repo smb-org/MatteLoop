@@ -54,6 +54,174 @@ from matteloop.app import main
 raise SystemExit(main([sys.argv[1]]))
 """
 
+_GUI_QUIT_SCRIPT = """
+import sys
+from pathlib import Path
+from threading import Event
+
+from PySide6.QtCore import QObject, QCoreApplication, QThread, QTimer
+from PySide6.QtWidgets import QApplication, QWidget
+
+import matteloop.app as app_module
+import matteloop.core.execution_providers as execution_providers
+import matteloop.logs as logs_module
+import matteloop.ui.controller as controller_module
+import matteloop.ui.i18n as i18n_module
+import matteloop.ui.main_window as main_window_module
+import matteloop.ui.theme as theme_module
+from matteloop.ui.worker_thread import wait_for_thread_shutdown
+
+mode = sys.argv[2]
+log_path = Path(sys.argv[1])
+
+
+class UncooperativeThread(QThread):
+    def __init__(self):
+        super().__init__()
+        self.started = Event()
+        self.release = Event()
+
+    def run(self):
+        self.started.set()
+        self.release.wait(5)
+
+
+class SourceController(QObject):
+    def __init__(self, _store, settings=None, parent=None):
+        super().__init__(parent)
+        self.model_options = ()
+        self._thread = UncooperativeThread() if mode == "stalled" else None
+        self.shutdown_complete = True
+
+    def set_dialog_parent(self, _parent):
+        pass
+
+    def attach_transform_stage(self, _group, _canvas):
+        pass
+
+    def shutdown(self):
+        if self._thread is None:
+            return True
+        self._thread.start()
+        if not self._thread.started.wait(1):
+            raise AssertionError("the uncooperative worker did not start")
+        self._thread.requestInterruption()
+        self.shutdown_complete = wait_for_thread_shutdown(
+            self._thread, 25, description="the uncooperative worker"
+        )
+        return self.shutdown_complete
+
+
+class Timeline:
+    shutdown_complete = True
+
+
+class Inspector:
+    transform_group = object()
+
+
+class MainWindow(QWidget):
+    def __init__(self, *_args, **_kwargs):
+        super().__init__()
+        self.inspector = Inspector()
+        self.result_canvas = None
+        self.timeline_widget = Timeline()
+
+
+logs_module.log_file = lambda: log_path
+controller_module.SourceController = SourceController
+main_window_module.MainWindow = MainWindow
+execution_providers.provider_options_from_runtime = lambda model_id: ()
+i18n_module.configure_locale = lambda language: None
+i18n_module.install_translators = lambda application, language: ()
+i18n_module.selected_language = lambda settings: "en"
+theme_module.install_theme = lambda application: None
+app_module._log_runtime_diagnostics = lambda: True
+app_module._start_update_controller = lambda *args: None
+
+application = QApplication([])
+QTimer.singleShot(0, lambda: QCoreApplication.exit(17))
+exit_code = app_module.main([])
+print("main-returned")
+raise SystemExit(exit_code)
+"""
+
+_REAL_SOURCE_CONTROLLER_QUIT_SCRIPT = """
+import sys
+from pathlib import Path
+from threading import Event
+
+from PySide6.QtCore import QCoreApplication, QTimer
+from PySide6.QtWidgets import QApplication, QWidget
+
+import matteloop.app as app_module
+import matteloop.core.execution_providers as execution_providers
+import matteloop.logs as logs_module
+import matteloop.ui.controller as controller_module
+import matteloop.ui.i18n as i18n_module
+import matteloop.ui.main_window as main_window_module
+import matteloop.ui.theme as theme_module
+import matteloop.ui.worker_thread as worker_thread_module
+from matteloop.ui.ports import VideoDropped
+from matteloop.ui.transform_group import TransformGroup
+
+log_path = Path(sys.argv[1])
+source_path = Path(sys.argv[2])
+
+
+class BlockingSourceAdapter:
+    started = Event()
+    release = Event()
+
+    def load(self, _path, _request_id):
+        self.started.set()
+        self.release.wait(5)
+        raise RuntimeError("the blocking source adapter was released")
+
+
+class Timeline:
+    shutdown_complete = True
+
+
+class Inspector:
+    def __init__(self):
+        self.transform_group = TransformGroup(lambda _command: None)
+
+
+class MainWindow(QWidget):
+    def __init__(self, _store, source_controller, *_args, **_kwargs):
+        super().__init__()
+        self.inspector = Inspector()
+        self.result_canvas = None
+        self.timeline_widget = Timeline()
+        source_controller.dispatch(VideoDropped(source_path))
+        self._quit_when_started()
+
+    def _quit_when_started(self):
+        if BlockingSourceAdapter.started.is_set():
+            QCoreApplication.exit(17)
+        else:
+            QTimer.singleShot(1, self._quit_when_started)
+
+
+logs_module.log_file = lambda: log_path
+controller_module.PyAVSourceAdapter = BlockingSourceAdapter
+worker_thread_module.SHUTDOWN_TIMEOUT_MS = 25
+main_window_module.MainWindow = MainWindow
+execution_providers.provider_options_from_runtime = lambda model_id: ()
+i18n_module.configure_locale = lambda language: None
+i18n_module.install_translators = lambda application, language: ()
+i18n_module.selected_language = lambda settings: "en"
+theme_module.install_theme = lambda application: None
+app_module._log_runtime_diagnostics = lambda: True
+app_module._start_update_controller = lambda *args: None
+
+application = QApplication([])
+exit_code = app_module.main([])
+print("main-returned")
+raise SystemExit(exit_code)
+"""
+
 
 def _run_guarded_smoke_command(
     tmp_path: Path, argument: str
@@ -79,6 +247,51 @@ def _run_guarded_smoke_command(
     )
 
 
+def _run_gui_quit_subprocess(
+    tmp_path: Path, mode: str
+) -> subprocess.CompletedProcess[str]:
+    environment = os.environ | {"QT_QPA_PLATFORM": "offscreen"}
+    return subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            textwrap.dedent(_GUI_QUIT_SCRIPT),
+            str(tmp_path / "matteloop.log"),
+            mode,
+        ],
+        cwd=Path(__file__).resolve().parents[1],
+        capture_output=True,
+        check=False,
+        env=environment,
+        text=True,
+        timeout=10,
+    )
+
+
+def _run_real_source_controller_quit_subprocess(
+    tmp_path: Path,
+) -> subprocess.CompletedProcess[str]:
+    environment = os.environ | {
+        "HOME": str(tmp_path),
+        "QT_QPA_PLATFORM": "offscreen",
+    }
+    return subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            textwrap.dedent(_REAL_SOURCE_CONTROLLER_QUIT_SCRIPT),
+            str(tmp_path / "matteloop.log"),
+            str(tmp_path / "blocking-source.mp4"),
+        ],
+        cwd=Path(__file__).resolve().parents[1],
+        capture_output=True,
+        check=False,
+        env=environment,
+        text=True,
+        timeout=10,
+    )
+
+
 def test_main_reports_version_without_opening_qt(capsys):
     assert main(["--version"]) == 0
     assert capsys.readouterr().out.strip().startswith("MatteLoop ")
@@ -96,6 +309,44 @@ def test_main_delegates_normal_launch_to_lazy_gui_seam(
 
     assert app.main([]) == 23
     assert calls == [True]
+
+
+def test_quit_with_an_unjoined_worker_exits_without_a_qt_abort(
+    tmp_path: Path,
+) -> None:
+    result = _run_gui_quit_subprocess(tmp_path, "stalled")
+
+    assert result.returncode == 17, result.stderr
+    assert result.stdout == ""
+    assert "worker(s) outlived their bounded shutdown wait" in (
+        tmp_path / "matteloop.log"
+    ).read_text(encoding="utf-8")
+
+
+def test_quit_with_joined_workers_returns_the_application_exit_code(
+    tmp_path: Path,
+) -> None:
+    result = _run_gui_quit_subprocess(tmp_path, "clean")
+
+    assert result.returncode == 17, result.stderr
+    assert result.stdout.strip() == "main-returned"
+    log = tmp_path / "matteloop.log"
+    if log.exists():
+        assert "outlived their bounded shutdown wait" not in log.read_text(
+            encoding="utf-8"
+        )
+
+
+def test_quit_with_real_source_controller_does_not_abort_on_source_timeout(
+    tmp_path: Path,
+) -> None:
+    result = _run_real_source_controller_quit_subprocess(tmp_path)
+
+    assert result.returncode == 17, result.stderr
+    assert result.stdout == ""
+    assert "worker(s) outlived their bounded shutdown wait" in (
+        tmp_path / "matteloop.log"
+    ).read_text(encoding="utf-8")
 
 
 def test_main_smoke_test_prints_machine_readable_success(

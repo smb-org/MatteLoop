@@ -127,6 +127,21 @@ Trigger: repro — an untagged 1280x720 H.264 clip that PyAV decodes cleanly
 failed with "color primaries 2 cannot be proven as BT.709/sRGB".
 ```
 
+### Incomplete shutdown exit
+
+Every bounded wait in the interface goes through `wait_for_thread_shutdown`,
+which retains any thread that misses its deadline. If that retention list is
+not empty once the event loop returns, `app.py` logs the count, flushes the
+handlers and calls `os._exit` with Qt's exit code. That abrupt exit is
+deliberate: Qt aborts when a `QThread` object is destroyed while its thread is
+still running, including during interpreter teardown, so ordinary destructor
+cleanup turns a reported shutdown timeout into `SIGABRT`. Clean shutdowns leave
+the list empty and return through the normal teardown path.
+
+Read the retention list rather than each owner's own completion flag. The flags
+cover one subsystem each, and the crash this answers came from the update
+controller's check thread -- a worker no such flag was watching.
+
 ### G2 — Vertical slice before depth
 
 **Rule.** No module may be built deeper than the currently reachable user path
