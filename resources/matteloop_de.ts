@@ -2026,17 +2026,17 @@ Freed %s.</source>
         <translation>Einstellungen schließen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/update_controller.py" line="268"/>
+        <location filename="../src/matteloop/ui/update_controller.py" line="180"/>
         <source>Checking for updates…</source>
         <translation>Nach Updates wird gesucht …</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/update_controller.py" line="312"/>
+        <location filename="../src/matteloop/ui/update_controller.py" line="224"/>
         <source>No update found.</source>
         <translation>Kein Update gefunden.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/update_controller.py" line="321"/>
+        <location filename="../src/matteloop/ui/update_controller.py" line="233"/>
         <source>Couldn’t check for updates. Try again later.</source>
         <translation>Updates konnten nicht geprüft werden. Versuchen Sie es später erneut.</translation>
     </message>
@@ -2575,7 +2575,7 @@ Freed %s.</source>
         <translation>Später</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/update_controller.py" line="575"/>
+        <location filename="../src/matteloop/ui/update_controller.py" line="487"/>
         <source>The update couldn’t be downloaded.</source>
         <translation>Das Update konnte nicht heruntergeladen werden.</translation>
     </message>
@@ -2592,27 +2592,27 @@ Freed %s.</source>
         <translation>Erneut versuchen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/update_controller.py" line="583"/>
+        <location filename="../src/matteloop/ui/update_controller.py" line="495"/>
         <source>MatteLoop cannot update itself from this location.</source>
         <translation>MatteLoop kann sich von diesem Speicherort aus nicht selbst aktualisieren.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/update_controller.py" line="665"/>
+        <location filename="../src/matteloop/ui/update_controller.py" line="577"/>
         <source>MatteLoop %1 is available.</source>
         <translation>MatteLoop %1 ist verfügbar.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/update_controller.py" line="671"/>
+        <location filename="../src/matteloop/ui/update_controller.py" line="583"/>
         <source>Downloading MatteLoop %1 (%2 %)…</source>
         <translation>MatteLoop %1 wird heruntergeladen (%2 %) …</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/update_controller.py" line="677"/>
+        <location filename="../src/matteloop/ui/update_controller.py" line="589"/>
         <source>MatteLoop %1 is ready to install.</source>
         <translation>MatteLoop %1 ist bereit zur Installation.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/update_controller.py" line="684"/>
+        <location filename="../src/matteloop/ui/update_controller.py" line="596"/>
         <source>Download size: %1 MB</source>
         <translation>Downloadgröße: %1 MB</translation>
     </message>

@@ -3,11 +3,9 @@
 from __future__ import annotations
 
 import logging
-import sys
 from collections.abc import Callable
-from pathlib import Path
 from threading import Event
-from typing import TYPE_CHECKING, Protocol, cast
+from typing import TYPE_CHECKING, cast
 
 from PySide6.QtCore import (
     QCoreApplication,
@@ -16,14 +14,12 @@ from PySide6.QtCore import (
     QThread,
     QTimer,
     QUrl,
-    Signal,
     Slot,
 )
 from PySide6.QtGui import QDesktopServices
 
 from matteloop.core.state import AppState, JobState
 from matteloop.jobs.models.download import DownloadTransport
-from matteloop.paths import cache_subdirectory
 from matteloop.ui.i18n import display_locale
 from matteloop.ui.ports import StateStore
 from matteloop.ui.preferences import load_check_on_startup, load_update_channel
@@ -40,12 +36,15 @@ from matteloop.ui.update_velopack import (
     _current_update_version,
     _pending_update,
 )
+from matteloop.ui.update_workers import (
+    UpdateReader,
+    _DownloadWorker,
+    _UpdateWorker,
+)
 from matteloop.ui.worker_thread import WorkerThread, wait_for_thread_shutdown
 from matteloop.updates import (
-    UpdateDownloadCancelled,
     UpdateOutcome,
     UpdateResult,
-    download_update,
     release_notes_url,
     releases_url,
 )
@@ -56,93 +55,6 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 _STARTUP_DELAY_MS = 3000
 _DOWNLOAD_SHUTDOWN_TIMEOUT_MS = 5000
-
-
-class UpdateReader(Protocol):
-    def check(
-        self,
-        channel: str = "stable",
-        current_version: str | None = None,
-        cancelled: Callable[[], bool] | None = None,
-    ) -> UpdateResult: ...
-
-
-class _UpdateWorker(QObject):
-    result = Signal(object)
-
-    def __init__(
-        self,
-        reader: UpdateReader,
-        channel: str,
-        current_version: str | None,
-        cancellation: Event,
-    ) -> None:
-        super().__init__()
-        self._reader = reader
-        self._channel = channel
-        self._current_version = current_version
-        self._cancellation = cancellation
-
-    def run(self) -> None:
-        try:
-            result = self._reader.check(
-                self._channel,
-                self._current_version,
-                self._cancellation.is_set,
-            )
-        except Exception as error:
-            _LOGGER.info("Update check failed: %s", error)
-            result = UpdateResult(UpdateOutcome.FAILED)
-        if self._cancellation.is_set():
-            return
-        self.result.emit(result)
-
-
-class _DownloadWorker(QObject):
-    progress = Signal(int, int)
-    succeeded = Signal(object)
-    failed = Signal(object)
-    cancelled = Signal()
-
-    def __init__(
-        self,
-        transport: DownloadTransport,
-        manager: UpdateManager,
-        version: str,
-        cancellation: Event,
-    ) -> None:
-        super().__init__()
-        self._transport = transport
-        self._manager = manager
-        self._version = version
-        self._cancellation = cancellation
-
-    def run(self) -> None:
-        package: Path | None = None
-        try:
-            package = download_update(
-                self._transport,
-                self._version,
-                cache_subdirectory("updates"),
-                self.progress.emit,
-                self._cancellation.is_set,
-                platform=sys.platform,
-            )
-            pending = self._manager.get_update_pending_restart()
-            if _update_version(pending, None) != self._version:
-                _remove_package(package)
-                raise RuntimeError(
-                    "Velopack did not report the downloaded package as pending"
-                )
-        except Exception as error:
-            if isinstance(error, UpdateDownloadCancelled):
-                self.cancelled.emit()
-            else:
-                if package is not None:
-                    _remove_package(package)
-                self.failed.emit(error)
-        else:
-            self.succeeded.emit(pending)
 
 
 class UpdateController(QObject):
@@ -688,10 +600,3 @@ class UpdateController(QObject):
         self._window.action_shelf.preferences_dialog.updates_status_label.setText(
             message
         )
-
-
-def _remove_package(package: Path) -> None:
-    try:
-        package.unlink(missing_ok=True)
-    except OSError as error:
-        _LOGGER.info("Could not remove failed update package %s: %s", package, error)

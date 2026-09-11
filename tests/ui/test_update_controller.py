@@ -655,7 +655,7 @@ def test_shutdown_reports_when_an_update_download_outlives_its_bounded_wait(
         "matteloop.ui.update_controller._DOWNLOAD_SHUTDOWN_TIMEOUT_MS", 25
     )
     monkeypatch.setattr(
-        "matteloop.ui.update_controller.download_update", blocked_download
+        "matteloop.ui.update_workers.download_update", blocked_download
     )
     window, controller, _ = _controller(
         qtbot,
@@ -786,7 +786,7 @@ def test_download_progress_reaches_the_offer_and_finishes_ready(
     info = _UpdateInfo(asset)
     manager = _Manager(pending_values=[None, info])
     monkeypatch.setattr(
-        "matteloop.ui.update_controller.cache_subdirectory", lambda *_: tmp_path
+        "matteloop.ui.update_workers.cache_subdirectory", lambda *_: tmp_path
     )
     window, controller, _ = _controller(
         qtbot,
@@ -834,7 +834,7 @@ def test_failed_download_offers_try_again(monkeypatch, qtbot, tmp_path: Path) ->
     info = _UpdateInfo(asset)
     manager = _Manager(pending_values=[None, info])
     monkeypatch.setattr(
-        "matteloop.ui.update_controller.cache_subdirectory", lambda *_: tmp_path
+        "matteloop.ui.update_workers.cache_subdirectory", lambda *_: tmp_path
     )
     window, controller, _ = _controller(
         qtbot,
@@ -873,7 +873,7 @@ def test_downloading_offer_reopens_from_the_arrow(
     ] = FakeResponse(b"package", on_read=lambda: time.sleep(0.25))
     manager = _Manager(pending_values=[None, _UpdateInfo(asset)])
     monkeypatch.setattr(
-        "matteloop.ui.update_controller.cache_subdirectory", lambda *_: tmp_path
+        "matteloop.ui.update_workers.cache_subdirectory", lambda *_: tmp_path
     )
     window, controller, _ = _controller(
         qtbot,
@@ -910,7 +910,7 @@ def test_self_check_rejecting_the_package_offers_try_again(
         pending_values=[None, _UpdateInfo(_Asset(__version__, asset.FileName))]
     )
     monkeypatch.setattr(
-        "matteloop.ui.update_controller.cache_subdirectory", lambda *_: tmp_path
+        "matteloop.ui.update_workers.cache_subdirectory", lambda *_: tmp_path
     )
     window, controller, _ = _controller(
         qtbot,
@@ -940,7 +940,7 @@ def test_cancel_stops_the_transport_and_leaves_no_package(
     ] = FakeResponse(b"package", on_read=lambda: time.sleep(0.25))
     manager = _Manager(pending_values=[None, _UpdateInfo(asset)])
     monkeypatch.setattr(
-        "matteloop.ui.update_controller.cache_subdirectory", lambda *_: tmp_path
+        "matteloop.ui.update_workers.cache_subdirectory", lambda *_: tmp_path
     )
     window, controller, _ = _controller(
         qtbot,
