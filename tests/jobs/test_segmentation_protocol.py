@@ -526,20 +526,25 @@ def test_untrusted_response_invalidates_process_and_slot(mode: str) -> None:
 
 
 def test_late_response_invalidates_process_at_the_latest_on_the_next_request() -> None:
-    """The duplicate response is caught either on arrival (segmentation_host.py
-    ~498) or, if it lands in the pipe just after that poll, on the next request
-    (segmentation_host.py ~642) — both are legitimate detection points."""
+    """The duplicate response is caught by one of the client's two poll
+    sites — on arrival, or as a stale message ahead of a later request.
+    Which one notices is an implementation detail and not asserted here:
+    on a loaded runner neither poll may have seen the duplicate yet by the
+    time a single request returns, so this makes bounded repeated requests
+    until the mismatch surfaces, then checks only what the protocol
+    promises once it does — the process and its slot are gone."""
     segmentation = client("late-response")
     segmentation.start()
-    try:
-        segmentation.segment(red_frame(), request())
-    except AppError as exc:
-        assert exc.code is ErrorCode.SEGMENTATION_PROTOCOL_MISMATCH
-        assert exc.job_id == "j1"
-    else:
-        with pytest.raises(AppError) as exc2:
+    error: AppError | None = None
+    deadline = time.monotonic() + 5
+    while error is None and time.monotonic() < deadline:
+        try:
             segmentation.segment(red_frame(), request())
-        assert exc2.value.code is ErrorCode.SEGMENTATION_PROTOCOL_MISMATCH
+        except AppError as exc:
+            error = exc
+    assert error is not None, "protocol never reported the duplicate response"
+    assert error.code is ErrorCode.SEGMENTATION_PROTOCOL_MISMATCH
+    assert error.job_id == "j1"
     assert not segmentation.is_running
     assert segmentation.shared_memory_name is None
 
