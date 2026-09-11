@@ -3,11 +3,9 @@
 from __future__ import annotations
 
 import logging
-import sys
 from collections.abc import Callable
-from pathlib import Path, PurePath, PureWindowsPath
 from threading import Event
-from typing import TYPE_CHECKING, Any, Protocol, cast
+from typing import TYPE_CHECKING, cast
 
 from PySide6.QtCore import (
     QCoreApplication,
@@ -16,14 +14,12 @@ from PySide6.QtCore import (
     QThread,
     QTimer,
     QUrl,
-    Signal,
     Slot,
 )
 from PySide6.QtGui import QDesktopServices
 
 from matteloop.core.state import AppState, JobState
 from matteloop.jobs.models.download import DownloadTransport
-from matteloop.paths import cache_subdirectory
 from matteloop.ui.i18n import display_locale
 from matteloop.ui.ports import StateStore
 from matteloop.ui.preferences import load_check_on_startup, load_update_channel
@@ -34,15 +30,23 @@ from matteloop.ui.update_paths import (
     _physical_executable_path,
     _update_version,
 )
+from matteloop.ui.update_velopack import (
+    UpdateManager,
+    _create_update_manager,
+    _current_update_version,
+    _pending_update,
+)
+from matteloop.ui.update_workers import (
+    UpdateReader,
+    _DownloadWorker,
+    _UpdateWorker,
+)
 from matteloop.ui.worker_thread import WorkerThread, wait_for_thread_shutdown
 from matteloop.updates import (
-    UpdateDownloadCancelled,
     UpdateOutcome,
     UpdateResult,
-    download_update,
     release_notes_url,
     releases_url,
-    update_repository_url,
 )
 
 if TYPE_CHECKING:
@@ -51,107 +55,6 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 _STARTUP_DELAY_MS = 3000
 _DOWNLOAD_SHUTDOWN_TIMEOUT_MS = 5000
-
-
-class UpdateReader(Protocol):
-    def check(
-        self,
-        channel: str = "stable",
-        current_version: str | None = None,
-        cancelled: Callable[[], bool] | None = None,
-    ) -> UpdateResult: ...
-
-
-class UpdateManager(Protocol):
-    def get_current_version(self) -> str: ...
-
-    def get_update_pending_restart(self) -> object | None: ...
-
-    def wait_exit_then_apply_updates(
-        self,
-        update: object,
-        silent: bool = False,
-        restart: bool = True,
-        restart_args: object | None = None,
-    ) -> None: ...
-
-
-class _UpdateWorker(QObject):
-    result = Signal(object)
-
-    def __init__(
-        self,
-        reader: UpdateReader,
-        channel: str,
-        current_version: str | None,
-        cancellation: Event,
-    ) -> None:
-        super().__init__()
-        self._reader = reader
-        self._channel = channel
-        self._current_version = current_version
-        self._cancellation = cancellation
-
-    def run(self) -> None:
-        try:
-            result = self._reader.check(
-                self._channel,
-                self._current_version,
-                self._cancellation.is_set,
-            )
-        except Exception as error:
-            _LOGGER.info("Update check failed: %s", error)
-            result = UpdateResult(UpdateOutcome.FAILED)
-        if self._cancellation.is_set():
-            return
-        self.result.emit(result)
-
-
-class _DownloadWorker(QObject):
-    progress = Signal(int, int)
-    succeeded = Signal(object)
-    failed = Signal(object)
-    cancelled = Signal()
-
-    def __init__(
-        self,
-        transport: DownloadTransport,
-        manager: UpdateManager,
-        version: str,
-        cancellation: Event,
-    ) -> None:
-        super().__init__()
-        self._transport = transport
-        self._manager = manager
-        self._version = version
-        self._cancellation = cancellation
-
-    def run(self) -> None:
-        package: Path | None = None
-        try:
-            package = download_update(
-                self._transport,
-                self._version,
-                cache_subdirectory("updates"),
-                self.progress.emit,
-                self._cancellation.is_set,
-                platform=sys.platform,
-            )
-            pending = self._manager.get_update_pending_restart()
-            if _update_version(pending, None) != self._version:
-                _remove_package(package)
-                raise RuntimeError(
-                    "Velopack did not report the downloaded package as pending"
-                )
-        except Exception as error:
-            if isinstance(error, UpdateDownloadCancelled):
-                self.cancelled.emit()
-            else:
-                if package is not None:
-                    _remove_package(package)
-                self.failed.emit(error)
-        else:
-            self.succeeded.emit(pending)
 
 
 class UpdateController(QObject):
@@ -697,112 +600,3 @@ class UpdateController(QObject):
         self._window.action_shelf.preferences_dialog.updates_status_label.setText(
             message
         )
-
-
-def _create_update_manager() -> UpdateManager | None:
-    """Construct Velopack with the bundle paths this project owns."""
-    try:
-        from velopack import UpdateManager as VelopackUpdateManager
-        from velopack import VelopackLocatorConfig
-
-        locator = _locator_config(_physical_executable_path(), VelopackLocatorConfig)
-        if not locator.UpdateExePath.exists() or not locator.ManifestPath.exists():
-            return None
-        return cast(
-            UpdateManager,
-            VelopackUpdateManager(update_repository_url(), locator=locator),
-        )
-    except Exception as error:
-        _LOGGER.warning("MatteLoop self-update unavailable: %s", error)
-        return None
-
-
-def _pending_update(manager: UpdateManager | None) -> object | None:
-    if manager is None:
-        return None
-    try:
-        pending = manager.get_update_pending_restart()
-        _sweep_packages(pending)
-        return pending
-    except Exception as error:
-        _LOGGER.warning("MatteLoop pending update could not be read: %s", error)
-        return None
-
-
-def _locator_config(executable: PurePath, config_type: Any) -> Any:
-    """Describe this installation's layout instead of letting Velopack guess."""
-    packages = cache_subdirectory("updates")
-    # Velopack probes the directory by writing into it, and silently falls back
-    # to its own location when that fails — including when the directory simply
-    # does not exist yet. It would then look for the package somewhere this
-    # application never writes.
-    packages.mkdir(parents=True, exist_ok=True)
-    if sys.platform == "darwin":
-        root = executable.parents[2]
-        return config_type(
-            root,
-            root / "Contents" / "MacOS" / "UpdateMac",
-            packages,
-            root / "Contents" / "Resources" / "sq.version",
-            root / "Contents" / "MacOS",
-            False,
-        )
-    if sys.platform == "win32":
-        windows_executable = executable
-        if not isinstance(windows_executable, (Path, PureWindowsPath)):
-            windows_executable = PureWindowsPath(str(executable))
-        current = windows_executable.parent
-        windows_root = current.parent
-        return config_type(
-            windows_root,
-            windows_root / "Update.exe",
-            packages,
-            current / "sq.version",
-            current,
-            Path(windows_root / ".portable").exists(),
-        )
-    raise RuntimeError("Velopack updates are only supported on macOS and Windows")
-
-
-def _sweep_packages(pending: object | None) -> None:
-    directory = cache_subdirectory("updates")
-    if not directory.exists():
-        return
-    pending_filename = _update_filename(pending)
-    for pattern in ("*.nupkg", "*.nupkg.part"):
-        for package in directory.glob(pattern):
-            if package.name == pending_filename:
-                continue
-            try:
-                package.unlink()
-            except OSError as error:
-                _LOGGER.info(
-                    "Could not remove stale update package %s: %s", package, error
-                )
-
-
-def _update_filename(update: object | None) -> str | None:
-    if update is None:
-        return None
-    asset = getattr(update, "TargetFullRelease", update)
-    filename = getattr(asset, "FileName", None)
-    return filename if isinstance(filename, str) else None
-
-
-def _remove_package(package: Path) -> None:
-    try:
-        package.unlink(missing_ok=True)
-    except OSError as error:
-        _LOGGER.info("Could not remove failed update package %s: %s", package, error)
-
-
-def _current_update_version(manager: UpdateManager | None) -> str | None:
-    """Use Velopack's version when available, not the numeric bundle version."""
-    if manager is None:
-        return None
-    try:
-        version = manager.get_current_version()
-    except Exception as error:
-        _LOGGER.info("Velopack current version could not be read: %s", error)
-        return None
-    return version if isinstance(version, str) else None

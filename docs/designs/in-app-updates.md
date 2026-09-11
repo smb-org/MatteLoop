@@ -639,8 +639,9 @@ release notes that announce Phase 1 should not repeat a bypass that no longer
 exists.
 
 **Phase 1 — Notify.** `src/matteloop/updates.py` (API reader, tag parsing,
-comparison; no Qt), `src/matteloop/ui/update_controller.py` (thread, dialog,
-arrow and Preferences wiring, `QDesktopServices.openUrl`), the Preferences row,
+comparison; no Qt), the update UI modules `update_controller.py`,
+`update_workers.py`, and `update_velopack.py` (thread, dialog, arrow and
+Preferences wiring, `QDesktopServices.openUrl`), the Preferences row,
 the dialog in `MainWindow`, the transport's `headers` keyword, strings in both
 catalogues, and a README sentence. The offer uses *Open releases page* in
 place of *Download update* when self-update is not advisable. Startup checks
