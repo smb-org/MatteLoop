@@ -185,7 +185,9 @@ def test_model_manager_reports_cut_set_disk_usage_separately(
     dialog.refresh()
 
     assert dialog.total_size_label.text() == "Total on disk: 13.0 B"
-    assert dialog.cut_sets_size_label.text() == "Cut sets on disk: 9.0 B"
+    # The cuts root can be an unbounded walk, so it is computed off the GUI
+    # thread; the tooltip/accessible description do not depend on it and are
+    # set immediately, but the text label only settles once the walk lands.
     assert dialog.cut_sets_size_label.objectName() == "cut_sets_total"
     assert dialog.cut_sets_size_label.accessibleName() == "Cut sets on disk"
     assert dialog.cut_sets_size_label.toolTip() == str(cuts_root)
@@ -193,6 +195,89 @@ def test_model_manager_reports_cut_set_disk_usage_separately(
     assert dialog.layout().indexOf(dialog.cut_sets_size_label) == (
         dialog.layout().indexOf(dialog.total_size_label) + 1
     )
+    qtbot.waitUntil(
+        lambda: dialog.cut_sets_size_label.text() == "Cut sets on disk: 9.0 B",
+        timeout=5000,
+    )
+
+
+def test_model_manager_cut_set_walk_does_not_block_refresh(
+    tmp_path: Path, cache_root: Path, qtbot
+) -> None:
+    cuts_root = paths_module.cut_workspace_root() / "cuts"
+    cut_set = cuts_root / "portrait-12345678"
+    cut_set.mkdir(parents=True)
+    (cut_set / "frame-000001.png").write_bytes(b"cut-frame")
+    dialog = ModelManagerDialog(ModelCatalog.load_resource(), tmp_path)
+    qtbot.addWidget(dialog)
+
+    dialog.refresh()
+
+    # No event loop iteration has run yet, so the cross-thread `computed`
+    # signal cannot have been delivered: refresh() returning with the
+    # pending text still showing is what proves it did not wait on the walk.
+    assert dialog.cut_sets_size_label.text() == "Cut sets on disk: …"
+    qtbot.waitUntil(
+        lambda: dialog.cut_sets_size_label.text() == "Cut sets on disk: 9.0 B",
+        timeout=5000,
+    )
+    assert dialog._cut_sets_thread is None
+
+
+def test_model_manager_cut_set_refresh_coalesces_overlapping_walks(
+    tmp_path: Path, cache_root: Path, qtbot, monkeypatch
+) -> None:
+    cuts_root = paths_module.cut_workspace_root() / "cuts"
+    cuts_root.mkdir(parents=True)
+    calls: list[Path] = []
+    release = Event()
+
+    def _blocking_directory_size(path: Path) -> int:
+        calls.append(path)
+        release.wait(2)
+        return 42
+
+    monkeypatch.setattr(
+        "matteloop.ui.model_manager._workers._directory_size",
+        _blocking_directory_size,
+    )
+    dialog = ModelManagerDialog(ModelCatalog.load_resource(), tmp_path)
+    qtbot.addWidget(dialog)
+
+    dialog.refresh()
+    qtbot.waitUntil(lambda: len(calls) == 1, timeout=5000)
+    dialog.refresh()
+
+    # A refresh that lands while a walk is still running must not start a
+    # second, racing thread -- it is coalesced into one pending re-walk.
+    assert dialog._cut_sets_thread is not None
+    assert dialog._cut_sets_refresh_pending is True
+
+    release.set()
+    qtbot.waitUntil(lambda: len(calls) == 2, timeout=5000)
+    qtbot.waitUntil(
+        lambda: dialog.cut_sets_size_label.text() == "Cut sets on disk: 42.0 B",
+        timeout=5000,
+    )
+    assert dialog._cut_sets_thread is None
+    assert dialog._cut_sets_refresh_pending is False
+
+
+def test_model_manager_close_event_waits_for_cut_set_walk(
+    tmp_path: Path, cache_root: Path, qtbot
+) -> None:
+    cuts_root = paths_module.cut_workspace_root() / "cuts"
+    cuts_root.mkdir(parents=True)
+    dialog = ModelManagerDialog(ModelCatalog.load_resource(), tmp_path)
+    qtbot.addWidget(dialog)
+
+    dialog.refresh()
+    dialog.close()
+
+    # close() -> closeEvent() waits out the real OS thread via
+    # shutdown_cut_sets_walk() before returning; the dialog only forgets the
+    # WorkerThread once its queued `finished` signal reaches the GUI thread.
+    qtbot.waitUntil(lambda: dialog._cut_sets_thread is None, timeout=5000)
 
 
 def test_model_manager_removes_only_confirmed_selected_weight_in_background(
