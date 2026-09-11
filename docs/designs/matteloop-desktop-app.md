@@ -333,7 +333,8 @@ Action emphasis is state-dependent without moving either button:
 
 Processing order is fixed: orient source → input crop → FPS sampling → `rembg`/edge treatment → optional global trim → padding → horizontal stretch → lossless WebP → optional proportional size fit.
 
-The job workspace is `<output-directory>/.matteloop-work/` with two lifecycles:
+The job workspace is `<platformdirs.user_cache_dir("matteloop")>/workspace/`
+with two lifecycles:
 
 - `scratch/<job-id>/` contains disposable decode/render/autofit files. It is removed after completion, cancellation, or handled failure unless diagnostic retention is explicitly chosen; abandoned scratch older than 24 hours is offered for cleanup at launch.
 - `cuts/<cache-key>/` contains persistent, editable post-segmentation PNGs, `manifest.json`, and derived union metadata for Rebuild. It is never auto-deleted. `Manage Workspaces…` shows size, source, last use, edited/pinned state, and explicit deletion. Above 20 GiB total, the app warns before creating another cache and opens cleanup; it still never deletes manual work automatically.

@@ -585,16 +585,17 @@ def test_existing_output_requires_explicit_replace_choice(tmp_path, qtbot) -> No
 
 
 def test_matching_cut_set_offers_three_choices_with_rebuild_default(
-    tmp_path, qtbot
+    tmp_path, qtbot, cache_root
 ) -> None:
     source = tmp_path / "source.mp4"
     source.write_bytes(b"fixture")
-    cuts_root = tmp_path / ".matteloop-work" / "cuts"
+    workspace_root = cache_root / "workspace"
+    cuts_root = workspace_root / "cuts"
     workspace = CutWorkspace(
         tmp_path,
-        tmp_path / ".matteloop-work",
+        workspace_root,
         cuts_root,
-        tmp_path / ".matteloop-work" / "scratch",
+        workspace_root / "scratch",
         "a" * 64,
         cuts_root / "source-aaaaaaaa",
         WorkspaceLifecycle.PROMOTED,
@@ -677,16 +678,17 @@ def test_artifact_ready_fires_with_the_workers_raw_artifact(tmp_path, qtbot) -> 
 
 
 def test_use_this_set_restores_the_stored_transform_before_rebuilding(
-    tmp_path, qtbot
+    tmp_path, qtbot, cache_root
 ) -> None:
     source = tmp_path / "source.mp4"
     source.write_bytes(b"fixture")
-    cuts_root = tmp_path / ".matteloop-work" / "cuts"
+    workspace_root = cache_root / "workspace"
+    cuts_root = workspace_root / "cuts"
     workspace = CutWorkspace(
         tmp_path,
-        tmp_path / ".matteloop-work",
+        workspace_root,
         cuts_root,
-        tmp_path / ".matteloop-work" / "scratch",
+        workspace_root / "scratch",
         "a" * 64,
         cuts_root / "source-aaaaaaaa",
         WorkspaceLifecycle.PROMOTED,

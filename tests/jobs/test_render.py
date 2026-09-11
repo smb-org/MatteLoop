@@ -17,6 +17,7 @@ from PIL import Image
 import matteloop.jobs.render as render_module
 import matteloop.jobs.transform_stage as transform_stage_module
 import matteloop.jobs.workspace as workspace_module
+import matteloop.paths as paths_module
 from matteloop.core.errors import AppError, ErrorCode
 from matteloop.core.specs import (
     CollisionPolicy,
@@ -118,7 +119,7 @@ def test_candidate_path_is_owned_by_the_explicit_private_work_directory(
 ) -> None:
     publisher = AtomicOutputPublisher()
     output = tmp_path / "exports" / "output.webp"
-    work_dir = tmp_path / ".matteloop-work" / "scratch" / "render-private"
+    work_dir = paths_module.cut_workspace_root() / "scratch" / "render-private"
     work_dir.mkdir(parents=True)
 
     candidate = publisher.candidate_path(output, "render-private", work_dir)
@@ -790,10 +791,30 @@ def test_render_samples_half_open_range_and_uses_private_encoder_inputs(
         artifact.cut_workspace.path not in path.parents for path in encoded_paths
     )
     assert "scratch/render-half-open" in encoder.calls[0][2].as_posix()
-    assert not (tmp_path / ".matteloop-work" / "scratch" / "render-half-open").exists()
+    assert not (
+        paths_module.cut_workspace_root() / "scratch" / "render-half-open"
+    ).exists()
     assert artifact.ownership_peak <= 3
     assert artifact.ownership_current == 0
     assert validate_webp(artifact.output_path, 2, 1000).lossless
+
+
+def test_render_writes_no_cut_or_scratch_file_into_the_output_directory(
+    tmp_path: Path, cache_root: Path
+) -> None:
+    output_directory = tmp_path / "exports"
+    output_directory.mkdir()
+    render_request = request(output_directory)
+
+    artifact = render_service().render(
+        render_request, job(tmp_path, "workspace-location", JobKind.RENDER)
+    )
+
+    assert artifact.cut_workspace.workspace_root == cache_root / "workspace"
+    assert artifact.output_path.parent == output_directory
+    assert not (output_directory / ".matteloop-work").exists()
+    assert not tuple(output_directory.rglob("frame-*.png"))
+    assert not tuple(output_directory.rglob("manifest.json"))
 
 
 def test_validated_candidate_is_closed_before_private_scratch_cleanup(
@@ -1564,7 +1585,9 @@ def test_impossible_size_after_promotion_keeps_output_and_cuts(tmp_path) -> None
         == 2
     )
     assert not tuple(tmp_path.glob(".output.webp.*.candidate"))
-    assert not (tmp_path / ".matteloop-work" / "scratch" / "impossible").exists()
+    assert not (
+        paths_module.cut_workspace_root() / "scratch" / "impossible"
+    ).exists()
 
 
 def test_low_disk_preflight_is_advisory(tmp_path) -> None:
@@ -1611,7 +1634,7 @@ def test_cancel_before_promotion_discards_stage_and_preserves_output(
     assert exc.value.code is ErrorCode.JOB_CANCELLED
     assert context.terminal_state is JobTerminalState.CANCELLED
     assert render_request.output.path.read_bytes() == b"old-output"
-    cuts = tmp_path / ".matteloop-work" / "cuts"
+    cuts = paths_module.cut_workspace_root() / "cuts"
     assert not cuts.exists() or not tuple(cuts.iterdir())
 
 
@@ -1713,7 +1736,7 @@ def test_stale_source_before_staging_preserves_old_output(tmp_path) -> None:
 
     assert exc.value.code is ErrorCode.SOURCE_CHANGED
     assert render_request.output.path.read_bytes() == b"old-output"
-    assert not (tmp_path / ".matteloop-work").exists()
+    assert not paths_module.cut_workspace_root().exists()
 
 
 @pytest.mark.parametrize(
@@ -3092,7 +3115,7 @@ def test_all_fallible_artifact_identity_work_finishes_before_publish(
 
 
 def _only_durable_workspace(output_directory: Path):
-    cuts = output_directory / ".matteloop-work" / "cuts"
+    cuts = paths_module.cut_workspace_root() / "cuts"
     durable_paths = tuple(
         path for path in cuts.iterdir() if not path.name.startswith(".")
     )

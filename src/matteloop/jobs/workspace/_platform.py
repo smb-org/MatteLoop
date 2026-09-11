@@ -4,10 +4,7 @@ from typing import TYPE_CHECKING
 
 from platformdirs import user_cache_dir
 
-from matteloop.paths import (
-    WORKSPACE_NAME,
-    cache_subdirectory,
-)
+from matteloop.paths import cut_workspace_root
 
 # ruff: noqa: F403,F405
 from ._common import *  # noqa: F403,F401
@@ -27,7 +24,7 @@ __all__ = (
     "_create_fallback_workspace",
     "_darwin_descriptor_is_local",
     "_default_local_filesystem_probe",
-    "_fallback_workspace_root",
+    "_durable_workspace_root",
     "_linux_mount_is_local",
     "_linux_mountinfo_is_local",
     "_windows_drive_type_is_local",
@@ -75,50 +72,23 @@ def _workspace_layout(
     output_directory: Path, *, create: bool
 ) -> WorkspaceLayout:
     output = _canonical_output_directory(output_directory)
-    requested_root = output / WORKSPACE_NAME
-    fallback = (
-        _locality_fallback(requested_root)
-        if requested_root.exists()
-        else _locality_fallback(output)
-    )
-    root = (
-        _fallback_workspace_root(output) if fallback is not None else requested_root
-    )
+    root = cut_workspace_root()
     cuts = root / "cuts"
     scratch = root / "scratch"
     if create:
-        if fallback is None:
-            try:
-                with _BoundDirectory.open(output) as output_bound:
-                    output_bound.mkdir(root.name, exist_ok=True)
-                    with output_bound.open_child(root.name) as root_bound:
-                        root_bound.mkdir(cuts.name, exist_ok=True)
-                        root_bound.mkdir(scratch.name, exist_ok=True)
-                        with root_bound.open_child(cuts.name):
-                            pass
-                        with root_bound.open_child(scratch.name):
-                            pass
-            except AppError:
-                raise
-            except OSError as error:
-                raise _unsafe_error(
-                    f"cannot create workspace directory: {error}"
-                ) from error
-        else:
-            _create_fallback_workspace(root, cuts, scratch)
+        _create_fallback_workspace(root, cuts, scratch)
     elif root.exists():
         _assert_safe_directory(root)
         if cuts.exists():
             _assert_safe_directory(cuts)
         if scratch.exists():
             _assert_safe_directory(scratch)
-    return WorkspaceLayout(output, root, cuts, scratch, fallback)
+    return WorkspaceLayout(output, root, cuts, scratch, None)
 
 
-def _fallback_workspace_root(output: Path) -> Path:
-    """Return the local cache workspace for a non-local output directory."""
-    digest = hashlib.sha256(os.fsencode(str(output))).hexdigest()
-    return cache_subdirectory("workspaces", digest)
+def _durable_workspace_root() -> Path:
+    """Return the shared cache workspace for durable cut sets."""
+    return cut_workspace_root()
 
 
 def _create_fallback_workspace(root: Path, cuts: Path, scratch: Path) -> None:
