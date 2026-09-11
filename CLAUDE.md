@@ -58,6 +58,7 @@ Verification for every change:
 
 ```sh
 uv run ruff check . && uv run mypy src && \
+  uv run mypy --platform linux src && uv run mypy --platform win32 src && \
   uv run python scripts/check_guardrails.py && \
   QT_QPA_PLATFORM=offscreen uv run pytest -q
 ```

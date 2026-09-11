@@ -223,7 +223,8 @@ def _rename_no_replace_bound(
             os.fsencode(destination),
             0x00000004,
         )
-    elif sys.platform.startswith("linux"):
+        return _finish_no_replace_rename(result, destination)
+    if sys.platform.startswith("linux"):
         libc = ctypes.CDLL(None, use_errno=True)
         renameat2 = getattr(libc, "renameat2", None)
         if renameat2 is None:
@@ -243,11 +244,14 @@ def _rename_no_replace_bound(
             os.fsencode(destination),
             0x00000001,
         )
-    else:
-        raise OSError(
-            errno.ENOTSUP,
-            "atomic handle-relative no-replace rename is unsupported",
-        )
+        return _finish_no_replace_rename(result, destination)
+    raise OSError(
+        errno.ENOTSUP,
+        "atomic handle-relative no-replace rename is unsupported",
+    )
+
+
+def _finish_no_replace_rename(result: int, destination: str) -> None:
     if result == 0:
         return
     code = ctypes.get_errno()

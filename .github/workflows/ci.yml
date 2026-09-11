@@ -25,6 +25,10 @@ jobs:
       - run: uv run --frozen --no-sync --no-build python scripts/check_guardrails.py
       - run: uv run --frozen --no-sync --no-build ruff check .
       - run: uv run --frozen --no-sync --no-build mypy src
+      # The runner is linux, so the step above already covers that platform;
+      # win32 is not, is not otherwise checked anywhere in CI, and is the
+      # platform the installer and onnxruntime-directml ship on.
+      - run: uv run --frozen --no-sync --no-build mypy --platform win32 src
 
   test:
     # Named from the matrix entry alone: the generated name would include

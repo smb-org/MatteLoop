@@ -1492,7 +1492,7 @@ class _CtypesWindowsDirectoryApi:
         import msvcrt
 
         return int(
-            msvcrt.open_osfhandle(  # type: ignore[attr-defined]
+            getattr(msvcrt, "open_osfhandle")(
                 handle, flags | getattr(os, "O_BINARY", 0)
             )
         )

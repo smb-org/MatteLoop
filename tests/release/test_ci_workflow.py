@@ -38,6 +38,7 @@ def test_ci_runs_without_syncing_or_building_dependencies() -> None:
         "uv run --frozen --no-sync --no-build python scripts/check_guardrails.py",
         "uv run --frozen --no-sync --no-build ruff check .",
         "uv run --frozen --no-sync --no-build mypy src",
+        "uv run --frozen --no-sync --no-build mypy --platform win32 src",
         "uv run --frozen --no-sync --no-build pytest -q ${{ matrix.paths }}",
         "uv run --frozen --no-sync --no-build pytest -q --durations=15 "
         "tests/jobs tests/core tests/test_resources.py",
