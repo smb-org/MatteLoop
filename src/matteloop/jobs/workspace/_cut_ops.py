@@ -284,7 +284,6 @@ def promote_cut_set(
                         workspace.cache_key,
                         target,
                         WorkspaceLifecycle.PROMOTED,
-                        workspace.fallback,
                         target.name,
                     )
                     with cuts_bound.open_child(target.name) as promoted_bound:

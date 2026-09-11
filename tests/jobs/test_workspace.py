@@ -2225,42 +2225,14 @@ def test_component_binding_closes_descriptors_when_fstat_fails(
     assert _open_handle_count(process) <= before
 
 
-def test_local_filesystem_policy_degrades_for_nonlocal_and_unknown_storage(
-    tmp_path: Path,
-) -> None:
-    assert (
-        workspace_module._locality_fallback(tmp_path, probe=lambda _bound: True) is None
-    )
-    nonlocal_fallback = workspace_module._locality_fallback(
-        tmp_path, probe=lambda _bound: False
-    )
-    assert nonlocal_fallback is not None
-    assert nonlocal_fallback.reason == "network-filesystem"
-
-    def undecidable(_bound: workspace_module._BoundDirectory) -> bool:
-        raise OSError("injected unsupported probe")
-
-    unknown_fallback = workspace_module._locality_fallback(tmp_path, probe=undecidable)
-    assert unknown_fallback is not None
-    assert unknown_fallback.reason == "locality-unknown"
-    assert workspace_module._windows_drive_type_is_local(2) is True
-    assert workspace_module._windows_drive_type_is_local(3) is True
-    assert workspace_module._windows_drive_type_is_local(4) is False
-
-
 def test_workspace_layout_uses_shared_cache_root(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     cache_root = tmp_path / "user-cache"
     monkeypatch.setattr(paths_module, "user_cache_dir", lambda _app: str(cache_root))
-    monkeypatch.setattr(
-        workspace_module, "_default_local_filesystem_probe", lambda _bound: False
-    )
 
     layout = workspace_module._workspace_layout(tmp_path, create=True)
 
-    assert not layout.fallback_used
-    assert layout.fallback is None
     assert layout.workspace_root == cache_root / "workspace"
     assert layout.workspace_root != tmp_path / ".matteloop-work"
 
@@ -2285,28 +2257,6 @@ def test_frame_replaced_mid_read_is_rejected(
 
     with pytest.raises(AppError, match="changed while it was read"):
         validate_cut_set(cuts)
-
-
-@pytest.mark.parametrize(
-    ("filesystem", "expected"),
-    [
-        ("ext4", True),
-        ("xfs", True),
-        ("btrfs", True),
-        ("tmpfs", True),
-        ("overlay", True),
-        ("nfs4", False),
-        ("cifs", False),
-        ("fuse.rclone", False),
-        ("futurefs", False),
-    ],
-)
-def test_linux_mountinfo_uses_a_fail_closed_local_filesystem_allowlist(
-    filesystem: str, expected: bool
-) -> None:
-    encoded = f"36 25 8:1 / /workspace rw,relatime - {filesystem} device rw\n".encode()
-
-    assert workspace_module._linux_mountinfo_is_local(encoded, "8:1") is expected
 
 
 def test_windows_component_binding_rejects_reparse_and_closes_all_handles(

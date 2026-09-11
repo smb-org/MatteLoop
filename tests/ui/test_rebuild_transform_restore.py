@@ -139,7 +139,6 @@ def _promoted_cut(tmp_path: Path, cache_root: Path, key: str) -> CutWorkspace:
         key * 64,
         cuts_root / f"source-{key * 8}",
         WorkspaceLifecycle.PROMOTED,
-        None,
         f"source-{key * 8}",
     )
 

@@ -22,7 +22,6 @@ if TYPE_CHECKING:
         _validate_path_value,
     )
     from ._platform import (
-        WorkspaceFallback,
         _durable_workspace_root,
         _workspace_layout,
     )
@@ -90,7 +89,6 @@ class CutWorkspace:
     cache_key: str
     path: Path
     lifecycle: WorkspaceLifecycle
-    fallback: WorkspaceFallback | None = None
     directory_name: str = ""
 
     def __post_init__(self) -> None:
@@ -183,7 +181,6 @@ class CutWorkspace:
             cache_key,
             stage,
             WorkspaceLifecycle.STAGING,
-            layout.fallback,
             directory_name,
         )
 
@@ -217,7 +214,6 @@ class CutWorkspace:
             cache_key,
             path,
             WorkspaceLifecycle.PROMOTED,
-            layout.fallback,
             path.name,
         )
 
