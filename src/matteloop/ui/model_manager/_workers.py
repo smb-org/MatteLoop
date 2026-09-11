@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QObject, Signal, Slot
 
 from matteloop.core.errors import AppError, ErrorCode
 from matteloop.jobs.context import CancellationState
+
+from ._entries import _directory_size
 
 if TYPE_CHECKING:
     from ._controller import ModelRemovalService
@@ -108,6 +111,26 @@ class _OutdatedRedownloadWorker(QObject):
 
     def _cancelled(self) -> bool:
         return self._cancel.requested
+
+
+class _CutSetsSizeWorker(QObject):
+    """Walk the cuts directory off the GUI thread; unbounded, unlike the cache total."""
+
+    computed = Signal(int)
+    finished = Signal()
+
+    def __init__(self, cuts_root: Path) -> None:
+        super().__init__()
+        self._cuts_root = cuts_root
+
+    @Slot()
+    def run(self) -> None:
+        try:
+            # _directory_size already tolerates a missing directory or a
+            # permission error by returning 0; nothing to degrade here.
+            self.computed.emit(_directory_size(self._cuts_root))
+        finally:
+            self.finished.emit()
 
 
 class _ObsoleteRemovalWorker(QObject):

@@ -891,131 +891,136 @@ Freed %s.</translation>
         <translation>Model folder: %s</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="59"/>
-        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="62"/>
+        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="60"/>
+        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="63"/>
         <source>Model manager</source>
         <translation>Model manager</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="87"/>
+        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="92"/>
         <source>Total model cache size</source>
         <translation>Total model cache size</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="92"/>
+        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="97"/>
         <source>Cut sets on disk</source>
         <translation>Cut sets on disk</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="97"/>
+        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="102"/>
         <source>Model cache location</source>
         <translation>Model cache location</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="104"/>
+        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="109"/>
         <source>V1 models</source>
         <translation>V1 models</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="117"/>
+        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="122"/>
         <source>Download weight</source>
         <translation>Download weight</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="121"/>
+        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="126"/>
         <source>Download selected model weight</source>
         <translation>Download selected model weight</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="126"/>
+        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="131"/>
         <source>Remove downloaded weight</source>
         <translation>Remove downloaded weight</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="130"/>
+        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="135"/>
         <source>Remove selected model weight</source>
         <translation>Remove selected model weight</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="135"/>
+        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="140"/>
         <source>Re-download outdated</source>
         <translation>Re-download outdated</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="139"/>
+        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="144"/>
         <source>Re-download outdated model weights</source>
         <translation>Re-download outdated model weights</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="150"/>
+        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="155"/>
         <source>Delete outdated</source>
         <translation>Delete outdated</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="154"/>
+        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="159"/>
         <source>Delete outdated model weights</source>
         <translation>Delete outdated model weights</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="159"/>
+        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="164"/>
         <source>Show cache location</source>
         <translation>Show cache location</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="163"/>
+        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="168"/>
         <source>Show model cache location</source>
         <translation>Show model cache location</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="168"/>
+        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="173"/>
         <source>Close</source>
         <translation>Close</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="171"/>
+        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="176"/>
         <source>Close model manager</source>
         <translation>Close model manager</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="174"/>
-        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="274"/>
-        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="280"/>
+        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="179"/>
+        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="279"/>
+        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="285"/>
         <source>Cancel</source>
         <translation>Cancel</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="178"/>
+        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="183"/>
         <source>Cancel the running model download</source>
         <translation>Cancel the running model download</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="188"/>
+        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="193"/>
         <source>Manage the downloaded V1 model weights.</source>
         <translation>Manage the downloaded V1 model weights.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="288"/>
-        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="292"/>
+        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="293"/>
+        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="297"/>
         <source>Cancelling…</source>
         <translation>Cancelling…</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="307"/>
+        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="312"/>
         <source>Cannot remove the model used by the active session.</source>
         <translation>Cannot remove the model used by the active session.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="348"/>
+        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="353"/>
         <source>Total on disk: %s</source>
         <translation>Total on disk: %s</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="354"/>
+        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="372"/>
+        <source>Cut sets on disk: …</source>
+        <translation>Cut sets on disk: …</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="395"/>
         <source>Cut sets on disk: %s</source>
         <translation>Cut sets on disk: %s</translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="362"/>
+        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="361"/>
         <source>%n V1 model(s); cache: %1</source>
         <translation>
             <numerusform>%n V1 model; cache: %1</numerusform>
@@ -1023,17 +1028,17 @@ Freed %s.</translation>
         </translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="375"/>
+        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="429"/>
         <source>Outdated weights from rembg %s occupy %s on disk and cannot be used by this version.</source>
         <translation>Outdated weights from rembg %s occupy %s on disk and cannot be used by this version.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="396"/>
+        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="450"/>
         <source>Remove the selected downloaded weight and free its disk space.</source>
         <translation>Remove the selected downloaded weight and free its disk space.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="406"/>
+        <location filename="../src/matteloop/ui/model_manager/_dialog.py" line="460"/>
         <source>Download the selected weight now instead of waiting for a preview.</source>
         <translation>Download the selected weight now instead of waiting for a preview.</translation>
     </message>

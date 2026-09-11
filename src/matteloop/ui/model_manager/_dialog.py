@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
-from PySide6.QtCore import QCoreApplication, QSize, Signal
+from PySide6.QtCore import QCoreApplication, QSize, QThread, Signal
 from PySide6.QtWidgets import (
     QDialog,
     QHBoxLayout,
@@ -20,15 +20,16 @@ from matteloop.jobs.models.catalog import ModelCatalog
 from matteloop.paths import cut_workspace_root
 from matteloop.ui.aligned_rows import AlignedRowDelegate, install_aligned_row
 from matteloop.ui.source_presentation import format_source_file_size
+from matteloop.ui.worker_thread import WorkerThread, wait_for_shutdown_worker
 
 from ._entries import (
     MODEL_ENTRY_ROLE,
     ModelEntry,
-    _directory_size,
     _model_entry,
     _obsolete_directory_size,
     present_model,
 )
+from ._workers import _CutSetsSizeWorker
 
 
 class ModelManagerDialog(QDialog):
@@ -69,6 +70,10 @@ class ModelManagerDialog(QDialog):
         self._entries: tuple[ModelEntry, ...] = ()
         self._obsolete_size_bytes = 0
         self._busy = False
+        self._cut_sets_root = cut_workspace_root() / "cuts"
+        self._cut_sets_thread: QThread | None = None
+        self._cut_sets_worker: _CutSetsSizeWorker | None = None
+        self._cut_sets_refresh_pending = False
         self._removal_guard: Callable[[ModelEntry], str | None] = (
             self._active_removal_guard
         )
@@ -350,13 +355,7 @@ class ModelManagerDialog(QDialog):
         ) % format_source_file_size(total)
         self.total_size_label.setText(total_text)
         self.total_size_label.setAccessibleDescription(total_text)
-        cuts_root = cut_workspace_root() / "cuts"
-        cuts_text = QCoreApplication.translate(
-            "ModelManagerDialog", "Cut sets on disk: %s"
-        ) % format_source_file_size(_directory_size(cuts_root))
-        self.cut_sets_size_label.setText(cuts_text)
-        self.cut_sets_size_label.setToolTip(str(cuts_root))
-        self.cut_sets_size_label.setAccessibleDescription(str(cuts_root))
+        self._refresh_cut_sets_size()
         entry_count = len(self._entries)
         message = self.tr(
             "%n V1 model(s); cache: %1", "", entry_count
@@ -364,6 +363,61 @@ class ModelManagerDialog(QDialog):
         self.set_message(message)
         self._update_outdated_notice(self._obsolete_size_bytes)
         self._update_actions()
+
+    def _refresh_cut_sets_size(self) -> None:
+        """Show the cuts root immediately; the walk of it runs off-thread."""
+        self._cut_sets_root = cut_workspace_root() / "cuts"
+        self.cut_sets_size_label.setToolTip(str(self._cut_sets_root))
+        self.cut_sets_size_label.setAccessibleDescription(str(self._cut_sets_root))
+        pending_text = QCoreApplication.translate(
+            "ModelManagerDialog", "Cut sets on disk: …"
+        )
+        self.cut_sets_size_label.setText(pending_text)
+        if self._cut_sets_thread is not None:
+            # A walk is already running; let it finish and start the next one
+            # for the latest cuts root instead of racing a second thread.
+            self._cut_sets_refresh_pending = True
+            return
+        self._start_cut_sets_walk()
+
+    def _start_cut_sets_walk(self) -> None:
+        worker = _CutSetsSizeWorker(self._cut_sets_root)
+        thread = WorkerThread(worker, self)
+        worker.computed.connect(self._cut_sets_size_computed)
+        worker.finished.connect(thread.quit)
+        worker.finished.connect(worker.deleteLater)
+        thread.finished.connect(self._cut_sets_thread_finished)
+        self._cut_sets_thread = thread
+        self._cut_sets_worker = worker
+        thread.start()
+
+    def _cut_sets_size_computed(self, size_bytes: int) -> None:
+        cuts_text = QCoreApplication.translate(
+            "ModelManagerDialog", "Cut sets on disk: %s"
+        ) % format_source_file_size(size_bytes)
+        self.cut_sets_size_label.setText(cuts_text)
+
+    def _cut_sets_thread_finished(self) -> None:
+        self._cut_sets_thread = None
+        self._cut_sets_worker = None
+        if self._cut_sets_refresh_pending:
+            self._cut_sets_refresh_pending = False
+            self._start_cut_sets_walk()
+
+    def shutdown_cut_sets_walk(self) -> bool:
+        """Stop the background walk before the dialog or app goes away."""
+        thread = self._cut_sets_thread
+        if thread is None:
+            return True
+        self._cut_sets_refresh_pending = False
+        thread.quit()
+        return wait_for_shutdown_worker(
+            thread, self._cut_sets_worker, "cut-set size worker"
+        )
+
+    def closeEvent(self, event) -> None:  # type: ignore[no-untyped-def]
+        self.shutdown_cut_sets_walk()
+        super().closeEvent(event)
 
     def _update_outdated_notice(self, size_bytes: int) -> None:
         if size_bytes <= 0:
