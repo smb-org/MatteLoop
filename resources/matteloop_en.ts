@@ -2620,100 +2620,150 @@ Freed %s.</translation>
 <context>
     <name>WorkspacePicker</name>
     <message>
-        <location filename="../src/matteloop/ui/workspace_controller.py" line="57"/>
+        <location filename="../src/matteloop/ui/workspace_controller.py" line="179"/>
+        <source>Each set is copied, verified, then removed from the output folder.</source>
+        <translation>Each set is copied, verified, then removed from the output folder.</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/workspace_controller.py" line="183"/>
+        <source>Externally edited frames are kept.</source>
+        <translation>Externally edited frames are kept.</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/workspace_controller.py" line="186"/>
+        <source>A set that is already in the cache is left where it is.</source>
+        <translation>A set that is already in the cache is left where it is.</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/workspace_controller.py" line="192"/>
+        <source>Move cut sets into the cache?</source>
+        <translation>Move cut sets into the cache?</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/workspace_controller.py" line="212"/>
         <source>Cut set is in use</source>
         <translation>Cut set is in use</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/workspace_controller.py" line="58"/>
+        <location filename="../src/matteloop/ui/workspace_controller.py" line="213"/>
         <source>This cut set is being used by a running job.</source>
         <translation>This cut set is being used by a running job.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/workspace_controller.py" line="73"/>
+        <location filename="../src/matteloop/ui/workspace_controller.py" line="228"/>
         <source>Could not delete cut set</source>
         <translation>Could not delete cut set</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/workspace_controller.py" line="95"/>
+        <location filename="../src/matteloop/ui/workspace_controller.py" line="250"/>
         <source>Delete %1 (%2 frames, %3)?
 Stored frames and the saved transform will be removed. Recreating them requires background removal again.</source>
         <translation>Delete %1 (%2 frames, %3)?
 Stored frames and the saved transform will be removed. Recreating them requires background removal again.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/workspace_controller.py" line="109"/>
+        <location filename="../src/matteloop/ui/workspace_controller.py" line="264"/>
         <source>Delete cut set?</source>
         <translation>Delete cut set?</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/workspace_controller.py" line="119"/>
+        <location filename="../src/matteloop/ui/workspace_controller.py" line="274"/>
         <source>Delete pinned cut set?</source>
         <translation>Delete pinned cut set?</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/workspace_controller.py" line="104"/>
-        <location filename="../src/matteloop/ui/workspace_controller.py" line="120"/>
+        <location filename="../src/matteloop/ui/workspace_controller.py" line="259"/>
+        <location filename="../src/matteloop/ui/workspace_controller.py" line="275"/>
         <source>This set is pinned. Delete it anyway?</source>
         <translation>This set is pinned. Delete it anyway?</translation>
     </message>
 </context>
 <context>
+    <name>WorkspacePickerController</name>
+    <message numerus="yes">
+        <location filename="../src/matteloop/ui/workspace_controller.py" line="170"/>
+        <source>Move %n cut set(s) (%1) from
+%2
+into
+%3?</source>
+        <translation>
+            <numerusform>Move %n cut set (%1) from
+%2
+into
+%3?</numerusform>
+            <numerusform>Move %n cut sets (%1) from
+%2
+into
+%3?</numerusform>
+        </translation>
+    </message>
+</context>
+<context>
     <name>WorkspacePickerDialog</name>
     <message>
-        <location filename="../src/matteloop/ui/workspace_dialog.py" line="58"/>
-        <location filename="../src/matteloop/ui/workspace_dialog.py" line="61"/>
-        <location filename="../src/matteloop/ui/workspace_dialog.py" line="69"/>
+        <location filename="../src/matteloop/ui/workspace_dialog.py" line="70"/>
+        <location filename="../src/matteloop/ui/workspace_dialog.py" line="73"/>
+        <location filename="../src/matteloop/ui/workspace_dialog.py" line="104"/>
         <source>Promoted cut sets</source>
         <translation>Promoted cut sets</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/workspace_dialog.py" line="75"/>
+        <location filename="../src/matteloop/ui/workspace_dialog.py" line="86"/>
+        <source>Legacy cut-set migration offer</source>
+        <translation>Legacy cut-set migration offer</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/workspace_dialog.py" line="93"/>
+        <source>Move legacy cut sets to the cache</source>
+        <translation>Move legacy cut sets to the cache</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/workspace_dialog.py" line="110"/>
         <source>Use this set</source>
         <translation>Use this set</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/workspace_dialog.py" line="78"/>
+        <location filename="../src/matteloop/ui/workspace_dialog.py" line="113"/>
         <source>Use selected cut set</source>
         <translation>Use selected cut set</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/workspace_dialog.py" line="81"/>
+        <location filename="../src/matteloop/ui/workspace_dialog.py" line="116"/>
         <source>Open folder</source>
         <translation>Open folder</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/workspace_dialog.py" line="84"/>
+        <location filename="../src/matteloop/ui/workspace_dialog.py" line="119"/>
         <source>Open selected cut folder</source>
         <translation>Open selected cut folder</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/workspace_dialog.py" line="89"/>
+        <location filename="../src/matteloop/ui/workspace_dialog.py" line="124"/>
         <source>Delete set</source>
         <translation>Delete set</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/workspace_dialog.py" line="92"/>
+        <location filename="../src/matteloop/ui/workspace_dialog.py" line="127"/>
         <source>Delete selected cut set</source>
         <translation>Delete selected cut set</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/workspace_dialog.py" line="97"/>
+        <location filename="../src/matteloop/ui/workspace_dialog.py" line="132"/>
         <source>Close</source>
         <translation>Close</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/workspace_dialog.py" line="104"/>
+        <location filename="../src/matteloop/ui/workspace_dialog.py" line="139"/>
         <source>Choose a validated cut set.</source>
         <translation>Choose a validated cut set.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/workspace_dialog.py" line="150"/>
+        <location filename="../src/matteloop/ui/workspace_dialog.py" line="195"/>
         <source>Could not read cut sets: %s</source>
         <translation>Could not read cut sets: %s</translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/matteloop/ui/workspace_dialog.py" line="173"/>
+        <location filename="../src/matteloop/ui/workspace_dialog.py" line="240"/>
         <source>%n promoted cut set(s) in MatteLoop&apos;s cache (%1)</source>
         <translation>
             <numerusform>%n promoted cut set in MatteLoop&apos;s cache (%1)</numerusform>
@@ -2721,9 +2771,68 @@ Stored frames and the saved transform will be removed. Recreating them requires 
         </translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/workspace_dialog.py" line="180"/>
+        <location filename="../src/matteloop/ui/workspace_dialog.py" line="247"/>
         <source>No promoted cut sets found.</source>
         <translation>No promoted cut sets found.</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/workspace_dialog.py" line="259"/>
+        <source>Moving %1 (%2 of %3)…</source>
+        <translation>Moving %1 (%2 of %3)…</translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../src/matteloop/ui/workspace_dialog.py" line="270"/>
+        <source>Moved %n set(s).</source>
+        <translation>
+            <numerusform>Moved %n set.</numerusform>
+            <numerusform>Moved %n sets.</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../src/matteloop/ui/workspace_dialog.py" line="289"/>
+        <source>%n cut set(s) (%1) from an earlier version are stored inside the output folder, where a sync client can alter them.</source>
+        <translation>
+            <numerusform>%n cut set (%1) from an earlier version is stored inside the output folder, where a sync client can alter it.</numerusform>
+            <numerusform>%n cut sets (%1) from an earlier version are stored inside the output folder, where a sync client can alter them.</numerusform>
+        </translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/workspace_dialog.py" line="297"/>
+        <source>Move them into MatteLoop&apos;s cache to use them again.</source>
+        <translation>Move them into MatteLoop&apos;s cache to use them again.</translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../src/matteloop/ui/workspace_dialog.py" line="303"/>
+        <source>Move %n set(s) to the cache</source>
+        <translation>
+            <numerusform>Move %n set to the cache</numerusform>
+            <numerusform>Move %n sets to the cache</numerusform>
+        </translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/workspace_dialog.py" line="313"/>
+        <source>%1: already in the cache with different frames — delete the cache copy in this list and move again to use the folder&apos;s copy.</source>
+        <translation>%1: already in the cache with different frames — delete the cache copy in this list and move again to use the folder&apos;s copy.</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/workspace_dialog.py" line="319"/>
+        <source>%1: not enough space in MatteLoop&apos;s cache.</source>
+        <translation>%1: not enough space in MatteLoop&apos;s cache.</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/workspace_dialog.py" line="323"/>
+        <source>%1: could not be moved: %2</source>
+        <translation>%1: could not be moved: %2</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/workspace_dialog.py" line="327"/>
+        <source>%1: moved, but the source folder could not be fully cleaned: %2</source>
+        <translation>%1: moved, but the source folder could not be fully cleaned: %2</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/workspace_dialog.py" line="332"/>
+        <source>%1: could not be read: %2</source>
+        <translation>%1: could not be read: %2</translation>
     </message>
 </context>
 <context>

@@ -2620,100 +2620,150 @@ Freed %s.</source>
 <context>
     <name>WorkspacePicker</name>
     <message>
-        <location filename="../src/matteloop/ui/workspace_controller.py" line="57"/>
+        <location filename="../src/matteloop/ui/workspace_controller.py" line="179"/>
+        <source>Each set is copied, verified, then removed from the output folder.</source>
+        <translation>Jedes Set wird kopiert, überprüft und anschließend aus dem Ausgabeordner entfernt.</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/workspace_controller.py" line="183"/>
+        <source>Externally edited frames are kept.</source>
+        <translation>Extern bearbeitete Frames bleiben erhalten.</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/workspace_controller.py" line="186"/>
+        <source>A set that is already in the cache is left where it is.</source>
+        <translation>Ein Set, das bereits im Cache vorhanden ist, bleibt dort.</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/workspace_controller.py" line="192"/>
+        <source>Move cut sets into the cache?</source>
+        <translation>Schnittsets in den Cache verschieben?</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/workspace_controller.py" line="212"/>
         <source>Cut set is in use</source>
         <translation>Schnittset wird verwendet</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/workspace_controller.py" line="58"/>
+        <location filename="../src/matteloop/ui/workspace_controller.py" line="213"/>
         <source>This cut set is being used by a running job.</source>
         <translation>Dieses Schnittset wird von einem laufenden Auftrag verwendet.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/workspace_controller.py" line="73"/>
+        <location filename="../src/matteloop/ui/workspace_controller.py" line="228"/>
         <source>Could not delete cut set</source>
         <translation>Schnittset konnte nicht gelöscht werden</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/workspace_controller.py" line="95"/>
+        <location filename="../src/matteloop/ui/workspace_controller.py" line="250"/>
         <source>Delete %1 (%2 frames, %3)?
 Stored frames and the saved transform will be removed. Recreating them requires background removal again.</source>
         <translation>Schnittset %1 (%2 Frames, %3) löschen?
 Gespeicherte Frames und die gespeicherte Transformation werden entfernt. Eine Neuerstellung erfordert eine erneute Hintergrundentfernung.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/workspace_controller.py" line="109"/>
+        <location filename="../src/matteloop/ui/workspace_controller.py" line="264"/>
         <source>Delete cut set?</source>
         <translation>Schnittset löschen?</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/workspace_controller.py" line="119"/>
+        <location filename="../src/matteloop/ui/workspace_controller.py" line="274"/>
         <source>Delete pinned cut set?</source>
         <translation>Angeheftetes Schnittset löschen?</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/workspace_controller.py" line="104"/>
-        <location filename="../src/matteloop/ui/workspace_controller.py" line="120"/>
+        <location filename="../src/matteloop/ui/workspace_controller.py" line="259"/>
+        <location filename="../src/matteloop/ui/workspace_controller.py" line="275"/>
         <source>This set is pinned. Delete it anyway?</source>
         <translation>Dieses Set ist angeheftet. Trotzdem löschen?</translation>
     </message>
 </context>
 <context>
+    <name>WorkspacePickerController</name>
+    <message numerus="yes">
+        <location filename="../src/matteloop/ui/workspace_controller.py" line="170"/>
+        <source>Move %n cut set(s) (%1) from
+%2
+into
+%3?</source>
+        <translation>
+            <numerusform>%n Schnittset (%1) aus
+%2
+in
+%3 verschieben?</numerusform>
+            <numerusform>%n Schnittsets (%1) aus
+%2
+in
+%3 verschieben?</numerusform>
+        </translation>
+    </message>
+</context>
+<context>
     <name>WorkspacePickerDialog</name>
     <message>
-        <location filename="../src/matteloop/ui/workspace_dialog.py" line="58"/>
-        <location filename="../src/matteloop/ui/workspace_dialog.py" line="61"/>
-        <location filename="../src/matteloop/ui/workspace_dialog.py" line="69"/>
+        <location filename="../src/matteloop/ui/workspace_dialog.py" line="70"/>
+        <location filename="../src/matteloop/ui/workspace_dialog.py" line="73"/>
+        <location filename="../src/matteloop/ui/workspace_dialog.py" line="104"/>
         <source>Promoted cut sets</source>
         <translation>Freigegebene Schnittsets</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/workspace_dialog.py" line="75"/>
+        <location filename="../src/matteloop/ui/workspace_dialog.py" line="86"/>
+        <source>Legacy cut-set migration offer</source>
+        <translation>Angebot zum Verschieben alter Schnittsets</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/workspace_dialog.py" line="93"/>
+        <source>Move legacy cut sets to the cache</source>
+        <translation>Alte Schnittsets in den Cache verschieben</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/workspace_dialog.py" line="110"/>
         <source>Use this set</source>
         <translation>Dieses Set verwenden</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/workspace_dialog.py" line="78"/>
+        <location filename="../src/matteloop/ui/workspace_dialog.py" line="113"/>
         <source>Use selected cut set</source>
         <translation>Ausgewähltes Schnittset verwenden</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/workspace_dialog.py" line="81"/>
+        <location filename="../src/matteloop/ui/workspace_dialog.py" line="116"/>
         <source>Open folder</source>
         <translation>Ordner öffnen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/workspace_dialog.py" line="84"/>
+        <location filename="../src/matteloop/ui/workspace_dialog.py" line="119"/>
         <source>Open selected cut folder</source>
         <translation>Ordner des ausgewählten Schnittsets öffnen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/workspace_dialog.py" line="89"/>
+        <location filename="../src/matteloop/ui/workspace_dialog.py" line="124"/>
         <source>Delete set</source>
         <translation>Set löschen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/workspace_dialog.py" line="92"/>
+        <location filename="../src/matteloop/ui/workspace_dialog.py" line="127"/>
         <source>Delete selected cut set</source>
         <translation>Ausgewähltes Schnittset löschen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/workspace_dialog.py" line="97"/>
+        <location filename="../src/matteloop/ui/workspace_dialog.py" line="132"/>
         <source>Close</source>
         <translation>Schließen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/workspace_dialog.py" line="104"/>
+        <location filename="../src/matteloop/ui/workspace_dialog.py" line="139"/>
         <source>Choose a validated cut set.</source>
         <translation>Wählen Sie ein validiertes Schnittset.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/workspace_dialog.py" line="150"/>
+        <location filename="../src/matteloop/ui/workspace_dialog.py" line="195"/>
         <source>Could not read cut sets: %s</source>
         <translation>Schnittsets konnten nicht gelesen werden: %s</translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/matteloop/ui/workspace_dialog.py" line="173"/>
+        <location filename="../src/matteloop/ui/workspace_dialog.py" line="240"/>
         <source>%n promoted cut set(s) in MatteLoop&apos;s cache (%1)</source>
         <translation>
             <numerusform>%n freigegebenes Schnittset im MatteLoop-Cache (%1)</numerusform>
@@ -2721,9 +2771,68 @@ Gespeicherte Frames und die gespeicherte Transformation werden entfernt. Eine Ne
         </translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/workspace_dialog.py" line="180"/>
+        <location filename="../src/matteloop/ui/workspace_dialog.py" line="247"/>
         <source>No promoted cut sets found.</source>
         <translation>Keine freigegebenen Schnittsets gefunden.</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/workspace_dialog.py" line="259"/>
+        <source>Moving %1 (%2 of %3)…</source>
+        <translation>%1 wird verschoben (%2 von %3) …</translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../src/matteloop/ui/workspace_dialog.py" line="270"/>
+        <source>Moved %n set(s).</source>
+        <translation>
+            <numerusform>%n Schnittset verschoben.</numerusform>
+            <numerusform>%n Schnittsets verschoben.</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../src/matteloop/ui/workspace_dialog.py" line="289"/>
+        <source>%n cut set(s) (%1) from an earlier version are stored inside the output folder, where a sync client can alter them.</source>
+        <translation>
+            <numerusform>%n Schnittset (%1) aus einer früheren Version ist im Ausgabeordner gespeichert, wo ein Synchronisierungsdienst es ändern kann.</numerusform>
+            <numerusform>%n Schnittsets (%1) aus einer früheren Version sind im Ausgabeordner gespeichert, wo ein Synchronisierungsdienst sie ändern kann.</numerusform>
+        </translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/workspace_dialog.py" line="297"/>
+        <source>Move them into MatteLoop&apos;s cache to use them again.</source>
+        <translation>Verschieben Sie sie in MatteLoops Cache, um sie wieder zu verwenden.</translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../src/matteloop/ui/workspace_dialog.py" line="303"/>
+        <source>Move %n set(s) to the cache</source>
+        <translation>
+            <numerusform>%n Schnittset in den Cache verschieben</numerusform>
+            <numerusform>%n Schnittsets in den Cache verschieben</numerusform>
+        </translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/workspace_dialog.py" line="313"/>
+        <source>%1: already in the cache with different frames — delete the cache copy in this list and move again to use the folder&apos;s copy.</source>
+        <translation>%1: bereits mit anderen Frames im Cache vorhanden – löschen Sie die Cache-Kopie in dieser Liste und verschieben Sie erneut, um die Kopie aus dem Ordner zu verwenden.</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/workspace_dialog.py" line="319"/>
+        <source>%1: not enough space in MatteLoop&apos;s cache.</source>
+        <translation>%1: nicht genügend Speicherplatz in MatteLoops Cache.</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/workspace_dialog.py" line="323"/>
+        <source>%1: could not be moved: %2</source>
+        <translation>%1: konnte nicht verschoben werden: %2</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/workspace_dialog.py" line="327"/>
+        <source>%1: moved, but the source folder could not be fully cleaned: %2</source>
+        <translation>%1: verschoben, aber der Quellordner konnte nicht vollständig bereinigt werden: %2</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/workspace_dialog.py" line="332"/>
+        <source>%1: could not be read: %2</source>
+        <translation>%1: konnte nicht gelesen werden: %2</translation>
     </message>
 </context>
 <context>

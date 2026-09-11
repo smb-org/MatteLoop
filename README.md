@@ -143,6 +143,10 @@ Model weights and generated workspaces are intentionally local and are never
 committed. Durable cut sets and scratch live under MatteLoop's user cache at
 <platformdirs.user_cache_dir("matteloop")>/workspace/.
 
+If an older output folder still contains cut sets in its legacy workspace,
+MatteLoop offers to move them into the cache from Manage Workspaces. The move
+is optional and is performed one set at a time after each copy is verified.
+
 The screenshots above are generated rather than collected, so a layout change
 never leaves them quietly out of date. Regenerate them with:
 
