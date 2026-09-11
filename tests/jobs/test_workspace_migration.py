@@ -330,6 +330,65 @@ def test_no_space_skips_one_set_and_continues_with_the_next(
     assert (cut_workspace_root() / "cuts" / second_path.name).exists()
 
 
+def test_no_space_reports_clean_outcome_for_fallback_set(
+    tmp_path: Path, cache_root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    output, legacy_path, _cache_key = _rendered_set(
+        tmp_path, cache_root, job_id="no-space-fallback", fallback=True
+    )
+    entry = migration_module.find_legacy_cut_sets(output)[0]
+
+    def disk_usage(_path: object) -> object:
+        return SimpleNamespace(free=entry.size_bytes + 256 * 1024**2 - 1)
+
+    monkeypatch.setattr(migration_module.shutil, "disk_usage", disk_usage)
+
+    result = migration_module.migrate_cut_set(entry, cancelled=lambda: False)
+
+    assert result.status is migration_module.MigrationStatus.NO_SPACE
+    assert legacy_path.exists()
+
+
+def test_pin_carry_over_names_the_published_target(
+    tmp_path: Path, cache_root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    output, legacy_path, _cache_key, promoted = _copy_to_legacy(
+        tmp_path, cache_root, job_id="pin-carry-over"
+    )
+    legacy_manifest = CutManifest.from_json_bytes(
+        (legacy_path / "manifest.json").read_bytes()
+    )
+    (legacy_path / "manifest.json").write_bytes(
+        replace(legacy_manifest, pinned=True).to_json_bytes()
+    )
+    pinned_by_output_directory: dict[Path, bool] = {}
+    actual_open = migration_module.CutWorkspace.open
+
+    class _PinProbe:
+        def __init__(self, output_directory: Path) -> None:
+            self._output_directory = Path(output_directory)
+
+        def set_pinned(self, value: bool) -> None:
+            pinned_by_output_directory[self._output_directory] = value
+
+    def probing_open(output_directory: Path, cache_key: str) -> object:
+        # Exercise the real open too, so a call-site argument that would
+        # actually fail validation still fails the same way it would in
+        # production; only the returned handle is swapped for a probe.
+        actual_open(output_directory, cache_key)
+        return _PinProbe(output_directory)
+
+    monkeypatch.setattr(
+        migration_module.CutWorkspace, "open", staticmethod(probing_open)
+    )
+
+    result = _outcome(output)
+
+    assert result.status is migration_module.MigrationStatus.REDUNDANT_REMOVED
+    assert pinned_by_output_directory.get(promoted) is True
+    assert legacy_path not in pinned_by_output_directory
+
+
 def test_transform_sidecar_travels_with_moved_set(
     tmp_path: Path, cache_root: Path
 ) -> None:

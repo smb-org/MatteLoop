@@ -173,13 +173,12 @@ def migrate_cut_set(
         collision = _resolve_collision(entry, manifest, source_frames, target)
         if collision is not None:
             return collision
-    if entry.source_kind is _LegacySource.OUTPUT:
-        try:
-            no_space = _no_space(cache_cuts, entry)
-        except OSError as error:
-            return MigrationOutcome(entry, MigrationStatus.FAILED, str(error))
-        if no_space:
-            return MigrationOutcome(entry, MigrationStatus.NO_SPACE)
+    try:
+        no_space = _no_space(cache_cuts, entry)
+    except OSError as error:
+        return MigrationOutcome(entry, MigrationStatus.FAILED, str(error))
+    if no_space:
+        return MigrationOutcome(entry, MigrationStatus.NO_SPACE)
 
     temporary = cache_cuts / f".migrating-{cache_key}-{uuid.uuid4().hex}"
     return _copy_verify_and_publish(
@@ -298,7 +297,7 @@ def _resolve_collision(
         )
     if manifest.pinned and not target_manifest.pinned:
         try:
-            CutWorkspace.open(entry.path, target_manifest.cache_key).set_pinned(True)
+            CutWorkspace.open(target, target_manifest.cache_key).set_pinned(True)
         except Exception as error:
             return MigrationOutcome(entry, MigrationStatus.FAILED, str(error))
     try:
