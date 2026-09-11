@@ -57,7 +57,9 @@ The three rules that get broken most often:
 Verification for every change:
 
 ```sh
-uv run ruff check . && uv run mypy src && QT_QPA_PLATFORM=offscreen uv run pytest -q
+uv run ruff check . && uv run mypy src && \
+  uv run python scripts/check_guardrails.py && \
+  QT_QPA_PLATFORM=offscreen uv run pytest -q
 ```
 
 ## Bumping `rembg` (REQUIRED — all of it, or segmentation dies silently)

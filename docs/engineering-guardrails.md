@@ -318,6 +318,6 @@ The implementation model for this repository is
   robustness work you notice along the way. Report what you noticed instead —
   a sentence in the final message is worth more than 300 lines of defence.
 - Verification for every change is exactly:
-  `uv run ruff check . && uv run mypy src && QT_QPA_PLATFORM=offscreen uv run pytest -q`.
+  `uv run ruff check . && uv run mypy src && uv run python scripts/check_guardrails.py && QT_QPA_PLATFORM=offscreen uv run pytest -q`.
   Green is required. Adding tests is welcome; adding *machinery to make new
   tests pass* is the spiral.
