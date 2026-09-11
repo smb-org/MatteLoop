@@ -32,7 +32,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, replace
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as package_version
-from multiprocessing.connection import Connection
+from multiprocessing.connection import _ConnectionBase
 from multiprocessing.context import BaseContext
 from multiprocessing.process import BaseProcess
 from multiprocessing.shared_memory import SharedMemory
@@ -89,7 +89,7 @@ _MAX_LAUNCH_TEXT_BYTES = 16 * 1024
 _LOGGER = logging.getLogger(__name__)
 
 type Uint8Frame = NDArray[np.uint8]
-type ChildTarget = Callable[[Connection, object], None]
+type ChildTarget = Callable[[_ConnectionBase, object], None]
 type Inference = Callable[[Uint8Frame, object, SegmentOptions], Uint8Frame]
 type _FallbackArtifact = tuple[Path, str, str, int, str]
 
@@ -125,8 +125,8 @@ class SegmentationClient:
         self._operation_owner_thread_id: int | None = None
         self._operation_job_id: str | None = None
         self._process: BaseProcess | None = None
-        self._connection: Connection | None = None
-        self._child_endpoint: Connection | None = None
+        self._connection: _ConnectionBase | None = None
+        self._child_endpoint: _ConnectionBase | None = None
         self._slot: SharedMemory | None = None
         self._slot_capacity = 0
         self._slot_closed = False
@@ -438,7 +438,7 @@ class SegmentationClient:
             self._cancel_requested = False
             self._cancel_wire_sent = False
 
-    def _send_cancel_on_wire(self, connection: Connection, job_id: str) -> None:
+    def _send_cancel_on_wire(self, connection: _ConnectionBase, job_id: str) -> None:
         self._send_parent(connection, CancelRequest(PROTOCOL_VERSION, job_id), job_id)
         with self._state_lock:
             if self._active_job_id == job_id:
@@ -719,7 +719,7 @@ class SegmentationClient:
                 )
 
     def _send_parent(
-        self, connection: Connection, message: ParentMessage, job_id: str
+        self, connection: _ConnectionBase, message: ParentMessage, job_id: str
     ) -> None:
         payload = self._encode_parent(message, job_id)
         self._send_parent_bytes(connection, payload, job_id)
@@ -735,7 +735,7 @@ class SegmentationClient:
             ) from error
 
     def _send_parent_bytes(
-        self, connection: Connection, payload: bytes, job_id: str
+        self, connection: _ConnectionBase, payload: bytes, job_id: str
     ) -> None:
         try:
             connection.send_bytes(payload)
@@ -897,7 +897,7 @@ class SegmentationClient:
         )
 
 
-def segmentation_process_main(connection: Connection, model_spec: object) -> None:
+def segmentation_process_main(connection: _ConnectionBase, model_spec: object) -> None:
     """Frozen child entry: create one session, then enter the exact tested loop."""
     session: object | None = None
     try:
@@ -947,7 +947,7 @@ def segmentation_process_main(connection: Connection, model_spec: object) -> Non
 
 
 def _serve_segmentation_connection(
-    connection: Connection,
+    connection: _ConnectionBase,
     session: object,
     inference: Inference,
     *,
@@ -1150,7 +1150,7 @@ def _serve_segmentation_connection(
             slot.close()
 
 
-def _receive_parent(connection: Connection) -> ParentMessage | None:
+def _receive_parent(connection: _ConnectionBase) -> ParentMessage | None:
     try:
         raw = connection.recv_bytes(MAX_PROTOCOL_MESSAGE_BYTES)
         return decode_parent_message(raw)
@@ -1158,14 +1158,14 @@ def _receive_parent(connection: Connection) -> ParentMessage | None:
         return None
 
 
-def _poll_parent(connection: Connection) -> bool | None:
+def _poll_parent(connection: _ConnectionBase) -> bool | None:
     try:
         return connection.poll()
     except (EOFError, BrokenPipeError, OSError):
         return None
 
 
-def _send_child(connection: Connection, message: ChildMessage) -> bool:
+def _send_child(connection: _ConnectionBase, message: ChildMessage) -> bool:
     try:
         connection.send_bytes(encode_child_message(message))
     except (BrokenPipeError, EOFError, OSError, ProtocolCodecError):

@@ -96,7 +96,7 @@ def _set_times_fd(descriptor: int, atime_ns: int, mtime_ns: int) -> None:
     )
     accessed = _filetime(atime_ns)
     written = _filetime(mtime_ns)
-    handle = msvcrt.get_osfhandle(descriptor)  # type: ignore[attr-defined]
+    handle = getattr(msvcrt, "get_osfhandle")(descriptor)
     if not set_file_time(
         handle, None, ctypes.byref(accessed), ctypes.byref(written)
     ):
