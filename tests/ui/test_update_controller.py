@@ -30,10 +30,10 @@ from matteloop.core.state import (
 )
 from matteloop.ui.main_window import MainWindow
 from matteloop.ui.store import ReducerStore
-from matteloop.ui.update_controller import (
-    UpdateController,
+from matteloop.ui.update_controller import UpdateController
+from matteloop.ui.update_paths import _install_root_is_writable
+from matteloop.ui.update_velopack import (
     _create_update_manager,
-    _install_root_is_writable,
     _locator_config,
     _pending_update,
 )
@@ -1234,7 +1234,7 @@ def test_repository_environment_overrides_the_explicit_velopack_source(
     monkeypatch.setattr(sys, "platform", "darwin")
     monkeypatch.setattr(sys, "executable", str(executable))
     monkeypatch.setattr(
-        "matteloop.ui.update_controller.cache_subdirectory",
+        "matteloop.ui.update_velopack.cache_subdirectory",
         lambda *_: tmp_path / "cache" / "updates",
     )
 
@@ -1268,7 +1268,7 @@ def test_windows_locator_uses_the_current_directory_and_portable_marker(
     executable = root / "current" / "matteloop.exe"
     monkeypatch.setattr(sys, "platform", "win32")
     monkeypatch.setattr(
-        "matteloop.ui.update_controller.cache_subdirectory",
+        "matteloop.ui.update_velopack.cache_subdirectory",
         lambda *_: tmp_path / "updates",
     )
 
@@ -1300,7 +1300,7 @@ def test_startup_sweep_keeps_only_the_pending_package(
     for path in (kept, stale, partial):
         path.write_bytes(b"package")
     monkeypatch.setattr(
-        "matteloop.ui.update_controller.cache_subdirectory", lambda *_: tmp_path
+        "matteloop.ui.update_velopack.cache_subdirectory", lambda *_: tmp_path
     )
 
     assert _pending_update(_Manager(pending=pending)) is pending

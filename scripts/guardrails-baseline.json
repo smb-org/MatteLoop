@@ -94,9 +94,5 @@
   "src/matteloop/ui/timeline.py": {
     "lines": 855,
     "long_functions": 0
-  },
-  "src/matteloop/ui/update_controller.py": {
-    "lines": 808,
-    "long_functions": 0
   }
 }
