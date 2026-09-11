@@ -599,7 +599,6 @@ def test_matching_cut_set_offers_three_choices_with_rebuild_default(
         "a" * 64,
         cuts_root / "source-aaaaaaaa",
         WorkspaceLifecycle.PROMOTED,
-        None,
         "source-aaaaaaaa",
     )
     runtime = MatchingCutsRuntime(workspace)
@@ -692,7 +691,6 @@ def test_use_this_set_restores_the_stored_transform_before_rebuilding(
         "a" * 64,
         cuts_root / "source-aaaaaaaa",
         WorkspaceLifecycle.PROMOTED,
-        None,
         "source-aaaaaaaa",
     )
     manifest = rebuild_manifest(source)

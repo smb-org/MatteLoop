@@ -117,7 +117,6 @@ def _snapshot_validated_workspace(
             workspace.cache_key,
             snapshot_path,
             WorkspaceLifecycle.SNAPSHOT,
-            workspace.fallback,
             workspace.directory_name,
         )
         validate_cut_set(snapshot)
@@ -211,7 +210,6 @@ def snapshot_for_rebuild(
             workspace.cache_key,
             snapshot_path,
             WorkspaceLifecycle.SNAPSHOT,
-            workspace.fallback,
             workspace.directory_name,
         )
         validate_cut_set(snapshot)
@@ -289,7 +287,6 @@ def list_workspaces(
                 cache_key,
                 cuts / name,
                 WorkspaceLifecycle.PROMOTED,
-                layout.fallback,
                 name,
             )
             try:
