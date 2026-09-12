@@ -131,14 +131,37 @@ def test_download_streams_to_versioned_part_verifies_and_atomically_promotes(
     assert response.closed is True
 
 
-def test_unknown_content_length_emits_no_byte_progress(tmp_path: Path) -> None:
+def test_download_reports_completion_after_verified_weight_is_promoted(
+    tmp_path: Path,
+) -> None:
+    data = b"verified-model-bytes"
+    target = tmp_path / "2.0.75" / "u2net" / "u2net.onnx"
+    completion_target_states: list[bool] = []
+
+    _download(
+        tmp_path,
+        data,
+        response=FakeResponse(data, headers={"Content-Length": str(len(data))}),
+        progress=lambda done, total: (
+            completion_target_states.append(target.is_file())
+            if done == total
+            else None
+        ),
+    )
+
+    assert completion_target_states == [True]
+
+
+def test_unknown_content_length_reports_post_promotion_completion(
+    tmp_path: Path,
+) -> None:
     events: list[tuple[int, int]] = []
 
     _download(
         tmp_path, b"abcdef", progress=lambda done, total: events.append((done, total))
     )
 
-    assert events == []
+    assert events == [(6, 6)]
 
 
 @pytest.mark.parametrize("cancel_after_call", [1, 3, 6])

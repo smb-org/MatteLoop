@@ -30,7 +30,7 @@
         <translation>Original-Videobild</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/crop_canvas.py" line="333"/>
+        <location filename="../src/matteloop/ui/crop_canvas.py" line="344"/>
         <source>Crop bounds: x %s, y %s, width %s, height %s source pixels; source %s × %s</source>
         <translation>Zuschnittgrenzen: x %s, y %s, Breite %s, Höhe %s Quellpixel; Quelle %s × %s</translation>
     </message>
@@ -354,7 +354,7 @@
     <message>
         <location filename="../src/matteloop/ui/inspector.py" line="430"/>
         <source>%s — %s download required</source>
-        <translation>%s — %s Download erforderlich</translation>
+        <translation>Für %s ist ein Download von %s erforderlich</translation>
     </message>
     <message>
         <location filename="../src/matteloop/ui/inspector.py" line="465"/>
@@ -1124,7 +1124,7 @@ Freed %s.</source>
     <message>
         <location filename="../src/matteloop/ui/copy.py" line="367"/>
         <source>Download &amp; Preview</source>
-        <translation>Herunterladen &amp; Vorschau</translation>
+        <translation>Modell laden &amp; Vorschau</translation>
     </message>
     <message>
         <location filename="../src/matteloop/ui/copy.py" line="370"/>
@@ -1273,13 +1273,13 @@ Freed %s.</source>
         <translation>Video wird gerendert</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/preview_controller/controller.py" line="305"/>
+        <location filename="../src/matteloop/ui/preview_controller/controller.py" line="312"/>
         <location filename="../src/matteloop/ui/preview_controller/dialog.py" line="339"/>
         <source>Previewing selected frame</source>
         <translation>Ausgewähltes Bild wird in der Vorschau angezeigt</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/preview_controller/controller.py" line="311"/>
+        <location filename="../src/matteloop/ui/preview_controller/controller.py" line="318"/>
         <location filename="../src/matteloop/ui/preview_controller/dialog.py" line="53"/>
         <location filename="../src/matteloop/ui/preview_controller/dialog.py" line="344"/>
         <source>Preparing model</source>

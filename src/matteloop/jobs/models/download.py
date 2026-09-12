@@ -234,7 +234,7 @@ class ModelDownloader:
                     except OSError as error:
                         raise _disk_error(spec.id, error) from error
                     digest.update(chunk)
-                    if known_total is not None:
+                    if known_total is not None and completed < known_total:
                         progress(completed, known_total)
                 _raise_if_cancelled(cancelled, spec.id)
                 if completed != artifact.size_bytes:
@@ -292,6 +292,7 @@ class ModelDownloader:
                 raise _permission_error(spec.id, error) from error
             except OSError as error:
                 raise _disk_error(spec.id, error) from error
+            progress(artifact.size_bytes, artifact.size_bytes)
             return target
         except BaseException as error:
             try:

@@ -30,7 +30,7 @@
         <translation>Original video frame</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/crop_canvas.py" line="333"/>
+        <location filename="../src/matteloop/ui/crop_canvas.py" line="344"/>
         <source>Crop bounds: x %s, y %s, width %s, height %s source pixels; source %s × %s</source>
         <translation>Crop bounds: x %s, y %s, width %s, height %s source pixels; source %s × %s</translation>
     </message>
@@ -1273,13 +1273,13 @@ Freed %s.</translation>
         <translation>Rendering video</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/preview_controller/controller.py" line="305"/>
+        <location filename="../src/matteloop/ui/preview_controller/controller.py" line="312"/>
         <location filename="../src/matteloop/ui/preview_controller/dialog.py" line="339"/>
         <source>Previewing selected frame</source>
         <translation>Previewing selected frame</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/preview_controller/controller.py" line="311"/>
+        <location filename="../src/matteloop/ui/preview_controller/controller.py" line="318"/>
         <location filename="../src/matteloop/ui/preview_controller/dialog.py" line="53"/>
         <location filename="../src/matteloop/ui/preview_controller/dialog.py" line="344"/>
         <source>Preparing model</source>

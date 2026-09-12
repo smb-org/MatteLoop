@@ -17,6 +17,7 @@ from matteloop.core.state import (
     JobKind,
     JobStageChanged,
     JobState,
+    ModelAvailabilityChanged,
     ModelPrepared,
     PreviewFailed,
     PreviewRequested,
@@ -260,6 +261,12 @@ class PreviewController(QObject):
         if self._store.state.job.job_id != job_id:
             return
         if isinstance(notification, ProgressEvent):
+            if (
+                notification.stage is ProgressStage.DOWNLOADING_MODEL
+                and notification.total is not None
+                and notification.completed == notification.total
+            ):
+                self._store.dispatch(ModelAvailabilityChanged(True))
             if self._store.state.job.phase is not JobState.CANCELLING:
                 assert self._dialog is not None
                 self._dialog.set_progress(notification)
