@@ -5,7 +5,6 @@ from fractions import Fraction
 import pytest
 
 from matteloop.core.crop import (
-    _MAX_ASPECT_DENOMINATOR,
     _orientation_transform,
     centered_crop_for_aspect,
     clamp_crop,
@@ -68,10 +67,13 @@ def test_crop_keyboard_nudge_uses_ten_source_pixels_with_shift_step() -> None:
 
 def test_oriented_crop_geometry_maps_rotation_and_pixel_aspect_once() -> None:
     crop = CropSpec(0, 0, 8, 8)
+    display_width, display_height = _display_dimensions(16, 8, Fraction(2), 270)
     raw_crop = oriented_rect_to_source_rect(
         crop,
         source_width=16,
         source_height=8,
+        display_width=display_width,
+        display_height=display_height,
         rotation=270,
         pixel_aspect=2,
     )
@@ -82,12 +84,17 @@ def test_oriented_crop_geometry_maps_rotation_and_pixel_aspect_once() -> None:
             rotation=270,
             pixel_aspect=2,
         ),
-        viewport=SizeF(8, 32),
+        viewport=SizeF(display_width, display_height),
         dpr=1,
     )
 
     assert geometry.visual["crop"] == RectF(0, 0, 8, 8)
-    assert oriented_point_from_widget(geometry, PointF(0, 0)) == PointF(0, 0)
+    assert oriented_point_from_widget(
+        geometry,
+        PointF(0, 0),
+        display_width=display_width,
+        display_height=display_height,
+    ) == PointF(0, 0)
 
 
 @pytest.mark.parametrize("rotation", [0, 90, 180, 270])
@@ -113,32 +120,40 @@ def test_oriented_crop_mapping_uses_rounded_decoder_extent(
     )
 
     transform = _orientation_transform(
-        source_width, source_height, rotation, float(pixel_aspect)
+        source_width,
+        source_height,
+        decoded[0],
+        decoded[1],
+        rotation,
+        float(pixel_aspect),
     )
 
     assert transform.viewport == SizeF(*decoded)
 
 
 @pytest.mark.parametrize("rotation", [0, 90, 180, 270])
-@pytest.mark.parametrize("pixel_aspect", [1.0, 2.0, 1.5, 0.75])
+@pytest.mark.parametrize(
+    "pixel_aspect",
+    [Fraction(1), Fraction(2), Fraction(3, 2), Fraction(3, 4)],
+)
 def test_oriented_crop_mapping_round_trips_inside_source_frame(
-    rotation: int, pixel_aspect: float
+    rotation: int, pixel_aspect: Fraction
 ) -> None:
     source_size = SizeF(16, 8)
     crop = CropSpec(4, 0, 4, 8)
-    display_size = MediaTransform(
-        source_size=source_size,
-        viewport=SizeF(1, 1),
-        rotation=rotation,
-        pixel_aspect=pixel_aspect,
-    ).oriented_display_size
+    display_width, display_height = _display_dimensions(
+        16, 8, pixel_aspect, rotation
+    )
+    display_size = SizeF(display_width, display_height)
 
     mapped = oriented_rect_to_source_rect(
         crop,
         source_width=16,
         source_height=8,
+        display_width=display_width,
+        display_height=display_height,
         rotation=rotation,
-        pixel_aspect=pixel_aspect,
+        pixel_aspect=float(pixel_aspect),
     )
 
     assert mapped.x >= 0
@@ -150,7 +165,7 @@ def test_oriented_crop_mapping_round_trips_inside_source_frame(
         source_size=source_size,
         viewport=display_size,
         rotation=rotation,
-        pixel_aspect=pixel_aspect,
+        pixel_aspect=float(pixel_aspect),
     ).source_rect_to_widget(mapped)
 
     assert restored.x == pytest.approx(crop.x)
@@ -160,29 +175,35 @@ def test_oriented_crop_mapping_round_trips_inside_source_frame(
 
 
 @pytest.mark.parametrize("rotation", [0, 90, 180, 270])
-@pytest.mark.parametrize("pixel_aspect", [1.0, 2.0, 1.5, 0.75])
+@pytest.mark.parametrize(
+    "pixel_aspect",
+    [Fraction(1), Fraction(2), Fraction(3, 2), Fraction(3, 4)],
+)
 def test_oriented_point_mapping_round_trips_through_display_geometry(
-    rotation: int, pixel_aspect: float
+    rotation: int, pixel_aspect: Fraction
 ) -> None:
     source_size = SizeF(16, 8)
-    display_size = MediaTransform(
-        source_size=source_size,
-        viewport=SizeF(1, 1),
-        rotation=rotation,
-        pixel_aspect=pixel_aspect,
-    ).oriented_display_size
+    display_width, display_height = _display_dimensions(
+        16, 8, pixel_aspect, rotation
+    )
+    display_size = SizeF(display_width, display_height)
     geometry = build_crop_geometry(
         state=CropGeometryState(
             source_size=source_size,
             crop=RectF(0, 0, 8, 8),
             rotation=rotation,
-            pixel_aspect=pixel_aspect,
+            pixel_aspect=float(pixel_aspect),
         ),
         viewport=display_size,
         dpr=1,
     )
 
-    restored = oriented_point_from_widget(geometry, PointF(2, 3))
+    restored = oriented_point_from_widget(
+        geometry,
+        PointF(2, 3),
+        display_width=display_width,
+        display_height=display_height,
+    )
 
     assert restored.x == pytest.approx(2)
     assert restored.y == pytest.approx(3)
@@ -315,37 +336,17 @@ def test_clamp_crop_leaves_a_crop_that_already_fits_unchanged() -> None:
     assert clamp_crop(crop, 100, 100) == crop
 
 
-# H.264 Table E-1: every standard sample aspect ratio, largest denominator 99.
-_H264_SAMPLE_ASPECT_RATIOS = [
-    (1, 1), (12, 11), (10, 11), (16, 11), (40, 33), (24, 11), (20, 11),
-    (32, 11), (80, 33), (18, 11), (15, 11), (64, 33), (160, 99), (4, 3),
-    (3, 2), (2, 1),
-]
+def test_canvas_extent_uses_the_decoder_for_an_arbitrary_declared_ratio() -> None:
+    pixel_aspect = Fraction(18333, 20000)
+    decoded = _display_dimensions(1926, 1080, pixel_aspect, 0)
 
-
-@pytest.mark.parametrize(("numerator", "denominator"), _H264_SAMPLE_ASPECT_RATIOS)
-def test_every_standard_sample_aspect_ratio_survives_the_float_round_trip(
-    numerator: int, denominator: int
-) -> None:
-    """The presentation layer hands the mapping a float, so the exact ratio has
-    to be recoverable for every ratio a real container can declare -- not only
-    the handful used as examples. A denominator bound below 99 loses 160:99.
-    """
-    exact = Fraction(numerator, denominator)
-
-    recovered = Fraction(float(exact)).limit_denominator(_MAX_ASPECT_DENOMINATOR)
-
-    assert recovered == exact
-
-
-@pytest.mark.parametrize(("numerator", "denominator"), _H264_SAMPLE_ASPECT_RATIOS)
-@pytest.mark.parametrize("rotation", [0, 90, 180, 270])
-def test_canvas_extent_matches_the_decoder_for_every_standard_ratio(
-    numerator: int, denominator: int, rotation: int
-) -> None:
-    exact = Fraction(numerator, denominator)
-
-    decoded = _display_dimensions(1926, 1080, exact, rotation)
-    transform = _orientation_transform(1926, 1080, rotation, float(exact))
+    transform = _orientation_transform(
+        1926,
+        1080,
+        decoded[0],
+        decoded[1],
+        0,
+        float(pixel_aspect),
+    )
 
     assert transform.viewport == SizeF(*decoded)

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import math
-from dataclasses import replace
 from fractions import Fraction
 
 from matteloop.core.geometry import (
@@ -14,8 +13,6 @@ from matteloop.core.geometry import (
     SizeF,
 )
 from matteloop.core.specs import CropSpec
-
-_MAX_ASPECT_DENOMINATOR = 99
 
 _HANDLES = frozenset(
     {
@@ -99,12 +96,19 @@ def oriented_rect_to_source_rect(
     *,
     source_width: int,
     source_height: int,
+    display_width: int,
+    display_height: int,
     rotation: int,
     pixel_aspect: float,
 ) -> RectF:
     """Map oriented crop pixels into the raw coordinates used by geometry."""
     transform = _orientation_transform(
-        source_width, source_height, rotation, pixel_aspect
+        source_width,
+        source_height,
+        display_width,
+        display_height,
+        rotation,
+        pixel_aspect,
     )
     return transform.widget_rect_to_source(
         RectF(crop.x, crop.y, crop.width, crop.height)
@@ -112,14 +116,20 @@ def oriented_rect_to_source_rect(
 
 
 def oriented_point_from_widget(
-    geometry: InteractionGeometry, point: PointF
+    geometry: InteractionGeometry,
+    point: PointF,
+    *,
+    display_width: int,
+    display_height: int,
 ) -> PointF:
     """Map a widget point through one crop geometry snapshot to oriented space."""
     transform = geometry.transform
     if not isinstance(transform, MediaTransform):
         raise ValueError("crop geometry must use a media transform")
     raw = geometry.widget_to_source(point)
-    return _orientation_transform_from_media(transform).source_to_widget(raw)
+    return _orientation_transform_from_media(
+        transform, display_width=display_width, display_height=display_height
+    ).source_to_widget(raw)
 
 
 def fit_crop_aspect(
@@ -255,40 +265,31 @@ def _resize_crop(
 
 
 def _orientation_transform(
-    source_width: int, source_height: int, rotation: int, pixel_aspect: float
+    source_width: int,
+    source_height: int,
+    display_width: int,
+    display_height: int,
+    rotation: int,
+    pixel_aspect: float,
 ) -> MediaTransform:
     _validate_dimensions(source_width, source_height)
-    transform = MediaTransform(
+    _validate_dimensions(display_width, display_height)
+    return MediaTransform(
         source_size=SizeF(source_width, source_height),
-        viewport=SizeF(source_width, source_height),
+        viewport=SizeF(display_width, display_height),
         rotation=rotation,
         pixel_aspect=pixel_aspect,
     )
-    # The presentation layer hands this in as a float, so the decoder's exact
-    # ratio has to be recovered before it is rounded -- 1926 * 11/12 is exactly
-    # 1765.5, and the float product 1765.4999999999998 rounds the other way.
-    # H.264 Table E-1 defines sixteen sample aspect ratios whose largest
-    # denominator is 99 (160:99); a bound of 33 silently misses that one.
-    pixel_aspect_fraction = Fraction(pixel_aspect).limit_denominator(
-        _MAX_ASPECT_DENOMINATOR
-    )
-    display_width = max(
-        1,
-        _rhu(Fraction(source_width) * pixel_aspect_fraction),
-    )
-    return replace(
-        transform,
-        viewport=SizeF(
-            source_height if rotation in {90, 270} else display_width,
-            display_width if rotation in {90, 270} else source_height,
-        ),
-    )
 
 
-def _orientation_transform_from_media(transform: MediaTransform) -> MediaTransform:
+def _orientation_transform_from_media(
+    transform: MediaTransform, *, display_width: int, display_height: int
+) -> MediaTransform:
     return _orientation_transform(
         int(transform.source_size.width),
         int(transform.source_size.height),
+        display_width,
+        display_height,
         transform.rotation,
         transform.pixel_aspect,
     )
@@ -296,7 +297,6 @@ def _orientation_transform_from_media(transform: MediaTransform) -> MediaTransfo
 
 def _rounded_delta(value: float) -> int:
     return math.floor(value + 0.5) if value >= 0 else math.ceil(value - 0.5)
-
 
 
 def _validate_dimensions(source_width: int, source_height: int) -> None:
