@@ -15,6 +15,8 @@ from matteloop.core.geometry import (
 )
 from matteloop.core.specs import CropSpec
 
+_MAX_ASPECT_DENOMINATOR = 99
+
 _HANDLES = frozenset(
     {
         "north_west",
@@ -262,9 +264,17 @@ def _orientation_transform(
         rotation=rotation,
         pixel_aspect=pixel_aspect,
     )
+    # The presentation layer hands this in as a float, so the decoder's exact
+    # ratio has to be recovered before it is rounded -- 1926 * 11/12 is exactly
+    # 1765.5, and the float product 1765.4999999999998 rounds the other way.
+    # H.264 Table E-1 defines sixteen sample aspect ratios whose largest
+    # denominator is 99 (160:99); a bound of 33 silently misses that one.
+    pixel_aspect_fraction = Fraction(pixel_aspect).limit_denominator(
+        _MAX_ASPECT_DENOMINATOR
+    )
     display_width = max(
         1,
-        _round_fraction(Fraction(source_width) * Fraction(str(pixel_aspect))),
+        _round_fraction(Fraction(source_width) * pixel_aspect_fraction),
     )
     return replace(
         transform,

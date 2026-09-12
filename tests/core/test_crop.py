@@ -5,6 +5,7 @@ from fractions import Fraction
 import pytest
 
 from matteloop.core.crop import (
+    _MAX_ASPECT_DENOMINATOR,
     _orientation_transform,
     centered_crop_for_aspect,
     clamp_crop,
@@ -90,16 +91,30 @@ def test_oriented_crop_geometry_maps_rotation_and_pixel_aspect_once() -> None:
 
 
 @pytest.mark.parametrize("rotation", [0, 90, 180, 270])
-def test_oriented_crop_mapping_uses_rounded_decoder_extent(rotation: int) -> None:
-    """720x480 at pixel aspect 32/27 (NTSC DVD 16:9) decodes to 853, not 853.33.
+@pytest.mark.parametrize(
+    ("source_width", "source_height", "pixel_aspect"),
+    [
+        pytest.param(720, 480, Fraction(32, 27), id="below-half"),
+        pytest.param(640, 480, Fraction(11, 12), id="above-half"),
+        pytest.param(1926, 1080, Fraction(11, 12), id="exact-half"),
+    ],
+)
+def test_oriented_crop_mapping_uses_rounded_decoder_extent(
+    rotation: int, source_width: int, source_height: int, pixel_aspect: Fraction
+) -> None:
+    """The canvas uses the decoder's rounded extent on both sides of .5.
 
-    Asserting against ``_display_dimensions`` rather than a written-out 853
-    is the point: the canvas and the decoder each round the same product, and
-    this is the assertion that fails if either one drifts from the other.
+    Asserting against ``_display_dimensions`` rather than written-out widths
+    is the point: the canvas and decoder each round the same product, and this
+    is the assertion that fails if either one drifts from the other.
     """
-    decoded = _display_dimensions(720, 480, Fraction(32, 27), rotation)
+    decoded = _display_dimensions(
+        source_width, source_height, pixel_aspect, rotation
+    )
 
-    transform = _orientation_transform(720, 480, rotation, 32 / 27)
+    transform = _orientation_transform(
+        source_width, source_height, rotation, float(pixel_aspect)
+    )
 
     assert transform.viewport == SizeF(*decoded)
 
@@ -298,3 +313,39 @@ def test_clamp_crop_leaves_a_crop_that_already_fits_unchanged() -> None:
     crop = CropSpec(5, 5, 50, 50)
 
     assert clamp_crop(crop, 100, 100) == crop
+
+
+# H.264 Table E-1: every standard sample aspect ratio, largest denominator 99.
+_H264_SAMPLE_ASPECT_RATIOS = [
+    (1, 1), (12, 11), (10, 11), (16, 11), (40, 33), (24, 11), (20, 11),
+    (32, 11), (80, 33), (18, 11), (15, 11), (64, 33), (160, 99), (4, 3),
+    (3, 2), (2, 1),
+]
+
+
+@pytest.mark.parametrize(("numerator", "denominator"), _H264_SAMPLE_ASPECT_RATIOS)
+def test_every_standard_sample_aspect_ratio_survives_the_float_round_trip(
+    numerator: int, denominator: int
+) -> None:
+    """The presentation layer hands the mapping a float, so the exact ratio has
+    to be recoverable for every ratio a real container can declare -- not only
+    the handful used as examples. A denominator bound below 99 loses 160:99.
+    """
+    exact = Fraction(numerator, denominator)
+
+    recovered = Fraction(float(exact)).limit_denominator(_MAX_ASPECT_DENOMINATOR)
+
+    assert recovered == exact
+
+
+@pytest.mark.parametrize(("numerator", "denominator"), _H264_SAMPLE_ASPECT_RATIOS)
+@pytest.mark.parametrize("rotation", [0, 90, 180, 270])
+def test_canvas_extent_matches_the_decoder_for_every_standard_ratio(
+    numerator: int, denominator: int, rotation: int
+) -> None:
+    exact = Fraction(numerator, denominator)
+
+    decoded = _display_dimensions(1926, 1080, exact, rotation)
+    transform = _orientation_transform(1926, 1080, rotation, float(exact))
+
+    assert transform.viewport == SizeF(*decoded)
