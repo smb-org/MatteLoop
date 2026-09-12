@@ -101,6 +101,7 @@ def _render_request(
             alpha_threshold=parameters.alpha_threshold,
             padding=parameters.padding,
             stretch_x=parameters.stretch_x,
+            exclusions=parameters.exclusions,
         ),
         output=OutputSpec.from_mib(
             output_directory_for_source(parameters, inputs.source),

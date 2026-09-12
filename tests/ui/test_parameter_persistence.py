@@ -44,6 +44,7 @@ def test_parameter_preferences_round_trip_as_qsettings_primitives() -> None:
         alpha_threshold=Decimal("3.5"),
         padding=9,
         stretch_x=Decimal("1.2"),
+        exclusions=(CropSpec(8, 9, 40, 50), CropSpec(80, 20, 10, 15)),
         output_directory=Path("/exports"),
         output_filename="last.webp",
         max_mib=Decimal("2.5"),
@@ -86,6 +87,13 @@ def test_unavailable_saved_provider_falls_back_to_the_available_cpu_choice() -> 
     )
 
     assert actual.execution_provider == CPU_EXECUTION_PROVIDER
+
+
+def test_malformed_exclusions_preference_falls_back_to_empty_regions() -> None:
+    settings = _settings()
+    settings.setValue("parameters/exclusions", "8,9,40,50;malformed")
+
+    assert load_parameters(settings).exclusions == ()
 
 
 def test_failed_provider_is_not_reintroduced_by_a_later_parameter_save() -> None:

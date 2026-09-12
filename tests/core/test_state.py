@@ -1,9 +1,12 @@
 from __future__ import annotations
 
-from dataclasses import FrozenInstanceError, dataclass
+from dataclasses import FrozenInstanceError, dataclass, replace
+from fractions import Fraction
 
 import pytest
 
+from matteloop.core.exclusion import cut_exclusions
+from matteloop.core.geometry import PixelBounds
 from matteloop.core.parameters import TransformChanged
 from matteloop.core.specs import CropSpec, TransformSpec
 from matteloop.core.state import (
@@ -45,6 +48,14 @@ from matteloop.core.tokens import ProgressStage
 SOURCE_ID = "source-1"
 SOURCE_REQUEST_ID = "load-1"
 SOURCE_VALUE = "metadata"
+
+
+@dataclass(frozen=True)
+class SizedSource:
+    width: int
+    height: int
+    duration: Fraction = Fraction(2)
+    average_rate: Fraction = Fraction(30)
 
 
 def loading_state(
@@ -881,3 +892,30 @@ def test_loading_a_new_source_resets_the_transform_but_keeps_other_parameters() 
     assert loading_next_source.parameters.model_id == with_transform.parameters.model_id
     assert loading_next_source.parameters.trim == with_transform.parameters.trim
     assert loading_next_source.parameters.padding == with_transform.parameters.padding
+
+
+def test_loading_a_smaller_source_clips_carried_regions_and_drops_those_outside(
+) -> None:
+    carried = replace(
+        ready_state(),
+        parameters=replace(
+            ready_state().parameters,
+            exclusions=(
+                CropSpec(60, 70, 80, 20),
+                CropSpec(120, 0, 10, 10),
+            ),
+        ),
+    )
+    loading = reduce(
+        carried,
+        SourceLoadRequested(source_id="smaller", request_id="load-2"),
+    )
+    loaded = reduce(
+        loading,
+        SourceLoaded("smaller", "load-2", SizedSource(100, 80)),
+    )
+
+    assert loaded.parameters.exclusions == (CropSpec(60, 70, 40, 10),)
+    assert cut_exclusions(
+        loaded.parameters.exclusions, CropSpec(0, 0, 100, 80)
+    ) == (PixelBounds(60, 70, 100, 80),)

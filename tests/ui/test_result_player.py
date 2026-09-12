@@ -12,6 +12,7 @@ from PySide6.QtWidgets import QApplication
 from matteloop.core.geometry import (
     _MEDIA_INSET,
     CropGeometryState,
+    PixelBounds,
     RectF,
     SizeF,
     build_crop_geometry,
@@ -481,6 +482,30 @@ def test_frame_load_worker_reports_unreadable_frames(tmp_path) -> None:
     worker.run()
 
     assert failures == ["Cut frames could not be read"]
+
+
+def test_frame_load_worker_masks_exclusion_boxes_before_framing(tmp_path) -> None:
+    artifact = _seed_cut(tmp_path, "worker-exclusions")
+    manifest = artifact.manifest
+    plan = framing_plan((manifest.width, manifest.height), None, FramingSpec())
+    worker = FrameLoadWorker(
+        artifact.cut_workspace,
+        manifest,
+        _DirectFrameReader(),
+        plan,
+        TransformSpec(),
+        (100,) * manifest.frame_count,
+        1,
+        exclusions=(PixelBounds(32, 24, 64, 104),),
+    )
+    results: list[PlayerFrames] = []
+    worker.succeeded.connect(lambda frames, _generation: results.append(frames))
+
+    worker.run()
+
+    assert len(results) == 1
+    assert results[0].framed[0].pixelColor(40, 30).alpha() == 0
+    assert results[0].framed[0].pixelColor(65, 30).alpha() == 255
 
 
 class _CancelAfterFirstReadReader:

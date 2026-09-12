@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from fractions import Fraction
 from pathlib import Path
 
@@ -15,6 +15,7 @@ from matteloop.core.state import (
     SourceLoadRequested,
     reduce,
 )
+from matteloop.ui.crop_presentation import present_crop
 from matteloop.ui.parameter_presentation import present_parameters
 
 
@@ -63,3 +64,20 @@ def test_parameter_presentation_exposes_the_transform_and_last_artifact() -> Non
 
     assert presentation.transform == transform
     assert presentation.artifact == artifact
+
+
+def test_parameter_and_crop_presentations_carry_exclusion_regions() -> None:
+    source = Path("/clips/holiday.mp4")
+    loading = reduce(AppState(), SourceLoadRequested("source", "load"))
+    ready = reduce(loading, SourceLoaded("source", "load", Metadata(source)))
+    region = CropSpec(10, 20, 30, 40)
+    state = replace(
+        ready, parameters=replace(ready.parameters, exclusions=(region,))
+    )
+
+    parameter_presentation = present_parameters(state)
+    crop_presentation = present_crop(state)
+
+    assert parameter_presentation.exclusions == (region,)
+    assert crop_presentation is not None
+    assert crop_presentation.exclusions == (region,)

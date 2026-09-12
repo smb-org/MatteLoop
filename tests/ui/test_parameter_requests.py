@@ -32,6 +32,7 @@ def test_preview_and_render_requests_share_every_inspector_parameter() -> None:
         alpha_threshold=Decimal("4.5"),
         padding=6,
         stretch_x=Decimal("1.25"),
+        exclusions=(CropSpec(10, 20, 30, 40),),
         output_directory=Path("/exports"),
         output_filename="holiday-cut.webp",
         max_mib=Decimal("12.5"),
@@ -52,6 +53,7 @@ def test_preview_and_render_requests_share_every_inspector_parameter() -> None:
     assert request.framing.alpha_threshold == parameters.alpha_threshold
     assert request.framing.padding == parameters.padding
     assert request.framing.stretch_x == parameters.stretch_x
+    assert request.framing.exclusions == parameters.exclusions
     assert request.output.path == Path("/exports/holiday-cut.webp")
     assert request.output.max_bytes == int(Decimal("12.5") * 1024 * 1024)
     assert request.transform == transform

@@ -403,6 +403,7 @@ def reduce(state: AppState, event: Event) -> AppState:
             source_frame=event.frame,
             timeline=timeline_from_metadata(event.value, state.parameters.fps),
             crop=_crop_state.default_crop_for_source(event.value), source_error=None,
+            parameters=_parameters.clip_exclusions(state.parameters, event.value),
             focus_target=FocusTarget.PREVIEW_ACTION,
         )
     if isinstance(event, _crop_state.CropEvent):

@@ -15,8 +15,10 @@ from PySide6.QtCore import Qt
 
 import matteloop.ui.worker_thread as worker_thread_module
 from matteloop.core.crop_state import CropChanged
+from matteloop.core.geometry import PixelBounds
 from matteloop.core.parameters import (
     AlphaThresholdChanged,
+    ExclusionsChanged,
     GlobalTrimChanged,
     PaddingChanged,
     TransformChanged,
@@ -47,7 +49,13 @@ from matteloop.ui.crop_canvas import CropCanvas
 from matteloop.ui.result_player import PlayerFrames, ResultPlayerCanvas
 from matteloop.ui.store import ReducerStore
 from matteloop.ui.transform_group import CutFacts, TransformGroup
-from matteloop.ui.transform_stage import TransformStageController, _DirectFrameReader
+from matteloop.ui.transform_stage import (
+    CutSession,
+    TransformStageController,
+    _compute_facts,
+    _DirectFrameReader,
+    _resolve_union,
+)
 from tests.jobs.render_support import job, render_service, request
 
 
@@ -335,6 +343,75 @@ def test_padding_change_recomputes_facts_from_the_shared_framing_stage(
         FramingSpec(False, parameters.alpha_threshold, 10, parameters.stretch_x),
     )
     assert controller.facts.framed_size == expected.output_size
+    controller.shutdown()
+
+
+def test_facts_ignore_cached_union_metadata_whose_fingerprint_does_not_match(
+    tmp_path, qtbot
+) -> None:
+    artifact = render_service(workspace=FilesystemWorkspacePort()).render(
+        request(tmp_path, framing=FramingSpec(True, Decimal("2"), 48, Decimal("1"))),
+        job(tmp_path, "stale-union", JobKind.RENDER),
+    )
+    framing = FramingSpec(
+        True,
+        Decimal("2"),
+        48,
+        Decimal("1"),
+        exclusions=(CropSpec(32, 24, 32, 80),),
+    )
+    session = CutSession(
+        artifact.cut_workspace,
+        artifact.manifest,
+        artifact.manifest.cache_key_inputs["sampling"]["fps"],
+    )
+
+    union = _resolve_union(session, framing, _DirectFrameReader())
+
+    assert union == PixelBounds(64, 24, 96, 104)
+
+
+def test_empty_union_degrades_to_the_untrimmed_framed_size(tmp_path, qtbot) -> None:
+    artifact = _seed_cut(tmp_path, "empty-union-facts")
+    framing = FramingSpec(
+        True,
+        Decimal("2"),
+        0,
+        Decimal("1"),
+        exclusions=(CropSpec(0, 0, 128, 128),),
+    )
+    session = CutSession(artifact.cut_workspace, artifact.manifest, 15)
+
+    facts, plan = _compute_facts(session, framing, _DirectFrameReader())
+
+    assert plan.global_bounds is None
+    assert facts.framed_size == (128, 128)
+
+
+def test_region_change_recomputes_facts_and_reloads_player_frames_without_the_region(
+    tmp_path, qtbot
+) -> None:
+    artifact = _seed_cut(tmp_path, "region-player")
+    store = ReducerStore(_ready_state(tmp_path / "source.mp4"))
+    controller = TransformStageController(store)
+    canvas = ResultPlayerCanvas()
+    qtbot.addWidget(canvas)
+    group = TransformGroup(lambda _event: None)
+    qtbot.addWidget(group)
+    controller.attach(group, canvas)
+    controller.open_artifact(artifact)
+    qtbot.waitUntil(lambda: canvas._frames is not None, timeout=5000)
+    first_frames = canvas._frames
+
+    store.dispatch(ExclusionsChanged((CropSpec(32, 24, 32, 80),)))
+
+    qtbot.waitUntil(
+        lambda: canvas._frames is not None
+        and canvas._frames is not first_frames
+        and canvas._frames.framed[0].pixelColor(40, 30).alpha() == 0,
+        timeout=5000,
+    )
+    assert canvas._frames.framed[0].pixelColor(65, 30).alpha() == 255
     controller.shutdown()
 
 

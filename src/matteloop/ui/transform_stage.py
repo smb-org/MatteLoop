@@ -17,7 +17,6 @@ from __future__ import annotations
 import threading
 from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass, replace
-from decimal import Decimal
 from itertools import count
 from typing import TYPE_CHECKING, Protocol, cast
 
@@ -26,12 +25,17 @@ from PySide6.QtCore import QCoreApplication, QObject, QThread, QTimer, Signal, S
 from PySide6.QtWidgets import QMessageBox, QWidget
 
 from matteloop.core.crop import clamp_crop
-from matteloop.core.geometry import FramingPlan, PixelBounds, union_alpha_bounds
+from matteloop.core.exclusion import (
+    cut_exclusions,
+    exclude_alpha,
+    union_alpha_bounds_or_none,
+)
+from matteloop.core.geometry import FramingPlan, PixelBounds
 from matteloop.core.parameters import ParameterState, TransformChanged
 from matteloop.core.specs import CropSpec, FramingSpec, TransformSpec
 from matteloop.core.state import AppState
 from matteloop.core.timebase import webp_delays
-from matteloop.jobs.transform_stage import framing_plan
+from matteloop.jobs.transform_stage import cached_union, framing_plan
 from matteloop.jobs.transform_store import load_transform
 from matteloop.jobs.workspace import (
     CutFrame,
@@ -564,6 +568,7 @@ class TransformStageController(QObject):
         cancel_event = threading.Event()
         self._frame_cancel_event = cancel_event
         transform = self._store.state.parameters.transform
+        crop = _crop_from_manifest(session.manifest)
         worker = FrameLoadWorker(
             session.workspace,
             session.manifest,
@@ -574,6 +579,7 @@ class TransformStageController(QObject):
             generation,
             budget=self._cache_budget,
             cancelled=cancel_event.is_set,
+            exclusions=cut_exclusions(self._framing.exclusions, crop),
         )
         thread = QThread(self)
         worker.moveToThread(thread)
@@ -644,6 +650,7 @@ def _framing_from_parameters(parameters: ParameterState) -> FramingSpec:
         parameters.alpha_threshold,
         parameters.padding,
         parameters.stretch_x,
+        parameters.exclusions,
     )
 
 
@@ -665,6 +672,24 @@ def _fps_from_manifest(manifest: CutManifest) -> int:
     if type(fps) is not int:
         raise ValueError("manifest fps is not an integer")
     return fps
+
+
+def _crop_from_manifest(manifest: CutManifest) -> CropSpec:
+    raw_crop = manifest.cache_key_inputs["crop"]
+    if not isinstance(raw_crop, Mapping):
+        raise ValueError("manifest crop inputs are not a mapping")
+    x = raw_crop["x"]
+    y = raw_crop["y"]
+    width = raw_crop["width"]
+    height = raw_crop["height"]
+    if (
+        type(x) is not int
+        or type(y) is not int
+        or type(width) is not int
+        or type(height) is not int
+    ):
+        raise ValueError("manifest crop inputs are not integers")
+    return CropSpec(x, y, width, height)
 
 
 def _compute_facts(
@@ -690,32 +715,36 @@ def _compute_facts(
 def _resolve_union(
     session: CutSession, framing: FramingSpec, frame_reader: FrameReader,
     cancelled: Callable[[], bool] = lambda: False,
-) -> PixelBounds:
+) -> PixelBounds | None:
+    crop = _crop_from_manifest(session.manifest)
     metadata = (
         None if session.manifest.edited else session.manifest.union_metadata
     )
-    if metadata is not None:
-        try:
-            matches = Decimal(metadata.alpha_threshold) == framing.alpha_threshold
-        except ArithmeticError:
-            matches = False
-        if matches:
-            left, top, right, bottom = metadata.bounds
-            return PixelBounds(left, top, right, bottom)
-    return union_alpha_bounds(
-        _iter_stored_frames(session, frame_reader, cancelled), framing.alpha_threshold
+    cached = cached_union(metadata, framing, crop, session.manifest.cache_key)
+    if cached is not None:
+        return cached
+    return union_alpha_bounds_or_none(
+        _iter_stored_frames(
+            session,
+            frame_reader,
+            cancelled,
+            exclusions=cut_exclusions(framing.exclusions, crop),
+        ),
+        framing.alpha_threshold,
     )
 
 
 def _iter_stored_frames(
     session: CutSession, frame_reader: FrameReader,
     cancelled: Callable[[], bool] = lambda: False,
+    *, exclusions: tuple[PixelBounds, ...] = (),
 ) -> Iterator[Image.Image]:
     for frame in session.manifest.frames:
         if cancelled():
             raise _CutFactsCancelled
         image = frame_reader.read(session.workspace, frame)
         try:
+            exclude_alpha(image, exclusions)
             yield image
         finally:
             image.close()

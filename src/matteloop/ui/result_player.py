@@ -31,7 +31,13 @@ from PySide6.QtGui import QImage
 from PySide6.QtWidgets import QPushButton, QWidget
 
 from matteloop.core.crop import fit_crop_aspect
-from matteloop.core.geometry import _MEDIA_INSET, FramingPlan, apply_framing
+from matteloop.core.exclusion import exclude_alpha
+from matteloop.core.geometry import (
+    _MEDIA_INSET,
+    FramingPlan,
+    PixelBounds,
+    apply_framing,
+)
 from matteloop.core.parameters import TransformChanged
 from matteloop.core.specs import CropSpec, TransformSpec
 from matteloop.core.transform import apply_transform
@@ -393,6 +399,7 @@ class FrameLoadWorker(QObject):
         *,
         budget: int = PLAYER_CACHE_BUDGET_BYTES,
         cancelled: Callable[[], bool] = _no_cancellation,
+        exclusions: tuple[PixelBounds, ...] = (),
     ) -> None:
         super().__init__()
         self._workspace = workspace
@@ -404,6 +411,7 @@ class FrameLoadWorker(QObject):
         self._generation = generation
         self._budget = budget
         self._cancelled = cancelled
+        self._exclusions = exclusions
 
     @Slot()
     def run(self) -> None:
@@ -417,6 +425,7 @@ class FrameLoadWorker(QObject):
                 self._delays,
                 self._budget,
                 self._cancelled,
+                exclusions=self._exclusions,
             )
         except _FrameLoadCancelled:
             pass
@@ -442,6 +451,8 @@ def _load_player_frames(
     delays: tuple[int, ...],
     budget: int,
     cancelled: Callable[[], bool] = _no_cancellation,
+    *,
+    exclusions: tuple[PixelBounds, ...] = (),
 ) -> PlayerFrames:
     frame_count = manifest.frame_count
     display_size, cached = _fit_budget(frame_count, plan.output_size, budget)
@@ -464,6 +475,7 @@ def _load_player_frames(
             plan,
             transform,
             display_size,
+            exclusions,
         )
         framed_images.append(framed_qimage)
         transformed_images.append(transformed_qimage)
@@ -484,9 +496,11 @@ def _load_one_frame(
     plan: FramingPlan,
     transform: TransformSpec,
     display_size: tuple[int, int],
+    exclusions: tuple[PixelBounds, ...] = (),
 ) -> tuple[QImage, QImage]:
     cut = frame_reader.read(workspace, frame)
     try:
+        exclude_alpha(cut, exclusions)
         framed = apply_framing(cut, plan)
     finally:
         cut.close()

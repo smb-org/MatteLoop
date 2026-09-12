@@ -11,6 +11,7 @@ from matteloop.core.parameters import (
     V1_MODEL_IDS,
     AlphaThresholdChanged,
     EdgeModeChanged,
+    ExclusionsChanged,
     ExecutionProviderChanged,
     GlobalTrimChanged,
     ModelChanged,
@@ -73,6 +74,7 @@ def test_parameter_defaults_match_the_v1_mapping() -> None:
     assert parameters.alpha_threshold == Decimal("2.0")
     assert parameters.padding == 0
     assert parameters.stretch_x == Decimal("1.0")
+    assert parameters.exclusions == ()
     assert parameters.max_mib == Decimal("0")
 
 
@@ -154,6 +156,28 @@ def test_cleanup_parameter_changes_stale_the_current_preview() -> None:
     assert state.stale_category is PreviewInvalidationReason.CROP_CLEANUP
 
 
+def test_exclusions_changed_invalidates_the_preview_as_crop_cleanup() -> None:
+    region = CropSpec(8, 8, 16, 16)
+
+    changed = reduce(_current(), ExclusionsChanged((region,)))
+
+    assert changed.parameters.exclusions == (region,)
+    assert changed.preview is PreviewState.STALE
+    assert changed.stale_category is PreviewInvalidationReason.CROP_CLEANUP
+
+
+def test_moving_a_region_outside_the_crop_does_not_invalidate_the_preview() -> None:
+    state = replace(
+        _current(),
+        crop=CropSpec(32, 32, 32, 32),
+        parameters=replace(
+            _current().parameters, exclusions=(CropSpec(0, 0, 8, 8),)
+        ),
+    )
+
+    assert reduce(state, ExclusionsChanged((CropSpec(1, 1, 8, 8),))) is state
+
+
 def test_output_fps_changes_sampling_and_stales_the_current_preview() -> None:
     changed = reduce(_current(), OutputFpsChanged(90))
 
@@ -176,6 +200,7 @@ def test_reset_restores_inspector_parameters_and_preserves_other_state() -> None
         alpha_threshold=Decimal("0.4"),
         padding=1,
         stretch_x=Decimal("1.2"),
+        exclusions=(CropSpec(4, 5, 20, 20),),
         output_directory=Path("exports"),
         output_filename="chosen.webp",
         max_mib=Decimal("12.5"),
@@ -207,6 +232,7 @@ def test_reset_restores_inspector_parameters_and_preserves_other_state() -> None
         "alpha_threshold",
         "padding",
         "stretch_x",
+        "exclusions",
         "max_mib",
     ):
         assert getattr(reset.parameters, name) == getattr(defaults, name)
@@ -386,3 +412,14 @@ def test_unrelated_invalid_saved_value_does_not_reset_valid_preferences() -> Non
     assert parameters.fps == 60
     assert parameters.alpha_threshold == Decimal("2.0")
     assert parameters.padding == 12
+
+
+def test_exclusions_settings_string_round_trips_and_malformed_entries_fall_back_to_none(
+) -> None:
+    exclusions = (CropSpec(1, 2, 30, 40), CropSpec(50, 60, 7, 8))
+
+    assert parameters_from_values(
+        {"exclusions": "1,2,30,40;50,60,7,8"}
+    ).exclusions == exclusions
+    assert parameters_from_values({"exclusions": "1,2,30"}).exclusions == ()
+    assert parameters_from_values({"exclusions": "1,2,3,4;bad"}).exclusions == ()

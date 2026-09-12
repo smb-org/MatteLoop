@@ -10,11 +10,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from matteloop.core.errors import ValidationError
+from matteloop.core.exclusion import cut_exclusions
 from matteloop.core.execution_providers import (
     CPU_EXECUTION_PROVIDER,
     is_allowed_provider,
 )
 from matteloop.core.specs import (
+    CropSpec,
     EdgeMode,
     FramingSpec,
     OutputSpec,
@@ -56,6 +58,7 @@ class ParameterState:
     alpha_threshold: Decimal = Decimal("2.0")
     padding: int = 0
     stretch_x: Decimal = Decimal("1.0")
+    exclusions: tuple[CropSpec, ...] = ()
     output_directory: Path | None = None
     output_filename: str | None = None
     max_mib: Decimal = Decimal("0")
@@ -74,6 +77,7 @@ class ParameterState:
             self.alpha_threshold,
             self.padding,
             self.stretch_x,
+            self.exclusions,
         )
         if self.output_directory is not None and (
             not isinstance(self.output_directory, Path)
@@ -130,6 +134,11 @@ class StretchChanged:
 
 
 @dataclass(frozen=True, slots=True)
+class ExclusionsChanged:
+    exclusions: tuple[CropSpec, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class OutputDirectoryChanged:
     directory: Path | None
 
@@ -163,6 +172,7 @@ ParameterEvent = (
     | AlphaThresholdChanged
     | PaddingChanged
     | StretchChanged
+    | ExclusionsChanged
     | OutputDirectoryChanged
     | OutputFilenameChanged
     | OutputMaxSizeChanged
@@ -198,6 +208,8 @@ def reduce_parameters(state: AppState, event: ParameterEvent) -> AppState:
         return _reduce_cleanup_value(state, event)
     if isinstance(event, StretchChanged):
         return _reduce_cleanup_value(state, event)
+    if isinstance(event, ExclusionsChanged):
+        return _reduce_exclusions(state, event)
     if isinstance(event, OutputDirectoryChanged):
         return _reduce_output_directory(state, event)
     if isinstance(event, OutputFilenameChanged):
@@ -222,6 +234,7 @@ def _reduce_parameters_reset(state: AppState) -> AppState:
         alpha_threshold=defaults.alpha_threshold,
         padding=defaults.padding,
         stretch_x=defaults.stretch_x,
+        exclusions=defaults.exclusions,
         max_mib=defaults.max_mib,
     )
     timeline = state.timeline
@@ -257,6 +270,7 @@ def _reduce_parameters_reset(state: AppState) -> AppState:
             (parameters.alpha_threshold, state.parameters.alpha_threshold),
             (parameters.padding, state.parameters.padding),
             (parameters.stretch_x, state.parameters.stretch_x),
+            (parameters.exclusions, state.parameters.exclusions),
         )
     ):
         reason = PreviewInvalidationReason.CROP_CLEANUP
@@ -366,6 +380,25 @@ def _reduce_cleanup_value(
     return _invalidate(state, updated, PreviewInvalidationReason.CROP_CLEANUP)
 
 
+def _reduce_exclusions(state: AppState, event: ExclusionsChanged) -> AppState:
+    from matteloop.core.tokens import PreviewInvalidationReason
+
+    if not isinstance(event.exclusions, tuple) or any(
+        not isinstance(exclusion, CropSpec) for exclusion in event.exclusions
+    ):
+        return state
+    crop = state.crop
+    if crop is None or cut_exclusions(event.exclusions, crop) == cut_exclusions(
+        state.parameters.exclusions, crop
+    ):
+        return state
+    return _invalidate(
+        state,
+        replace(state.parameters, exclusions=event.exclusions),
+        PreviewInvalidationReason.CROP_CLEANUP,
+    )
+
+
 def _reduce_output_directory(
     state: AppState, event: OutputDirectoryChanged
 ) -> AppState:
@@ -451,6 +484,7 @@ def parameters_from_values(values: Mapping[str, object]) -> ParameterState:
         stretch_x=_decimal_value(
             values.get("stretch_x"), defaults.stretch_x, lambda value: value > 0
         ),
+        exclusions=_exclusions_value(values.get("exclusions"), defaults.exclusions),
         max_mib=_decimal_value(
             values.get("max_mib"), defaults.max_mib, lambda value: value >= 0
         ),
@@ -538,6 +572,54 @@ def _bool_value(value: object, default: bool) -> bool:
         if value.casefold() == "false":
             return False
     return default
+
+
+def _exclusions_value(
+    value: object, default: tuple[CropSpec, ...]
+) -> tuple[CropSpec, ...]:
+    if value is None:
+        return default
+    if not isinstance(value, str):
+        return ()
+    if not value:
+        return ()
+    try:
+        exclusions = []
+        for entry in value.split(";"):
+            fields = entry.split(",")
+            if len(fields) != 4:
+                return ()
+            exclusions.append(CropSpec(*(int(field) for field in fields)))
+        return tuple(exclusions)
+    except (TypeError, ValueError, ValidationError):
+        return ()
+
+
+def clip_exclusions(parameters: ParameterState, source: object) -> ParameterState:
+    """Intersect carried regions with the newly loaded source dimensions."""
+    width = getattr(source, "width", None)
+    height = getattr(source, "height", None)
+    if type(width) is not int or type(height) is not int or width < 1 or height < 1:
+        return parameters
+    clipped: list[CropSpec] = []
+    for exclusion in parameters.exclusions:
+        right = min(exclusion.x + exclusion.width, width)
+        bottom = min(exclusion.y + exclusion.height, height)
+        if exclusion.x < width and exclusion.y < height:
+            clipped.append(
+                CropSpec(
+                    exclusion.x,
+                    exclusion.y,
+                    right - exclusion.x,
+                    bottom - exclusion.y,
+                )
+            )
+    result = tuple(clipped)
+    return (
+        parameters
+        if result == parameters.exclusions
+        else replace(parameters, exclusions=result)
+    )
 
 
 def _directory_value(value: object) -> Path | None:

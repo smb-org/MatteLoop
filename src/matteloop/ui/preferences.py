@@ -20,6 +20,7 @@ _KEYS = (
     "alpha_threshold",
     "padding",
     "stretch_x",
+    "exclusions",
     "output_directory",
     "output_filename",
     "max_mib",
@@ -55,6 +56,13 @@ def persist_parameters(settings: QSettings, parameters: ParameterState) -> None:
     )
     settings.setValue(f"{_PREFIX}padding", parameters.padding)
     settings.setValue(f"{_PREFIX}stretch_x", str(parameters.stretch_x))
+    settings.setValue(
+        f"{_PREFIX}exclusions",
+        ";".join(
+            ",".join(str(value) for value in (e.x, e.y, e.width, e.height))
+            for e in parameters.exclusions
+        ),
+    )
     if parameters.output_directory is None:
         settings.remove(f"{_PREFIX}output_directory")
     else:
