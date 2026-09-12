@@ -6,6 +6,7 @@ from pathlib import Path
 
 from PySide6.QtCore import QCoreApplication, QPoint, QPointF, QRectF, Qt, Signal
 from PySide6.QtGui import (
+    QBrush,
     QColor,
     QContextMenuEvent,
     QKeyEvent,
@@ -177,9 +178,7 @@ class ExclusionCanvas(CropCanvas):
     def _paint_exclusions(
         self, painter: QPainter, geometry: InteractionGeometry
     ) -> None:
-        effective_fill = QColor("#E5484D")
-        effective_fill.setAlpha(90)
-        effective_pen = QPen(QColor("#E5484D"), 1)
+        effective_brush, effective_pen = self._effective_exclusion_style()
         ineffective_fill = QColor("#E5484D")
         ineffective_fill.setAlpha(32)
         ineffective_pen = QPen(
@@ -201,7 +200,7 @@ class ExclusionCanvas(CropCanvas):
                 self._paint_exclusion_rect(
                     painter,
                     effective_rect,
-                    fill=effective_fill,
+                    fill=effective_brush,
                     pen=effective_pen,
                 )
                 continue
@@ -218,16 +217,30 @@ class ExclusionCanvas(CropCanvas):
             self._paint_exclusion_rect(
                 painter,
                 effective_rect,
-                fill=effective_fill,
+                fill=effective_brush,
                 pen=effective_pen,
             )
+
+    def _effective_exclusion_style(self) -> tuple[QColor | QBrush, QPen]:
+        effective_fill = QColor("#E5484D")
+        effective_fill.setAlpha(90)
+        effective_pen = QPen(QColor("#E5484D"), 1)
+        presentation = self._presentation
+        if presentation is not None and presentation.exclusions_before_model:
+            effective_brush: QColor | QBrush = QBrush(
+                effective_fill, Qt.BrushStyle.BDiagPattern
+            )
+            effective_pen = QPen(QColor("#E5484D"), 2)
+        else:
+            effective_brush = effective_fill
+        return effective_brush, effective_pen
 
     @staticmethod
     def _paint_exclusion_rect(
         painter: QPainter,
         rect: QRectF,
         *,
-        fill: QColor | None,
+        fill: QColor | QBrush | None,
         pen: QPen,
     ) -> None:
         painter.setBrush(fill if fill is not None else Qt.BrushStyle.NoBrush)
@@ -701,19 +714,30 @@ class ExclusionCanvas(CropCanvas):
         if presentation is None:
             return
         self._emit_exclusion_selection()
-        index = self._selected_exclusion
-        if self._exclusion_edit and (
-            index is None or index >= len(presentation.exclusions)
-        ):
-            self.setAccessibleDescription(
-                QCoreApplication.translate(
-                    "CropCanvas",
-                    "Exclusion region mode: %1 region(s); no region selected",
-                ).replace("%1", str(len(presentation.exclusions)))
-            )
+        if self._exclusion_edit:
+            self._announce_exclusion_crop(presentation)
             return
-        if not self._exclusion_edit:
-            super()._announce_crop()
+        super()._announce_crop()
+        if presentation.exclusions_before_model:
+            self.setAccessibleDescription(
+                self.accessibleDescription()
+                + QCoreApplication.translate(
+                    "CropCanvas", "; blanked before the model"
+                )
+            )
+
+    def _announce_exclusion_crop(self, presentation: CropPresentation) -> None:
+        index = self._selected_exclusion
+        if index is None or index >= len(presentation.exclusions):
+            description = QCoreApplication.translate(
+                "CropCanvas",
+                "Exclusion region mode: %1 region(s); no region selected",
+            ).replace("%1", str(len(presentation.exclusions)))
+            if presentation.exclusions_before_model:
+                description += QCoreApplication.translate(
+                    "CropCanvas", "; blanked before the model"
+                )
+            self.setAccessibleDescription(description)
             return
         assert index is not None
         crop = self._edited_rect()
@@ -746,6 +770,10 @@ class ExclusionCanvas(CropCanvas):
         )
         for number, value in enumerate(values, start=1):
             text = text.replace(f"%{number}", str(value))
+        if presentation.exclusions_before_model:
+            text += QCoreApplication.translate(
+                "CropCanvas", "; blanked before the model"
+            )
         self.setAccessibleDescription(text)
 
     def _emit_exclusion_selection(self) -> None:

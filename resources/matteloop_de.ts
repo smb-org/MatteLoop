@@ -30,22 +30,29 @@
         <translation>Original-Videobild</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="709"/>
+        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="717"/>
         <source>Exclusion region mode: %1 region(s); no region selected</source>
         <translation>Ausschlussregion-Modus: %1 Region(en); keine Region ausgewählt</translation>
     </message>
     <message>
         <location filename="../src/matteloop/ui/exclusion_canvas.py" line="722"/>
+        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="732"/>
+        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="769"/>
+        <source>; blanked before the model</source>
+        <translation>; vor dem Modell ausgeblendet</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="741"/>
         <source>Exclusion region %1 of %2: x %3, y %4, width %5, height %6 source pixels; entirely outside crop</source>
         <translation>Ausschlussregion %1 von %2: x %3, y %4, Breite %5, Höhe %6 Quellpixel; vollständig außerhalb des Zuschnitts</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="728"/>
+        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="747"/>
         <source>Exclusion region %1 of %2: x %3, y %4, width %5, height %6 source pixels; partly outside crop</source>
         <translation>Ausschlussregion %1 von %2: x %3, y %4, Breite %5, Höhe %6 Quellpixel; teilweise außerhalb des Zuschnitts</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="734"/>
+        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="753"/>
         <source>Exclusion region %1 of %2: x %3, y %4, width %5, height %6 source pixels</source>
         <translation>Ausschlussregion %1 von %2: x %3, y %4, Breite %5, Höhe %6 Quellpixel</translation>
     </message>
@@ -81,8 +88,16 @@
 <context>
     <name>ExclusionControls</name>
     <message numerus="yes">
-        <location filename="../src/matteloop/ui/exclusion_controls.py" line="40"/>
-        <location filename="../src/matteloop/ui/exclusion_controls.py" line="101"/>
+        <location filename="../src/matteloop/ui/exclusion_controls.py" line="51"/>
+        <source>%n region(s), blanked before the model</source>
+        <translation>
+            <numerusform>%n Region, vor dem Modell ausgeblendet</numerusform>
+            <numerusform>%n Regionen, vor dem Modell ausgeblendet</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../src/matteloop/ui/exclusion_controls.py" line="54"/>
+        <location filename="../src/matteloop/ui/exclusion_controls.py" line="137"/>
         <source>%n region(s)</source>
         <translation>
             <numerusform>%n Region</numerusform>
@@ -276,17 +291,17 @@
         <translation>Arbeitsbereiche verwalten…</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector_reset.py" line="51"/>
+        <location filename="../src/matteloop/ui/inspector_reset.py" line="55"/>
         <source>Reset to defaults</source>
         <translation>Auf Standardwerte zurücksetzen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector_reset.py" line="55"/>
+        <location filename="../src/matteloop/ui/inspector_reset.py" line="59"/>
         <source>Reset inspector parameters</source>
         <translation>Inspector-Parameter zurücksetzen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector_reset.py" line="57"/>
+        <location filename="../src/matteloop/ui/inspector_reset.py" line="61"/>
         <source>Compute acceleration, transform, output directory, and output filename are not affected.</source>
         <translation>Beschleunigung, Transformation, Ausgabeordner und Dateiname bleiben unverändert.</translation>
     </message>
@@ -371,49 +386,59 @@
         <translation>Ausgabeordner auswählen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/exclusion_controls.py" line="54"/>
+        <location filename="../src/matteloop/ui/exclusion_controls.py" line="76"/>
         <source>No region selected</source>
         <translation>Keine Region ausgewählt</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/exclusion_controls.py" line="144"/>
+        <location filename="../src/matteloop/ui/exclusion_controls.py" line="181"/>
         <source>Selected region: x %1, y %2, width %3, height %4 source pixels; entirely outside crop</source>
         <translation>Ausgewählte Region: x %1, y %2, Breite %3, Höhe %4 Quellpixel; vollständig außerhalb des Zuschnitts</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/exclusion_controls.py" line="150"/>
+        <location filename="../src/matteloop/ui/exclusion_controls.py" line="187"/>
         <source>Selected region: x %1, y %2, width %3, height %4 source pixels; partly outside crop</source>
         <translation>Ausgewählte Region: x %1, y %2, Breite %3, Höhe %4 Quellpixel; teilweise außerhalb des Zuschnitts</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/exclusion_controls.py" line="155"/>
+        <location filename="../src/matteloop/ui/exclusion_controls.py" line="192"/>
         <source>Selected region: x %1, y %2, width %3, height %4 source pixels</source>
         <translation>Ausgewählte Region: x %1, y %2, Breite %3, Höhe %4 Quellpixel</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/exclusion_controls.py" line="82"/>
+        <location filename="../src/matteloop/ui/exclusion_controls.py" line="108"/>
         <source>Edit</source>
         <translation>Bearbeiten</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/exclusion_controls.py" line="84"/>
-        <location filename="../src/matteloop/ui/exclusion_controls.py" line="87"/>
+        <location filename="../src/matteloop/ui/exclusion_controls.py" line="110"/>
+        <location filename="../src/matteloop/ui/exclusion_controls.py" line="113"/>
         <source>Edit exclusion regions</source>
         <translation>Ausschlussregionen bearbeiten</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/exclusion_controls.py" line="91"/>
+        <location filename="../src/matteloop/ui/exclusion_controls.py" line="117"/>
         <location filename="../src/matteloop/ui/inspector.py" line="330"/>
         <source>Clear</source>
         <translation>Zurücksetzen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/exclusion_controls.py" line="93"/>
+        <location filename="../src/matteloop/ui/exclusion_controls.py" line="119"/>
         <source>Clear exclusion regions</source>
         <translation>Ausschlussregionen löschen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/exclusion_controls.py" line="111"/>
+        <location filename="../src/matteloop/ui/exclusion_controls.py" line="122"/>
+        <source>Blank before the model</source>
+        <translation>Vor dem Modell ausblenden</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/exclusion_controls.py" line="125"/>
+        <source>Re-segments the clip: the stored cut set is not reused</source>
+        <translation>Der Clip wird neu segmentiert: Der gespeicherte Schnitt wird nicht wiederverwendet</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/exclusion_controls.py" line="147"/>
         <source>Selected exclusion region</source>
         <translation>Ausgewählte Ausschlussregion</translation>
     </message>
@@ -2983,7 +3008,7 @@ in
         <translation>%1; %2; %3; %4 bei %5; %6; erstellt %7; Zweck: %8; Lizenz: %9; %10</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/workspace_presentation.py" line="214"/>
+        <location filename="../src/matteloop/ui/workspace_presentation.py" line="234"/>
         <source>unknown time</source>
         <translation>unbekannte Zeit</translation>
     </message>

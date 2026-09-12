@@ -26,6 +26,7 @@ class ParameterPresentation:
     padding: int
     stretch_x: Decimal
     exclusions: tuple[CropSpec, ...]
+    exclusions_before_model: bool
     output_directory: Path | None
     output_filename: str
     max_mib: Decimal
@@ -64,6 +65,7 @@ def present_parameters(state: AppState) -> ParameterPresentation:
         padding=parameters.padding,
         stretch_x=parameters.stretch_x,
         exclusions=parameters.exclusions,
+        exclusions_before_model=parameters.exclusions_before_model,
         output_directory=directory,
         output_filename=filename,
         max_mib=parameters.max_mib,

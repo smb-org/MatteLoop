@@ -125,6 +125,7 @@ def _state(metadata: object, source_frame: QImage, result_frame: QImage) -> AppS
                 model_id=_MODEL_ID,
                 output_directory=_OUTPUT_DIRECTORY,
                 exclusions=(CropSpec(560, 32, 150, 88),),
+                exclusions_before_model=True,
             )
         ),
         SourceLoadRequested(_SOURCE_ID, _LOAD_REQUEST_ID),

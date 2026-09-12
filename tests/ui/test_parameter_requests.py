@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import Decimal
 from fractions import Fraction
 from pathlib import Path
@@ -49,6 +49,7 @@ def test_preview_and_render_requests_share_every_inspector_parameter() -> None:
     assert request.segmentation.model_id == parameters.model_id
     assert request.segmentation.edge_mode is parameters.edge_mode
     assert request.segmentation.execution_provider == parameters.execution_provider
+    assert request.segmentation.exclusions == ()
     assert request.framing.trim is parameters.trim
     assert request.framing.alpha_threshold == parameters.alpha_threshold
     assert request.framing.padding == parameters.padding
@@ -57,6 +58,13 @@ def test_preview_and_render_requests_share_every_inspector_parameter() -> None:
     assert request.output.path == Path("/exports/holiday-cut.webp")
     assert request.output.max_bytes == int(Decimal("12.5") * 1024 * 1024)
     assert request.transform == transform
+
+    enabled = replace(parameters, exclusions_before_model=True)
+    enabled_request = _render_request(
+        _preview_inputs(Metadata(source), timeline, parameters=enabled)
+    )
+    assert enabled_request.segmentation.exclusions == enabled.exclusions
+    assert enabled_request.framing.exclusions == enabled.exclusions
 
 
 def timeline_to_sampling(timeline: TimelineState):

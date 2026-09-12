@@ -25,6 +25,10 @@ def can_reset_parameters(presentation: ParameterPresentation) -> bool:
             (presentation.padding, defaults.padding),
             (presentation.stretch_x, defaults.stretch_x),
             (presentation.exclusions, defaults.exclusions),
+            (
+                presentation.exclusions_before_model,
+                defaults.exclusions_before_model,
+            ),
             (presentation.max_mib, defaults.max_mib),
         )
     ):

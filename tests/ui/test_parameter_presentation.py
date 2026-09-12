@@ -72,12 +72,19 @@ def test_parameter_and_crop_presentations_carry_exclusion_regions() -> None:
     ready = reduce(loading, SourceLoaded("source", "load", Metadata(source)))
     region = CropSpec(10, 20, 30, 40)
     state = replace(
-        ready, parameters=replace(ready.parameters, exclusions=(region,))
+        ready,
+        parameters=replace(
+            ready.parameters,
+            exclusions=(region,),
+            exclusions_before_model=True,
+        ),
     )
 
     parameter_presentation = present_parameters(state)
     crop_presentation = present_crop(state)
 
     assert parameter_presentation.exclusions == (region,)
+    assert parameter_presentation.exclusions_before_model is True
     assert crop_presentation is not None
     assert crop_presentation.exclusions == (region,)
+    assert crop_presentation.exclusions_before_model is True

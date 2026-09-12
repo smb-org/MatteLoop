@@ -78,6 +78,19 @@ def test_parameter_preferences_round_trip_as_qsettings_primitives() -> None:
     assert actual == expected
 
 
+def test_exclusions_before_model_persists_as_a_bool() -> None:
+    settings = _settings()
+    expected = ParameterState(
+        exclusions=(CropSpec(8, 9, 40, 50),),
+        exclusions_before_model=True,
+    )
+
+    persist_parameters(settings, expected)
+
+    assert settings.value("parameters/exclusions_before_model") is True
+    assert load_parameters(settings).exclusions_before_model is True
+
+
 def test_persist_parameters_writes_no_transform_key() -> None:
     settings = _settings()
     non_identity = ParameterState(

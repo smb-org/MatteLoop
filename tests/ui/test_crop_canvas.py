@@ -19,6 +19,7 @@ from matteloop.ui.preview_canvas import PreviewStage
 def _presentation(
     crop: CropSpec = CropSpec(10, 10, 40, 20),
     exclusions: tuple[CropSpec, ...] = (),
+    exclusions_before_model: bool = False,
 ) -> CropPresentation:
     return CropPresentation(
         source_id="source",
@@ -30,6 +31,7 @@ def _presentation(
         pixel_aspect=1,
         crop=crop,
         exclusions=exclusions,
+        exclusions_before_model=exclusions_before_model,
     )
 
 
@@ -731,6 +733,45 @@ def test_selected_exclusion_announces_when_crop_does_not_apply(
     )
 
     assert canvas.accessibleDescription().endswith(f"; {status}")
+
+
+def test_model_exclusions_are_painted_hatched_and_announced(qtbot) -> None:
+    region = CropSpec(20, 10, 30, 20)
+    canvas = _canvas(qtbot)
+    frame = QImage(100, 50, QImage.Format.Format_RGBA8888)
+    frame.fill(QColor("#ffffff"))
+    canvas.set_frame(frame)
+    canvas.apply_presentation(
+        _presentation(
+            exclusions=(region,), exclusions_before_model=True
+        ),
+        active=True,
+        editable=True,
+    )
+    canvas.show()
+    canvas.set_exclusion_edit(True)
+    qtbot.wait(10)
+
+    image = canvas.grab().toImage()
+    assert canvas._geometry is not None  # noqa: SLF001
+    rect = canvas._widget_rect(canvas._geometry, region)  # noqa: SLF001
+    left = round(rect.left())
+    right = round(rect.right())
+    top = round(rect.top())
+    bottom = round(rect.bottom())
+    colors = {
+        image.pixelColor(x, y).rgba()
+        for x in range(left + 2, right - 2)
+        for y in range(top + 2, bottom - 2)
+    }
+
+    assert len(colors) > 1
+    assert any(
+        (color := image.pixelColor(x, y)).red() > color.green()
+        for x in range(left + 2, right - 2)
+        for y in range(top + 2, bottom - 2)
+    )
+    assert canvas.accessibleDescription().endswith("; blanked before the model")
 
 
 def test_crop_canvas_keyboard_moves_overlay_by_one_source_pixel(qtbot) -> None:

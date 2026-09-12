@@ -21,6 +21,7 @@ _KEYS = (
     "padding",
     "stretch_x",
     "exclusions",
+    "exclusions_before_model",
     "output_directory",
     "output_filename",
     "max_mib",
@@ -62,6 +63,9 @@ def persist_parameters(settings: QSettings, parameters: ParameterState) -> None:
             ",".join(str(value) for value in (e.x, e.y, e.width, e.height))
             for e in parameters.exclusions
         ),
+    )
+    settings.setValue(
+        f"{_PREFIX}exclusions_before_model", parameters.exclusions_before_model
     )
     if parameters.output_directory is None:
         settings.remove(f"{_PREFIX}output_directory")

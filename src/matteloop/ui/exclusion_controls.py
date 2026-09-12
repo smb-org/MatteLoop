@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import QCoreApplication, Qt, Signal
 from PySide6.QtWidgets import (
+    QCheckBox,
     QHBoxLayout,
     QLabel,
     QSizePolicy,
@@ -13,7 +14,10 @@ from PySide6.QtWidgets import (
 )
 
 from matteloop.core.exclusion import cut_exclusions
-from matteloop.core.parameters import ExclusionsChanged
+from matteloop.core.parameters import (
+    ExclusionsBeforeModelChanged,
+    ExclusionsChanged,
+)
 from matteloop.core.specs import CropSpec
 from matteloop.ui.parameter_presentation import ParameterPresentation
 
@@ -33,16 +37,34 @@ class ExclusionControls(QWidget):
         self.clear_button.clicked.connect(
             lambda: self.command_requested.emit(ExclusionsChanged(()))
         )
+        self.before_model_checkbox.toggled.connect(
+            lambda enabled: self.command_requested.emit(
+                ExclusionsBeforeModelChanged(enabled)
+            )
+        )
 
     def apply(self, presentation: ParameterPresentation, editable: bool) -> None:
         """Render the region count and current source editability."""
         count = len(presentation.exclusions)
-        count_text = self.tr("%n region(s)", "", count)
+        if presentation.exclusions_before_model:
+            count_text = self.tr(
+                "%n region(s), blanked before the model", "", count
+            )
+        else:
+            count_text = self.tr("%n region(s)", "", count)
         self.count_label.setText(count_text)
         self.count_label.setAccessibleDescription(count_text)
         available = editable and presentation.duration is not None
         self.edit_button.setEnabled(available)
         self.clear_button.setEnabled(available and count > 0)
+        self.before_model_checkbox.setEnabled(available and count > 0)
+        blocked = self.before_model_checkbox.blockSignals(True)
+        try:
+            self.before_model_checkbox.setChecked(
+                presentation.exclusions_before_model
+            )
+        finally:
+            self.before_model_checkbox.blockSignals(blocked)
         if not available and self.edit_button.isChecked():
             self.edit_button.setChecked(False)
 
@@ -73,7 +95,11 @@ class ExclusionControls(QWidget):
 
     def tab_widgets(self) -> tuple[QWidget, ...]:
         """Return the row's keyboard controls in visual order."""
-        return (self.edit_button, self.clear_button)
+        return (
+            self.edit_button,
+            self.clear_button,
+            self.before_model_checkbox,
+        )
 
     def _build_widgets(self) -> None:
         self.edit_button = QToolButton()
@@ -92,6 +118,19 @@ class ExclusionControls(QWidget):
         self.clear_button.setAccessibleName(
             QCoreApplication.translate("Inspector", "Clear exclusion regions")
         )
+        self.before_model_checkbox = QCheckBox(
+            QCoreApplication.translate("Inspector", "Blank before the model")
+        )
+        self.before_model_checkbox.setObjectName("exclusion_before_model")
+        self.before_model_checkbox.setSizePolicy(
+            QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred
+        )
+        cost = QCoreApplication.translate(
+            "Inspector",
+            "Re-segments the clip: the stored cut set is not reused",
+        )
+        self.before_model_checkbox.setToolTip(cost)
+        self.before_model_checkbox.setAccessibleDescription(cost)
         self.count_label = QLabel()
         self.count_label.setObjectName("exclusion_count")
         self.count_label.setProperty("secondary", True)
@@ -113,6 +152,7 @@ class ExclusionControls(QWidget):
         self.set_selected_exclusion(None, None)
         self.edit_button.setEnabled(False)
         self.clear_button.setEnabled(False)
+        self.before_model_checkbox.setEnabled(False)
 
     def _build_layout(self) -> None:
         layout = QVBoxLayout(self)
@@ -124,6 +164,7 @@ class ExclusionControls(QWidget):
         actions.addWidget(self.edit_button)
         actions.addWidget(self.clear_button)
         layout.addLayout(actions)
+        layout.addWidget(self.before_model_checkbox)
         layout.addWidget(self.count_label)
         layout.addWidget(self.selected_readout)
 
