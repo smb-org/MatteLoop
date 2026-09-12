@@ -274,7 +274,7 @@ def _orientation_transform(
     )
     display_width = max(
         1,
-        _round_fraction(Fraction(source_width) * pixel_aspect_fraction),
+        _rhu(Fraction(source_width) * pixel_aspect_fraction),
     )
     return replace(
         transform,
@@ -297,10 +297,6 @@ def _orientation_transform_from_media(transform: MediaTransform) -> MediaTransfo
 def _rounded_delta(value: float) -> int:
     return math.floor(value + 0.5) if value >= 0 else math.ceil(value - 0.5)
 
-
-def _round_fraction(value: Fraction) -> int:
-    quotient, remainder = divmod(value.numerator, value.denominator)
-    return quotient + int(remainder * 2 >= value.denominator)
 
 
 def _validate_dimensions(source_width: int, source_height: int) -> None:
