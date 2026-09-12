@@ -53,33 +53,23 @@ class ExclusionControls(QWidget):
         if exclusion is None or crop is None:
             text = QCoreApplication.translate("Inspector", "No region selected")
         else:
-            text = QCoreApplication.translate(
-                "Inspector",
-                "Selected region: x %1, y %2, width %3, height %4 source pixels",
+            # One complete sentence per case rather than a stem plus appended
+            # fragments: a fragment forces every language into English word
+            # order, and a language that must lead with the qualifier or
+            # restructure the clause cannot translate it at all.
+            text = self._format_selection(
+                _selection_template(_crop_relation(exclusion, crop)), exclusion
             )
-            values = (exclusion.x, exclusion.y, exclusion.width, exclusion.height)
-            for number, value in enumerate(values, start=1):
-                text = text.replace(f"%{number}", str(value))
-            boxes = cut_exclusions((exclusion,), crop)
-            if not boxes:
-                text += QCoreApplication.translate(
-                    "Inspector", "; entirely outside crop"
-                )
-            else:
-                box = boxes[0]
-                effective = CropSpec(
-                    crop.x + box.left,
-                    crop.y + box.top,
-                    box.width,
-                    box.height,
-                )
-                if effective != exclusion:
-                    text += QCoreApplication.translate(
-                        "Inspector", "; partly outside crop"
-                    )
         self.selected_readout.setText(text)
         self.selected_readout.setToolTip(text)
         self.selected_readout.setAccessibleDescription(text)
+
+    @staticmethod
+    def _format_selection(template: str, exclusion: CropSpec) -> str:
+        values = (exclusion.x, exclusion.y, exclusion.width, exclusion.height)
+        for number, value in enumerate(values, start=1):
+            template = template.replace(f"%{number}", str(value))
+        return template
 
     def tab_widgets(self) -> tuple[QWidget, ...]:
         """Return the row's keyboard controls in visual order."""
@@ -136,3 +126,33 @@ class ExclusionControls(QWidget):
         layout.addLayout(actions)
         layout.addWidget(self.count_label)
         layout.addWidget(self.selected_readout)
+
+
+def _crop_relation(exclusion: CropSpec, crop: CropSpec) -> str:
+    """Say whether the stored rectangle is fully, partly, or not in the crop."""
+    boxes = cut_exclusions((exclusion,), crop)
+    if not boxes:
+        return "outside"
+    box = boxes[0]
+    effective = CropSpec(crop.x + box.left, crop.y + box.top, box.width, box.height)
+    return "inside" if effective == exclusion else "partial"
+
+
+def _selection_template(relation: str) -> str:
+    """Return one complete translatable sentence for each relation."""
+    if relation == "outside":
+        return QCoreApplication.translate(
+            "Inspector",
+            "Selected region: x %1, y %2, width %3, height %4 source pixels;"
+            " entirely outside crop",
+        )
+    if relation == "partial":
+        return QCoreApplication.translate(
+            "Inspector",
+            "Selected region: x %1, y %2, width %3, height %4 source pixels;"
+            " partly outside crop",
+        )
+    return QCoreApplication.translate(
+        "Inspector",
+        "Selected region: x %1, y %2, width %3, height %4 source pixels",
+    )
