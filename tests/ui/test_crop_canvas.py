@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 from PySide6.QtCore import QPoint, Qt
 from PySide6.QtGui import QColor, QImage
+from PySide6.QtWidgets import QPushButton, QVBoxLayout, QWidget
 
 from matteloop.core.crop_state import CropChanged
 from matteloop.core.geometry import MediaTransform, PointF
@@ -127,6 +128,49 @@ def test_region_state_change_cancels_an_in_flight_drag(
 
     assert events == []
     assert canvas._drag_exclusion is None  # noqa: SLF001
+
+
+def test_creating_a_region_cancels_the_previous_drag_before_nudging_it(qtbot) -> None:
+    original = CropSpec(20, 10, 20, 20)
+    created = CropSpec(40, 20, 20, 10)
+    canvas = _canvas(qtbot)
+    canvas.apply_presentation(
+        _presentation(exclusions=(original,)), active=True, editable=True
+    )
+    canvas.set_exclusion_edit(True)
+    events: list[object] = []
+    canvas.command_requested.connect(events.append)
+
+    qtbot.mousePress(
+        canvas,
+        Qt.MouseButton.LeftButton,
+        pos=_source_pos(canvas, 25, 15),
+    )
+    qtbot.mouseMove(canvas, _source_pos(canvas, 30, 15))
+    canvas.setFocus()
+    qtbot.waitUntil(canvas.hasFocus, timeout=1000)
+    qtbot.keyClick(canvas, Qt.Key.Key_N)
+
+    assert events == [ExclusionsChanged((original, created))]
+    canvas.apply_presentation(
+        _presentation(exclusions=(original, created)),
+        active=True,
+        editable=True,
+    )
+    assert canvas._selected_exclusion == 1  # noqa: SLF001
+    assert canvas._drag_exclusion is None  # noqa: SLF001
+
+    qtbot.keyClick(canvas, Qt.Key.Key_Right)
+    qtbot.mouseRelease(
+        canvas,
+        Qt.MouseButton.LeftButton,
+        pos=_source_pos(canvas, 30, 15),
+    )
+
+    assert events == [
+        ExclusionsChanged((original, created)),
+        ExclusionsChanged((original, CropSpec(41, 20, 20, 10))),
+    ]
 
 
 def test_exclusion_editing_stays_active_when_crop_is_disabled(qtbot) -> None:
@@ -431,25 +475,66 @@ def test_region_mode_keyboard_creates_a_region(qtbot) -> None:
     assert len(events[0].exclusions) == 1
 
 
-def test_region_mode_keyboard_cycles_selection_and_deletes_it(qtbot) -> None:
+def test_region_mode_bracket_keys_cycle_selection_in_focus_chain(qtbot) -> None:
     regions = (CropSpec(20, 10, 20, 20), CropSpec(60, 10, 20, 20))
-    canvas = _canvas(qtbot)
+    window = QWidget()
+    qtbot.addWidget(window)
+    layout = QVBoxLayout(window)
+    canvas = ExclusionCanvas(window)
+    button = QPushButton("Other focusable control", window)
+    layout.addWidget(canvas)
+    layout.addWidget(button)
+    canvas.resize(200, 100)
+    canvas.set_frame(QImage(100, 50, QImage.Format.Format_RGBA8888))
     canvas.apply_presentation(
         _presentation(exclusions=regions), active=True, editable=True
     )
     canvas.set_exclusion_edit(True)
+    window.setTabOrder(canvas, button)
+    window.resize(240, 240)
+    window.show()
     canvas.setFocus()
     qtbot.waitUntil(canvas.hasFocus, timeout=1000)
     events: list[object] = []
     canvas.command_requested.connect(events.append)
 
-    qtbot.keyClick(canvas, Qt.Key.Key_Tab)
+    qtbot.keyClick(canvas, Qt.Key.Key_BracketRight)
     assert canvas._selected_exclusion == 0  # noqa: SLF001
-    qtbot.keyClick(canvas, Qt.Key.Key_Tab)
+    assert canvas.hasFocus()
+    qtbot.keyClick(canvas, Qt.Key.Key_BracketLeft)
     assert canvas._selected_exclusion == 1  # noqa: SLF001
     qtbot.keyClick(canvas, Qt.Key.Key_Delete)
 
     assert events == [ExclusionsChanged((regions[0],))]
+
+
+def test_crop_controls_are_hidden_when_crop_is_disabled_but_regions_are_painted(
+    qtbot,
+) -> None:
+    canvas = _canvas(qtbot)
+    frame = QImage(100, 50, QImage.Format.Format_RGBA8888)
+    frame.fill(QColor("#ffffff"))
+    canvas.set_frame(frame)
+    canvas.apply_presentation(
+        _presentation(exclusions=(CropSpec(20, 10, 30, 20),)),
+        active=False,
+        editable=True,
+    )
+    qtbot.wait(10)
+
+    image = canvas.grab().toImage()
+    accent = QColor("#B7F34A").rgba()
+
+    assert any(
+        image.pixelColor(x, y).red() > image.pixelColor(x, y).green()
+        for x in range(image.width())
+        for y in range(image.height())
+    )
+    assert not any(
+        image.pixelColor(x, y).rgba() == accent
+        for x in range(image.width())
+        for y in range(image.height())
+    )
 
 
 def test_region_mode_announces_mode_without_a_selection(qtbot) -> None:

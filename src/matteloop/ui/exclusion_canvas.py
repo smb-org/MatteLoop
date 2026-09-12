@@ -257,9 +257,12 @@ class ExclusionCanvas(CropCanvas):
         self._paint_exclusions(painter, geometry)
         if self._active:
             self._paint_crop_outline(painter, crop)
-        if not self._exclusion_edit or self._selected_exclusion is not None:
+        show_controls = (
+            self._active and not self._exclusion_edit
+        ) or (self._exclusion_edit and self._selected_exclusion is not None)
+        if show_controls:
             self._paint_handles(painter, geometry)
-        if not self._exclusion_edit or self._selected_exclusion is not None:
+        if show_controls:
             self._paint_focus_ring(painter, geometry)
         painter.end()
 
@@ -364,12 +367,12 @@ class ExclusionCanvas(CropCanvas):
             self.update()
             event.accept()
             return True
-        if event.key() in {int(Qt.Key.Key_Tab), int(Qt.Key.Key_Backtab)}:
+        if event.key() in {
+            int(Qt.Key.Key_BracketLeft),
+            int(Qt.Key.Key_BracketRight),
+        }:
             if self._cycle_exclusion_selection(
-                backwards=(
-                    event.key() == int(Qt.Key.Key_Backtab)
-                    or bool(event.modifiers() & Qt.KeyboardModifier.ShiftModifier)
-                )
+                backwards=event.key() == int(Qt.Key.Key_BracketLeft)
             ):
                 event.accept()
                 return True
@@ -581,6 +584,8 @@ class ExclusionCanvas(CropCanvas):
     def _set_exclusion_selection(
         self, index: int, *, value: CropSpec | None = None
     ) -> None:
+        if self._selected_exclusion != index:
+            self._clear_gesture()
         self._selected_exclusion = index
         if value is not None:
             self._selected_exclusion_value = value
