@@ -1519,9 +1519,90 @@ def test_empty_frame_is_retained_when_range_union_is_nonempty(tmp_path) -> None:
     assert artifact.manifest.union_metadata is not None
 
 
-@pytest.mark.parametrize("visible_size", [None, 10])
-def test_invalid_range_framing_fails_after_cut_promotion_and_preserves_output(
-    tmp_path, visible_size: int | None
+def test_render_stores_unexcluded_cuts_but_unions_and_encodes_without_the_region(
+    tmp_path,
+) -> None:
+    encoder = FakeEncoder()
+    render_request = replace(
+        request(tmp_path),
+        framing=FramingSpec(
+            False,
+            Decimal("2"),
+            0,
+            Decimal("1"),
+            exclusions=(CropSpec(32, 24, 32, 80),),
+        ),
+    )
+
+    artifact = render_service(encoder=encoder).render(
+        render_request, job(tmp_path, "excluded-render", JobKind.RENDER)
+    )
+
+    with artifact.cut_workspace.read_promoted_cut(0) as stored:
+        assert stored.getpixel((40, 30)) == (0, 60, 90, 255)
+    with Image.open(artifact.output_path) as output:
+        output.seek(0)
+        output.load()
+        assert output.getpixel((40, 30)) == (0, 0, 0, 0)
+        assert output.getpixel((65, 30)) == (0, 60, 90, 255)
+    assert artifact.manifest.union_metadata is not None
+    assert artifact.manifest.union_metadata.bounds == (64, 24, 96, 104)
+
+
+def test_render_peak_rgba_owner_count_is_unchanged_by_exclusions(tmp_path) -> None:
+    encoder = FakeEncoder()
+    render_request = replace(
+        request(tmp_path),
+        framing=FramingSpec(
+            False,
+            Decimal("2"),
+            0,
+            Decimal("1"),
+            exclusions=(CropSpec(32, 24, 32, 80),),
+        ),
+    )
+
+    artifact = render_service(encoder=encoder).render(
+        render_request, job(tmp_path, "excluded-owners", JobKind.RENDER)
+    )
+
+    assert artifact.ownership_peak <= 3
+    assert artifact.ownership_current == 0
+
+
+def test_render_with_trim_and_an_empty_mask_encodes_the_untrimmed_canvas_and_notes_it(
+    tmp_path,
+) -> None:
+    render_request = replace(
+        request(tmp_path),
+        framing=FramingSpec(
+            True,
+            Decimal("2"),
+            0,
+            Decimal("1"),
+            exclusions=(CropSpec(0, 0, 128, 128),),
+        ),
+    )
+
+    artifact = render_service().render(
+        render_request, job(tmp_path, "empty-exclusion", JobKind.RENDER)
+    )
+
+    assert (artifact.width, artifact.height) == (128, 128)
+    assert artifact.manifest.union_metadata is None
+    assert (
+        "trim skipped: no pixel above the alpha threshold survives the "
+        "exclusion regions"
+    ) in artifact.notes
+    with Image.open(artifact.output_path) as output:
+        output.seek(0)
+        output.load()
+        assert output.getpixel((64, 64)) == (0, 0, 0, 0)
+
+
+@pytest.mark.parametrize("visible_size", [10])
+def test_render_still_refuses_a_trimmed_box_below_the_minimum_dimension(
+    tmp_path, visible_size: int
 ) -> None:
     class SmallOrEmptySegmenter(FakeSegmenter):
         def segment(self, frame, request):
@@ -1544,12 +1625,7 @@ def test_invalid_range_framing_fails_after_cut_promotion_and_preserves_output(
             render_request, job(tmp_path, "invalid-framing", JobKind.RENDER)
         )
 
-    expected = (
-        ErrorCode.INVALID_FRAMING
-        if visible_size is None
-        else ErrorCode.INVALID_FINAL_DIMENSIONS
-    )
-    assert exc.value.code is expected
+    assert exc.value.code is ErrorCode.INVALID_FINAL_DIMENSIONS
     assert render_request.output.path.read_bytes() == b"old-output"
     durable = _only_durable_workspace(render_request.output.directory)
     assert FilesystemWorkspacePort().validate(durable).frame_count == 2

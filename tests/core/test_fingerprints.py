@@ -18,6 +18,7 @@ from matteloop.core.fingerprints import (
     complete_source_sha256,
     cut_cache_key,
     cut_cache_key_inputs,
+    cut_union_fingerprint,
     provisional_source_fingerprint,
     render_fingerprint,
     union_fingerprint,
@@ -409,6 +410,82 @@ def test_union_identity_tracks_only_cut_content_and_alpha_threshold(
     assert union_fingerprint(new_output, cut_key=cut_key) == baseline
     assert union_fingerprint(new_padding, cut_key=cut_key) == baseline
     assert union_fingerprint(new_threshold, cut_key=cut_key) != baseline
+
+
+def test_render_and_preview_identity_track_effective_exclusions_only(
+    tmp_path: Path,
+) -> None:
+    request = request_a(tmp_path)
+    outside = replace(
+        request,
+        framing=replace(
+            request.framing, exclusions=(CropSpec(0, 0, 1, 1),)
+        ),
+    )
+    inside = replace(
+        request,
+        framing=replace(
+            request.framing, exclusions=(CropSpec(10, 10, 20, 20),)
+        ),
+    )
+
+    assert render_fingerprint(outside, cut_key="ef" * 32) == render_fingerprint(
+        request, cut_key="ef" * 32
+    )
+    assert preview_fingerprint(outside, Fraction(1, 5)) == preview_fingerprint(
+        request, Fraction(1, 5)
+    )
+    assert render_fingerprint(inside, cut_key="ef" * 32) != render_fingerprint(
+        request, cut_key="ef" * 32
+    )
+    assert preview_fingerprint(inside, Fraction(1, 5)) != preview_fingerprint(
+        request, Fraction(1, 5)
+    )
+
+
+def test_union_identity_tracks_effective_exclusions(tmp_path: Path) -> None:
+    request = request_a(tmp_path)
+    first_region = CropSpec(10, 10, 20, 20)
+    second_region = CropSpec(40, 40, 10, 10)
+    first = replace(
+        request,
+        framing=replace(
+            request.framing, exclusions=(first_region, second_region)
+        ),
+    )
+    reordered = replace(
+        request,
+        framing=replace(
+            request.framing,
+            exclusions=(second_region, first_region),
+        ),
+    )
+    outside = replace(
+        request,
+        framing=replace(
+            request.framing, exclusions=(CropSpec(0, 0, 1, 1),)
+        ),
+    )
+
+    assert union_fingerprint(first, cut_key="ef" * 32) == union_fingerprint(
+        reordered, cut_key="ef" * 32
+    )
+    assert union_fingerprint(first, cut_key="ef" * 32) != union_fingerprint(
+        outside, cut_key="ef" * 32
+    )
+
+
+def test_identities_without_exclusions_match_the_previous_schema(
+    tmp_path: Path,
+) -> None:
+    request = replace(request_a(tmp_path), framing=FramingSpec())
+
+    assert "exclusions" not in fingerprints_module._framing(request)
+    assert cut_union_fingerprint(
+        request.framing, request.crop, cut_key="ef" * 32
+    ) == (
+        "8e9f72c32c74a7feb4a7bc60345c74dfeee018fd73d4864d6bbc92e5bc96fb17"
+    )
 
 
 def test_render_fingerprint_distinguishes_long_exact_decimal_values(

@@ -17,32 +17,61 @@ from __future__ import annotations
 import dataclasses
 import os
 import tempfile
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import closing
 from pathlib import Path
+from typing import Protocol
 
 from PIL import Image
 
 from matteloop.core.crop import clamp_crop
-from matteloop.core.errors import ErrorCode, ValidationError
+from matteloop.core.exclusion import exclude_alpha
+from matteloop.core.fingerprints import cut_union_fingerprint
 from matteloop.core.geometry import FramingPlan, PixelBounds, apply_framing
 from matteloop.core.rgba import RgbaOwnershipTracker
-from matteloop.core.specs import FramingSpec, TransformSpec
+from matteloop.core.specs import CropSpec, FramingSpec, TransformSpec
 from matteloop.core.tokens import ProgressStage
 from matteloop.core.transform import apply_transform
 from matteloop.jobs.context import JobContext
 from matteloop.jobs.encoding import _map_output_os_error, _output_error
+from matteloop.jobs.workspace import CutManifest, CutUnionMetadata, CutWorkspace
+
+
+class _RebuildWorkspace(Protocol):
+    def read_cut(
+        self, workspace: CutWorkspace, index: int, ownership: RgbaOwnershipTracker
+    ) -> Image.Image: ...
+
+
+def cached_union(
+    metadata: CutUnionMetadata | None,
+    framing: FramingSpec,
+    crop: CropSpec,
+    cut_key: str,
+) -> PixelBounds | None:
+    """Return cached bounds only when their effective inputs still match."""
+    if metadata is None or metadata.fingerprint != cut_union_fingerprint(
+        framing, crop, cut_key=cut_key
+    ):
+        return None
+    return PixelBounds(*metadata.bounds)
+
+
+def _iter_rebuild_frames(
+    workspace: _RebuildWorkspace, private: CutWorkspace, manifest: CutManifest,
+    tracker: RgbaOwnershipTracker, context: JobContext, boxes: tuple[PixelBounds, ...],
+) -> Iterator[Image.Image]:
+    for index in range(manifest.frame_count):
+        context.checkpoint("rebuild-union")
+        with closing(workspace.read_cut(private, index, tracker)) as image:
+            exclude_alpha(image, boxes)
+            yield image
 
 
 def framing_plan(
     source_size: tuple[int, int], union: PixelBounds | None, framing: FramingSpec
 ) -> FramingPlan:
     """Build the one immutable ``FramingPlan`` the encoder and the player share."""
-    if framing.trim and union is None:
-        raise ValidationError(
-            ErrorCode.INVALID_FRAMING,
-            "framing",
-            "range-wide alpha union contains no visible pixels at this threshold",
-        )
     return FramingPlan(
         source_size,
         global_bounds=union if framing.trim else None,
@@ -61,6 +90,8 @@ def stage_encoder_frames(
     tracker: RgbaOwnershipTracker,
     context: JobContext,
     overall: tuple[int, int],
+    *,
+    exclusions: tuple[PixelBounds, ...] = (),
 ) -> tuple[tuple[Path, ...], tuple[int, ...]]:
     """Frame, crop, and resize the kept cut frames and persist them.
 
@@ -88,6 +119,31 @@ def stage_encoder_frames(
         raise _map_output_os_error(
             error, "cannot create framed input directory"
         ) from error
+    framed_paths = _stage_kept_frames(
+        read_cut,
+        frame_count,
+        plan,
+        transform,
+        framed_directory,
+        tracker,
+        context,
+        overall,
+        exclusions,
+    )
+    return framed_paths, transform.select_kept(delays)
+
+
+def _stage_kept_frames(
+    read_cut: Callable[[int, RgbaOwnershipTracker], Image.Image],
+    frame_count: int,
+    plan: FramingPlan,
+    transform: TransformSpec,
+    framed_directory: Path,
+    tracker: RgbaOwnershipTracker,
+    context: JobContext,
+    overall: tuple[int, int],
+    exclusions: tuple[PixelBounds, ...],
+) -> tuple[Path, ...]:
     kept = transform.kept_range(frame_count)
     kept_count = len(kept)
     framed_paths: list[Path] = []
@@ -96,7 +152,14 @@ def stage_encoder_frames(
         context.checkpoint("framing")
         framed_paths.append(
             _stage_frame(
-                read_cut, index, position, plan, transform, framed_directory, tracker
+                read_cut,
+                index,
+                position,
+                plan,
+                transform,
+                framed_directory,
+                tracker,
+                exclusions,
             )
         )
         context.progress(
@@ -107,7 +170,7 @@ def stage_encoder_frames(
             overall_completed=overall[0] + position + 1,
             overall_total=overall[1],
         )
-    return tuple(framed_paths), transform.select_kept(delays)
+    return tuple(framed_paths)
 
 
 def _stage_frame(
@@ -118,9 +181,11 @@ def _stage_frame(
     transform: TransformSpec,
     framed_directory: Path,
     tracker: RgbaOwnershipTracker,
+    exclusions: tuple[PixelBounds, ...],
 ) -> Path:
     cut = read_cut(index, tracker)
     try:
+        exclude_alpha(cut, exclusions)
         framed = apply_framing(cut, plan)
         tracker.register(framed)
     finally:

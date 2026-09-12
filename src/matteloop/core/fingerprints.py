@@ -14,6 +14,7 @@ from types import MappingProxyType
 from typing import BinaryIO, Protocol, cast
 
 from matteloop.core.errors import AppError, ErrorCode, ValidationError
+from matteloop.core.exclusion import cut_exclusions
 from matteloop.core.specs import (
     CropSpec,
     FramingSpec,
@@ -155,7 +156,7 @@ def preview_fingerprint(
                 "model_weight_sha256": model_weight_sha256,
                 **_edge_settings(request),
             },
-            "framing": _framing(request.framing),
+            "framing": _framing(request),
             "pipeline_schema_version": pipeline_schema_version,
             "orientation_color_version": orientation_color_version,
             "rembg_version": rembg_version,
@@ -240,7 +241,7 @@ def render_fingerprint(request: RenderRequest, *, cut_key: str) -> str:
         {
             **_schema("render"),
             "cut_key": cut_key,
-            "framing": _framing(request.framing),
+            "framing": _framing(request),
             "max_bytes": request.output.max_bytes,
         }
     )
@@ -249,14 +250,41 @@ def render_fingerprint(request: RenderRequest, *, cut_key: str) -> str:
 def union_fingerprint(request: RenderRequest, *, cut_key: str) -> str:
     """Identify the cut bytes and threshold consumed by range-union analysis."""
     request = _validated_request(request)
+    return cut_union_fingerprint(request.framing, request.crop, cut_key=cut_key)
+
+
+def cut_union_fingerprint(
+    framing: FramingSpec, crop: CropSpec, *, cut_key: str
+) -> str:
+    """Identify cut-union inputs, including effective exclusions when present."""
     cut_key = _validated_sha256(cut_key, "cut_key")
-    return _canonical_hash(
-        {
-            **_schema("cut-union"),
-            "cut_key": cut_key,
-            "alpha_threshold": _canonical_decimal(request.framing.alpha_threshold),
-        }
-    )
+    payload: dict[str, object] = {
+        **_schema("cut-union"),
+        "cut_key": cut_key,
+        "alpha_threshold": _canonical_decimal(framing.alpha_threshold),
+    }
+    boxes = cut_exclusions(framing.exclusions, crop)
+    if boxes:
+        payload["exclusions"] = [
+            [box.left, box.top, box.right, box.bottom] for box in boxes
+        ]
+    return _canonical_hash(payload)
+
+
+def _framing(request: RenderRequest) -> dict[str, object]:
+    framing = request.framing
+    payload: dict[str, object] = {
+        "trim": framing.trim,
+        "alpha_threshold": _canonical_decimal(framing.alpha_threshold),
+        "padding": framing.padding,
+        "stretch_x": _canonical_decimal(framing.stretch_x),
+    }
+    boxes = cut_exclusions(framing.exclusions, request.crop)
+    if boxes:
+        payload["exclusions"] = [
+            [box.left, box.top, box.right, box.bottom] for box in boxes
+        ]
+    return payload
 
 
 def _update_digest(
@@ -337,15 +365,6 @@ def _fraction(value: Fraction) -> dict[str, int]:
 
 def _crop(crop: CropSpec) -> dict[str, int]:
     return {"x": crop.x, "y": crop.y, "width": crop.width, "height": crop.height}
-
-
-def _framing(framing: FramingSpec) -> dict[str, object]:
-    return {
-        "trim": framing.trim,
-        "alpha_threshold": _canonical_decimal(framing.alpha_threshold),
-        "padding": framing.padding,
-        "stretch_x": _canonical_decimal(framing.stretch_x),
-    }
 
 
 def _edge_settings(request: RenderRequest) -> dict[str, object]:

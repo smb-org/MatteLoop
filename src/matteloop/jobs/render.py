@@ -36,6 +36,11 @@ import numpy as np
 from PIL import Image
 
 from matteloop.core.errors import AppError, ErrorCode, ValidationError
+from matteloop.core.exclusion import (
+    cut_exclusions,
+    exclude_alpha,
+    union_alpha_bounds_or_none,
+)
 from matteloop.core.fingerprints import (
     PIPELINE_SCHEMA_VERSION,
     REMBG_VERSION,
@@ -79,7 +84,12 @@ from matteloop.jobs.encoding import (
 from matteloop.jobs.models.cache_fs import BoundDirectoryCloseError, UnsafeCacheError
 from matteloop.jobs.protocol import PROTOCOL_VERSION, SegmentOptions, SegmentRequest
 from matteloop.jobs.source import DecodedFrame, SourceInfo, decode_frame, probe_source
-from matteloop.jobs.transform_stage import framing_plan, stage_encoder_frames
+from matteloop.jobs.transform_stage import (
+    _iter_rebuild_frames,
+    cached_union,
+    framing_plan,
+    stage_encoder_frames,
+)
 from matteloop.jobs.transform_store import store_transform
 from matteloop.jobs.workspace import (
     AdvisoryFileLock,
@@ -921,6 +931,8 @@ class PreviewService:
                 tracker,
             )
             try:
+                cut_boxes = cut_exclusions(request.framing.exclusions, request.crop)
+                exclude_alpha(cut, cut_boxes)
                 local_bounds = alpha_bounds(cut, request.framing.alpha_threshold)
                 applied_bounds: PixelBounds | None = None
                 exact = False
@@ -988,14 +1000,7 @@ class PreviewService:
             )
             manifest = self._workspace.validate(workspace)
             metadata = manifest.union_metadata
-            if (
-                metadata is None
-                or metadata.fingerprint != union_fingerprint(request, cut_key=cache_key)
-                or metadata.alpha_threshold
-                != _decimal_text(request.framing.alpha_threshold)
-            ):
-                return None
-            return PixelBounds(*metadata.bounds)
+            return cached_union(metadata, request.framing, request.crop, cache_key)
         except AppError as error:
             if error.code in {
                 ErrorCode.CUT_MANIFEST_INVALID,
@@ -1078,6 +1083,7 @@ class RenderService:
             )
             cache_key = cut_cache_key_from_inputs(inputs)
             tracker = RgbaOwnershipTracker((request.crop.width, request.crop.height))
+            exclusions = cut_exclusions(request.framing.exclusions, request.crop)
             self._advisory_disk_check(request, len(timestamps), notes)
             context.checkpoint("cut-staging")
             staged = self._workspace.create_staging(
@@ -1106,9 +1112,10 @@ class RenderService:
                     tracker,
                 )
                 try:
+                    frame_records.append(self._workspace.stage(staged, index, cut))
+                    exclude_alpha(cut, exclusions)
                     bounds = alpha_bounds(cut, request.framing.alpha_threshold)
                     union = _union_bounds(union, bounds)
-                    frame_records.append(self._workspace.stage(staged, index, cut))
                     actual_pts.append(actual)
                 finally:
                     cut.close()
@@ -1323,32 +1330,20 @@ class RenderService:
         notes: list[str],
         tracker: RgbaOwnershipTracker,
     ) -> PixelBounds | None:
-        metadata = manifest.union_metadata
-        expected_fingerprint = union_fingerprint(request, cut_key=manifest.cache_key)
-        if (
-            metadata is not None
-            and metadata.fingerprint == expected_fingerprint
-            and metadata.alpha_threshold
-            == _decimal_text(request.framing.alpha_threshold)
-        ):
-            return PixelBounds(*metadata.bounds)
-        union: PixelBounds | None = None
-        for index in range(manifest.frame_count):
-            context.checkpoint("rebuild-union")
-            image = self._workspace.read_cut(private, index, tracker)
-            try:
-                union = _union_bounds(
-                    union,
-                    alpha_bounds(image, request.framing.alpha_threshold),
-                )
-            finally:
-                image.close()
-                del image
+        cached = cached_union(
+            manifest.union_metadata, request.framing, request.crop, manifest.cache_key
+        )
+        if cached is not None:
+            return cached
+        boxes = cut_exclusions(request.framing.exclusions, request.crop)
+        store = self._workspace
+        frames = _iter_rebuild_frames(store, private, manifest, tracker, context, boxes)
+        union = union_alpha_bounds_or_none(frames, request.framing.alpha_threshold)
         if union is not None:
             new_metadata = CutUnionMetadata(
                 (union.left, union.top, union.right, union.bottom),
                 _decimal_text(request.framing.alpha_threshold),
-                expected_fingerprint,
+                union_fingerprint(request, cut_key=manifest.cache_key),
             )
             try:
                 won = self._workspace.compare_and_set_union(
@@ -1380,9 +1375,13 @@ class RenderService:
         overall: tuple[int, int],
         rebuilt: bool,
     ) -> RenderArtifact:
+        if request.framing.trim and union is None:
+            notes.append("trim skipped: no pixel above the alpha threshold "
+                         + "survives the exclusion regions")
         plan = framing_plan((manifest.width, manifest.height), union, request.framing)
         tracker.include_size(plan.output_size)
         scratch = private.path.parent
+        exclusions = cut_exclusions(request.framing.exclusions, request.crop)
         framed_paths, delays = stage_encoder_frames(
             partial(self._workspace.read_cut, private),
             manifest.frame_count,
@@ -1393,6 +1392,7 @@ class RenderService:
             tracker,
             context,
             overall=overall,
+            exclusions=exclusions,
         )
         candidate = self._output_publisher.candidate_path(
             request.output.path, context.job_id, scratch

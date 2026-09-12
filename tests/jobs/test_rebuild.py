@@ -459,6 +459,42 @@ def test_identity_transform_rebuild_is_byte_identical(tmp_path) -> None:
     assert explicit_delays == default_delays
 
 
+def test_rebuild_with_a_region_misses_the_cached_union_and_recomputes_it(
+    tmp_path,
+) -> None:
+    workspace = FilesystemWorkspacePort()
+    seed_request = replace(
+        request(tmp_path),
+        framing=FramingSpec(True, Decimal("2"), 48, Decimal("1")),
+    )
+    original = render_service(workspace=workspace).render(
+        seed_request, job(tmp_path, "seed-union-region", JobKind.RENDER)
+    )
+    rebuild_request = replace(
+        seed_request,
+        rebuild=True,
+        framing=FramingSpec(
+            True,
+            Decimal("2"),
+            48,
+            Decimal("1"),
+            exclusions=(CropSpec(32, 24, 32, 80),),
+        ),
+        output=replace(seed_request.output, filename="region.webp"),
+    )
+
+    artifact = _rebuild_service(workspace, FakeEncoder()).rebuild(
+        rebuild_request,
+        original.cut_workspace,
+        job(tmp_path, "rebuild-union-region", JobKind.REBUILD),
+    )
+
+    assert (artifact.width, artifact.height) == (128, 176)
+    metadata = workspace.validate(original.cut_workspace).union_metadata
+    assert metadata is not None
+    assert metadata.bounds == (64, 24, 96, 104)
+
+
 def test_trim_keeps_exactly_the_selected_frames_and_their_delays(tmp_path) -> None:
     """AC 2 / E2 / T7: the kept delays are a *slice* of the full non-uniform
     grid, not a recomputation over the kept count."""
