@@ -36,6 +36,9 @@ from matteloop.core.errors import ErrorCode, ValidationError
 from matteloop.core.geometry import PixelBounds, alpha_bounds
 from matteloop.core.specs import CropSpec
 
+MODEL_FILL_ID = "imagenet-mean"
+MODEL_FILL_RGB = (124, 116, 104)
+
 
 def cut_exclusions(
     exclusions: tuple[CropSpec, ...], crop: CropSpec
@@ -50,6 +53,24 @@ def cut_exclusions(
         if right > left and bottom > top:
             boxes.add((left, top, right, bottom))
     return tuple(PixelBounds(*box) for box in sorted(boxes))
+
+
+def blank_model_input(
+    image: Image.Image, boxes: tuple[PixelBounds, ...]
+) -> None:
+    """Fill model-excluded RGB pixels while preserving their alpha channel."""
+    if not boxes:
+        return
+    alpha = image.getchannel("A")
+    try:
+        for box in boxes:
+            image.paste(
+                MODEL_FILL_RGB,
+                (box.left, box.top, box.right, box.bottom),
+            )
+        image.putalpha(alpha)
+    finally:
+        alpha.close()
 
 
 def exclude_alpha(image: Image.Image, boxes: tuple[PixelBounds, ...]) -> None:

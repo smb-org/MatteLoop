@@ -11,6 +11,7 @@ from matteloop.core.parameters import (
     V1_MODEL_IDS,
     AlphaThresholdChanged,
     EdgeModeChanged,
+    ExclusionsBeforeModelChanged,
     ExclusionsChanged,
     ExecutionProviderChanged,
     GlobalTrimChanged,
@@ -117,6 +118,73 @@ def test_segmentation_parameter_changes_stale_the_current_preview() -> None:
     changed_again = reduce(changed, EdgeModeChanged(EdgeMode.DECONTAMINATE_COLORS))
     assert changed_again.parameters.edge_mode is EdgeMode.DECONTAMINATE_COLORS
     assert changed_again.preview is PreviewState.STALE
+
+
+def test_exclusions_before_model_invalidates_the_preview_as_segmentation() -> None:
+    state = replace(
+        _current(),
+        parameters=replace(
+            _current().parameters,
+            exclusions=(CropSpec(10, 10, 20, 20),),
+        ),
+    )
+
+    changed = reduce(state, ExclusionsBeforeModelChanged(True))
+
+    assert changed.parameters.exclusions_before_model is True
+    assert changed.preview is PreviewState.STALE
+    assert changed.stale_category is PreviewInvalidationReason.SEGMENTATION
+
+
+def test_exclusions_before_model_with_no_effective_region_does_not_invalidate() -> None:
+    state = replace(
+        _current(),
+        parameters=replace(
+            _current().parameters,
+            exclusions=(CropSpec(200, 200, 20, 20),),
+        ),
+    )
+
+    changed = reduce(state, ExclusionsBeforeModelChanged(True))
+
+    assert changed.parameters.exclusions_before_model is True
+    assert changed.preview is PreviewState.CURRENT
+    assert changed.stale_category is None
+
+
+def test_region_change_invalidates_as_segmentation_while_the_switch_is_on() -> None:
+    initial = CropSpec(10, 10, 20, 20)
+    state = replace(
+        _current(),
+        parameters=replace(
+            _current().parameters,
+            exclusions=(initial,),
+            exclusions_before_model=True,
+        ),
+    )
+
+    changed = reduce(
+        state, ExclusionsChanged((CropSpec(20, 20, 20, 20),))
+    )
+
+    assert changed.preview is PreviewState.STALE
+    assert changed.stale_category is PreviewInvalidationReason.SEGMENTATION
+
+
+def test_parameters_reset_clears_exclusions_before_model() -> None:
+    state = replace(
+        _current(),
+        parameters=replace(
+            _current().parameters,
+            exclusions=(CropSpec(10, 10, 20, 20),),
+            exclusions_before_model=True,
+        ),
+    )
+
+    reset = reduce(state, ParametersReset())
+
+    assert reset.parameters.exclusions_before_model is False
+    assert reset.stale_category is PreviewInvalidationReason.SEGMENTATION
 
 
 def test_execution_provider_changes_stale_the_current_preview() -> None:
@@ -428,3 +496,13 @@ def test_exclusions_settings_string_round_trips_and_malformed_entries_fall_back_
     ).exclusions == exclusions
     assert parameters_from_values({"exclusions": "1,2,30"}).exclusions == ()
     assert parameters_from_values({"exclusions": "1,2,3,4;bad"}).exclusions == ()
+
+
+def test_exclusions_before_model_settings_round_trip_and_malformed_value_fall_back(
+) -> None:
+    assert parameters_from_values(
+        {"exclusions_before_model": "true"}
+    ).exclusions_before_model is True
+    assert parameters_from_values(
+        {"exclusions_before_model": "not-a-bool"}
+    ).exclusions_before_model is False

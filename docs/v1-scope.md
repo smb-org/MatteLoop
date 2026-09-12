@@ -51,7 +51,7 @@ Nothing else gates V1. When that sentence is true end to end, V1 is done.
 | Output | Lossless animated WebP, plus the still-image single-frame case. |
 | Timeline | Filmstrip, playhead, IN/OUT range handles, exact time/frame readout. |
 | Crop | Visual rectangle with handles, plus numeric fields. |
-| Exclusion regions | Several user-drawn rectangles over the source frame, forced to alpha 0 after segmentation so a burned-in overlay does not survive into the cutout. **Scope reopened 2026-09-12 (issue #80):** no setting addressed a composited chat box, alert box or a bystander at the frame edge — `Crop` removes the subject with the overlay, and a largest-component filter was measured to fail in both directions. |
+| Exclusion regions | Several user-drawn rectangles over the source frame, forced to alpha 0 after segmentation so a burned-in overlay does not survive into the cutout. **Scope reopened 2026-09-12 (issue #80):** an optional global switch also blanks those regions before the model; effective boxes are part of the cut key, so changing them re-segments while post-only edits keep the stored cut set. |
 | Preview | `Preview Frame` through the exact render pipeline, with the stale-result contract. |
 | Jobs | Exclusive modal job dialog with truthful stage/progress and working cancellation. |
 | Accessibility | Full keyboard reachability, correct tab order, accessible names and values on **standard** widgets, no colour-only status. |

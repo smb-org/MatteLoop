@@ -209,6 +209,7 @@ class SegmentationSpec:
     edge_mode: EdgeMode = EdgeMode.STANDARD
     alpha_matting: AlphaMattingSpec = field(default_factory=AlphaMattingSpec)
     execution_provider: str = CPU_EXECUTION_PROVIDER
+    exclusions: tuple[CropSpec, ...] = ()
 
     def __post_init__(self) -> None:
         self.validate()
@@ -237,6 +238,14 @@ class SegmentationSpec:
                 ErrorCode.INVALID_SEGMENTATION,
                 "segmentation",
                 "alpha_matting must be an AlphaMattingSpec",
+            )
+        if not isinstance(self.exclusions, tuple) or any(
+            not isinstance(exclusion, CropSpec) for exclusion in self.exclusions
+        ):
+            raise ValidationError(
+                ErrorCode.INVALID_SEGMENTATION,
+                "segmentation",
+                "exclusions must be a tuple of CropSpec values",
             )
 
 

@@ -100,6 +100,29 @@ def test_preview_zeroes_excluded_alpha_in_the_cut_image_and_its_bounds(
     assert preview.local_bounds_estimate == PixelBounds(64, 24, 96, 104)
 
 
+def test_preview_shows_no_filler_pixels_inside_a_model_exclusion(
+    tmp_path,
+) -> None:
+    render_request = replace(
+        request(tmp_path),
+        segmentation=SegmentationSpec(
+            exclusions=(CropSpec(32, 24, 32, 80),)
+        ),
+    )
+
+    preview = PreviewService(
+        source=FakeSource(),
+        segmentation=binding(FakeSegmenter()),
+        workspace=FilesystemWorkspacePort(),
+        clock=FakeClock(),
+    ).preview(
+        render_request, Fraction(0), job(tmp_path, "model-preview", JobKind.PREVIEW)
+    )
+
+    with preview.pre_global_trim_rgba.to_image() as cut:
+        assert cut.getpixel((40, 30)) == (0, 0, 0, 0)
+
+
 def test_preview_fingerprint_tracks_the_prepared_model_weight(tmp_path) -> None:
     request_with_same_user_settings = request(tmp_path)
     source = FakeSource()

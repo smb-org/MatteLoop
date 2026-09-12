@@ -154,6 +154,23 @@ def test_framing_spec_rejects_exclusions_that_are_not_crop_specs(
 
 
 @pytest.mark.parametrize(
+    "exclusions",
+    [
+        [CropSpec(0, 0, 10, 10)],
+        (CropSpec(0, 0, 10, 10), (0, 0, 10, 10)),
+    ],
+    ids=["not-a-tuple", "contains-a-non-crop"],
+)
+def test_segmentation_spec_rejects_exclusions_that_are_not_crop_specs(
+    exclusions: object,
+) -> None:
+    with pytest.raises(ValidationError) as exc:
+        SegmentationSpec(exclusions=exclusions)  # type: ignore[arg-type]
+
+    assert exc.value.code is ErrorCode.INVALID_SEGMENTATION
+
+
+@pytest.mark.parametrize(
     ("crop", "source_width", "source_height"),
     [
         (CropSpec(x=91, y=0, width=10, height=10), 100, 100),

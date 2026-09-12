@@ -59,6 +59,7 @@ class ParameterState:
     padding: int = 0
     stretch_x: Decimal = Decimal("1.0")
     exclusions: tuple[CropSpec, ...] = ()
+    exclusions_before_model: bool = False
     output_directory: Path | None = None
     output_filename: str | None = None
     max_mib: Decimal = Decimal("0")
@@ -139,6 +140,11 @@ class ExclusionsChanged:
 
 
 @dataclass(frozen=True, slots=True)
+class ExclusionsBeforeModelChanged:
+    enabled: bool
+
+
+@dataclass(frozen=True, slots=True)
 class OutputDirectoryChanged:
     directory: Path | None
 
@@ -173,6 +179,7 @@ ParameterEvent = (
     | PaddingChanged
     | StretchChanged
     | ExclusionsChanged
+    | ExclusionsBeforeModelChanged
     | OutputDirectoryChanged
     | OutputFilenameChanged
     | OutputMaxSizeChanged
@@ -210,6 +217,8 @@ def reduce_parameters(state: AppState, event: ParameterEvent) -> AppState:
         return _reduce_cleanup_value(state, event)
     if isinstance(event, ExclusionsChanged):
         return _reduce_exclusions(state, event)
+    if isinstance(event, ExclusionsBeforeModelChanged):
+        return _reduce_exclusions_before_model(state, event)
     if isinstance(event, OutputDirectoryChanged):
         return _reduce_output_directory(state, event)
     if isinstance(event, OutputFilenameChanged):
@@ -235,6 +244,7 @@ def _reduce_parameters_reset(state: AppState) -> AppState:
         padding=defaults.padding,
         stretch_x=defaults.stretch_x,
         exclusions=defaults.exclusions,
+        exclusions_before_model=defaults.exclusions_before_model,
         max_mib=defaults.max_mib,
     )
     timeline = state.timeline
@@ -255,6 +265,8 @@ def _reduce_parameters_reset(state: AppState) -> AppState:
     if (
         parameters.model_id != state.parameters.model_id
         or parameters.edge_mode != state.parameters.edge_mode
+        or parameters.exclusions_before_model
+        != state.parameters.exclusions_before_model
     ):
         reason = PreviewInvalidationReason.SEGMENTATION
     elif parameters.fps != state.parameters.fps or (
@@ -398,8 +410,32 @@ def _reduce_exclusions(state: AppState, event: ExclusionsChanged) -> AppState:
     return _invalidate(
         state,
         updated,
-        PreviewInvalidationReason.CROP_CLEANUP,
+        (
+            PreviewInvalidationReason.SEGMENTATION
+            if state.parameters.exclusions_before_model
+            else PreviewInvalidationReason.CROP_CLEANUP
+        ),
     )
+
+
+def _reduce_exclusions_before_model(
+    state: AppState, event: ExclusionsBeforeModelChanged
+) -> AppState:
+    from matteloop.core.tokens import PreviewInvalidationReason
+
+    if (
+        type(event.enabled) is not bool
+        or event.enabled == state.parameters.exclusions_before_model
+    ):
+        return state
+    updated = replace(
+        state.parameters, exclusions_before_model=event.enabled
+    )
+    if state.crop is None or not cut_exclusions(
+        state.parameters.exclusions, state.crop
+    ):
+        return replace(state, parameters=updated)
+    return _invalidate(state, updated, PreviewInvalidationReason.SEGMENTATION)
 
 
 def _reduce_output_directory(
@@ -488,6 +524,9 @@ def parameters_from_values(values: Mapping[str, object]) -> ParameterState:
             values.get("stretch_x"), defaults.stretch_x, lambda value: value > 0
         ),
         exclusions=_exclusions_value(values.get("exclusions"), defaults.exclusions),
+        exclusions_before_model=_bool_value(
+            values.get("exclusions_before_model"), defaults.exclusions_before_model
+        ),
         max_mib=_decimal_value(
             values.get("max_mib"), defaults.max_mib, lambda value: value >= 0
         ),

@@ -1571,6 +1571,103 @@ def test_render_stores_unexcluded_cuts_but_unions_and_encodes_without_the_region
     assert artifact.manifest.union_metadata.bounds == (64, 24, 96, 104)
 
 
+def test_render_blanks_model_exclusions_and_zeroes_stored_cut(
+    tmp_path: Path,
+) -> None:
+    segmenter = FakeSegmenter()
+    render_request = replace(
+        request(tmp_path),
+        segmentation=SegmentationSpec(
+            exclusions=(CropSpec(32, 24, 32, 80),)
+        ),
+    )
+
+    artifact = render_service(segmenter=segmenter).render(
+        render_request, job(tmp_path, "model-exclusion", JobKind.RENDER)
+    )
+
+    assert tuple(segmenter.frames[0][30, 40, :3]) == (124, 116, 104)
+    with artifact.cut_workspace.read_promoted_cut(0) as stored:
+        assert stored.getpixel((40, 30)) == (0, 0, 0, 0)
+
+
+def test_render_with_model_exclusions_reads_the_original_pixels_outside_the_box(
+    tmp_path: Path,
+) -> None:
+    segmenter = FakeSegmenter()
+    render_request = replace(
+        request(tmp_path),
+        segmentation=SegmentationSpec(
+            exclusions=(CropSpec(32, 24, 32, 80),)
+        ),
+    )
+
+    render_service(segmenter=segmenter).render(
+        render_request, job(tmp_path, "model-exclusion-edge", JobKind.RENDER)
+    )
+
+    frame = segmenter.frames[0]
+    assert tuple(frame[23, 40, :3]) == (0, 60, 90)
+    assert tuple(frame[30, 31, :3]) == (0, 60, 90)
+    assert tuple(frame[104, 40, :3]) == (0, 60, 90)
+
+
+def test_render_with_the_switch_off_sends_the_model_the_unblanked_frame(
+    tmp_path: Path,
+) -> None:
+    segmenter = FakeSegmenter()
+
+    render_service(segmenter=segmenter).render(
+        request(tmp_path), job(tmp_path, "model-exclusion-off", JobKind.RENDER)
+    )
+
+    assert tuple(segmenter.frames[0][30, 40, :3]) == (0, 60, 90)
+
+
+def test_render_reuses_the_unblanked_cut_set_after_the_switch_is_turned_off(
+    tmp_path: Path,
+) -> None:
+    segmenter = FakeSegmenter()
+    service = render_service(segmenter=segmenter)
+    pre_model = replace(
+        request(tmp_path),
+        segmentation=SegmentationSpec(
+            exclusions=(CropSpec(32, 24, 32, 80),)
+        ),
+    )
+    post_model = request(tmp_path)
+
+    service.render(pre_model, job(tmp_path, "reuse-pre-first", JobKind.RENDER))
+    assert len(segmenter.calls) == 2
+    service.render(post_model, job(tmp_path, "reuse-post", JobKind.RENDER))
+    assert len(segmenter.calls) == 4
+    service.render(
+        pre_model, job(tmp_path, "reuse-pre-again", JobKind.RENDER)
+    )
+
+    assert len(segmenter.calls) == 4
+
+
+def test_render_with_whole_frame_model_exclusion_notes_untrimmed_canvas(
+    tmp_path: Path,
+) -> None:
+    render_request = replace(
+        request(tmp_path),
+        segmentation=SegmentationSpec(
+            exclusions=(CropSpec(0, 0, 128, 128),)
+        ),
+        framing=FramingSpec(True, Decimal("2"), 0, Decimal("1")),
+    )
+
+    artifact = render_service().render(
+        render_request, job(tmp_path, "whole-model-exclusion", JobKind.RENDER)
+    )
+
+    assert (artifact.width, artifact.height) == (128, 128)
+    assert artifact.manifest.union_metadata is None
+    assert any("trim skipped" in note for note in artifact.notes)
+
+
 def test_render_maps_offset_source_exclusions_into_cut_coordinates(tmp_path) -> None:
     render_request = replace(
         request(tmp_path, crop=CropSpec(16, 16, 128, 128)),

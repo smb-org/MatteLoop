@@ -42,6 +42,40 @@ def test_cut_exclusions_is_order_independent_and_deduplicated() -> None:
     )
 
 
+def test_blank_model_input_fills_each_box_and_nothing_else() -> None:
+    from matteloop.core.exclusion import blank_model_input
+
+    image = Image.new("RGBA", (8, 6))
+    image.putdata(
+        tuple((x, y, x + y, 20 + x * 8 + y) for y in range(6) for x in range(8))
+    )
+    original = image.copy()
+    boxes = (PixelBounds(1, 1, 3, 3), PixelBounds(5, 0, 7, 2))
+
+    blank_model_input(image, boxes)
+
+    for y in range(6):
+        for x in range(8):
+            inside = (1 <= x < 3 and 1 <= y < 3) or (5 <= x < 7 and y < 2)
+            expected = (
+                (124, 116, 104, original.getpixel((x, y))[3])
+                if inside
+                else original.getpixel((x, y))
+            )
+            assert image.getpixel((x, y)) == expected
+
+
+def test_blank_model_input_with_no_boxes_leaves_the_image_byte_identical() -> None:
+    from matteloop.core.exclusion import blank_model_input
+
+    image = Image.new("RGBA", (4, 3), (10, 20, 30, 40))
+    before = image.tobytes()
+
+    blank_model_input(image, ())
+
+    assert image.tobytes() == before
+
+
 def test_exclude_alpha_zeroes_rgba_inside_each_box_and_nothing_else() -> None:
     image = Image.new("RGBA", (6, 6), (10, 20, 30, 255))
     boxes = (PixelBounds(1, 1, 3, 3), PixelBounds(4, 0, 6, 2))

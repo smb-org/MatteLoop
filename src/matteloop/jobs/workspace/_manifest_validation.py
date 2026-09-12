@@ -74,18 +74,21 @@ def _frame_from_payload(value: object) -> CutFrame:
 
 
 def _validate_cache_inputs(inputs: FrozenJsonMap) -> None:
+    expected_keys = {
+        "crop",
+        "edge_settings",
+        "model",
+        "orientation_color_version",
+        "pipeline_schema_version",
+        "rembg_version",
+        "sampling",
+        "source_sha256",
+    }
+    if "model_exclusions" in inputs:
+        expected_keys.add("model_exclusions")
     _exact_keys(
         inputs,
-        {
-            "crop",
-            "edge_settings",
-            "model",
-            "orientation_color_version",
-            "pipeline_schema_version",
-            "rembg_version",
-            "sampling",
-            "source_sha256",
-        },
+        expected_keys,
         "cache_key_inputs",
     )
     _validate_sha256(_string(inputs["source_sha256"], "source sha256"), "source sha256")
@@ -151,6 +154,51 @@ def _validate_cache_inputs(inputs: FrozenJsonMap) -> None:
         minimum=0,
         maximum=_MAX_INT64,
     )
+    if "model_exclusions" in inputs:
+        _validate_model_exclusions(inputs["model_exclusions"])
+
+
+def _validate_model_exclusions(value: FrozenJsonValue) -> None:
+    exclusions = _frozen_object(value, "model exclusions")
+    _exact_keys(exclusions, {"boxes", "fill"}, "model exclusions")
+    _bounded_text(
+        _string(exclusions["fill"], "model exclusion fill"),
+        "model exclusion fill",
+    )
+    boxes = exclusions["boxes"]
+    if type(boxes) is not tuple:
+        raise _manifest_error("model exclusion boxes must be an array")
+    for box in boxes:
+        if type(box) is not tuple or len(box) != 4:
+            raise _manifest_error("model exclusion boxes must contain four integers")
+        left = _bounded_int(
+            _int(box[0], "model exclusion left"),
+            "model exclusion left",
+            minimum=0,
+            maximum=MAX_CUT_DIMENSION,
+        )
+        top = _bounded_int(
+            _int(box[1], "model exclusion top"),
+            "model exclusion top",
+            minimum=0,
+            maximum=MAX_CUT_DIMENSION,
+        )
+        right = _bounded_int(
+            _int(box[2], "model exclusion right"),
+            "model exclusion right",
+            minimum=0,
+            maximum=MAX_CUT_DIMENSION,
+        )
+        bottom = _bounded_int(
+            _int(box[3], "model exclusion bottom"),
+            "model exclusion bottom",
+            minimum=0,
+            maximum=MAX_CUT_DIMENSION,
+        )
+        if right <= left or bottom <= top:
+            raise _manifest_error(
+                "model exclusion boxes must be positive rectangles"
+            )
 
 
 def _fraction_payload(value: FrozenJsonValue, field: str) -> float:

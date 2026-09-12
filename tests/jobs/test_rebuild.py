@@ -12,6 +12,7 @@ from PIL import Image
 
 import matteloop.paths as paths_module
 from matteloop.core.errors import AppError, ErrorCode, ValidationError
+from matteloop.core.fingerprints import cut_cache_key
 from matteloop.core.specs import (
     CropSpec,
     FramingSpec,
@@ -19,6 +20,7 @@ from matteloop.core.specs import (
     OutputSpec,
     ResizeSpec,
     SamplingSpec,
+    SegmentationSpec,
     TransformSpec,
 )
 from matteloop.core.state import JobKind
@@ -34,6 +36,7 @@ from matteloop.jobs.render import (
     RenderService,
 )
 from matteloop.jobs.transform_store import load_transform, transform_sidecar_path
+from matteloop.ui.workspace_presentation import request_for_workspace
 from tests.jobs.render_support import (
     ExplodingSource,
     FakeClock,
@@ -412,6 +415,43 @@ def _rebuild_service(workspace: FilesystemWorkspacePort, encoder) -> RenderServi
         clock=FakeClock(),
         output_publisher=AtomicOutputPublisher(),
     )
+
+
+def test_rebuild_of_a_model_exclusion_set_reproduces_its_key_from_the_manifest(
+    tmp_path,
+) -> None:
+    workspace = FilesystemWorkspacePort()
+    seed_request = replace(
+        request(tmp_path),
+        segmentation=SegmentationSpec(
+            exclusions=(CropSpec(32, 24, 32, 80),)
+        ),
+    )
+    original = render_service(workspace=workspace).render(
+        seed_request, job(tmp_path, "seed-model-rebuild", JobKind.RENDER)
+    )
+    rebuilt_request = request_for_workspace(
+        original.manifest,
+        replace(seed_request, segmentation=SegmentationSpec()),
+    )
+
+    assert (
+        rebuilt_request.segmentation.exclusions
+        == seed_request.segmentation.exclusions
+    )
+    assert cut_cache_key(
+        rebuilt_request,
+        source_sha256=original.manifest.source_sha256,
+        model_weight_sha256="ab" * 32,
+    ) == original.manifest.cache_key
+
+    rebuilt = _rebuild_service(workspace, FakeEncoder()).rebuild(
+        rebuilt_request,
+        original.cut_workspace,
+        job(tmp_path, "rebuild-model-set", JobKind.REBUILD),
+    )
+
+    assert rebuilt.manifest.cache_key == original.manifest.cache_key
 
 
 def test_identity_transform_rebuild_is_byte_identical(tmp_path) -> None:

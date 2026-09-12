@@ -14,7 +14,7 @@ from types import MappingProxyType
 from typing import BinaryIO, Protocol, cast
 
 from matteloop.core.errors import AppError, ErrorCode, ValidationError
-from matteloop.core.exclusion import cut_exclusions
+from matteloop.core.exclusion import MODEL_FILL_ID, cut_exclusions
 from matteloop.core.specs import (
     CropSpec,
     FramingSpec,
@@ -155,6 +155,7 @@ def preview_fingerprint(
                 "model_id": request.segmentation.model_id,
                 "model_weight_sha256": model_weight_sha256,
                 **_edge_settings(request),
+                **_model_exclusions(request),
             },
             "framing": _framing(request),
             "pipeline_schema_version": pipeline_schema_version,
@@ -218,6 +219,7 @@ def cut_cache_key_inputs(
             "pipeline_schema_version": pipeline_schema_version,
             "orientation_color_version": orientation_color_version,
             "edge_settings": _edge_settings(request),
+            **_model_exclusions(request),
         }
     )
 
@@ -285,6 +287,20 @@ def _framing(request: RenderRequest) -> dict[str, object]:
             [box.left, box.top, box.right, box.bottom] for box in boxes
         ]
     return payload
+
+
+def _model_exclusions(request: RenderRequest) -> dict[str, object]:
+    boxes = cut_exclusions(request.segmentation.exclusions, request.crop)
+    if not boxes:
+        return {}
+    return {
+        "model_exclusions": {
+            "fill": MODEL_FILL_ID,
+            "boxes": tuple(
+                (box.left, box.top, box.right, box.bottom) for box in boxes
+            ),
+        }
+    }
 
 
 def _update_digest(

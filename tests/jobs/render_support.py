@@ -119,9 +119,11 @@ def frozen_segmentation_result(result: np.ndarray) -> np.ndarray:
 class FakeSegmenter:
     def __init__(self) -> None:
         self.calls: list[SegmentRequest] = []
+        self.frames: list[np.ndarray] = []
 
     def segment(self, frame: np.ndarray, request: SegmentRequest) -> np.ndarray:
         self.calls.append(request)
+        self.frames.append(frame.copy())
         result = np.zeros(frame.shape[:2] + (4,), dtype=np.uint8)
         result[24:104, 32:96, :3] = frame[24:104, 32:96, :3]
         result[24:104, 32:96, 3] = 255

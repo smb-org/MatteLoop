@@ -7,7 +7,6 @@ cuts directly::
                                                    |              |
                                                    v              v
                                              durable promote   framing -> encode
-
     rebuild: durable cuts -----------------> private snapshot -> framing -> encode
 
 ``_produce_cut_frame`` is the only decode/crop/segment/edge-cleanup path.  The
@@ -37,6 +36,7 @@ from PIL import Image
 
 from matteloop.core.errors import AppError, ErrorCode, ValidationError
 from matteloop.core.exclusion import (
+    blank_model_input,
     cut_exclusions,
     exclude_alpha,
     union_alpha_bounds_or_none,
@@ -1561,6 +1561,8 @@ def _produce_cut_frame(
         decoded_image.close()
         del decoded, decoded_image
     try:
+        model_boxes = cut_exclusions(request.segmentation.exclusions, request.crop)
+        blank_model_input(cropped, model_boxes)
         input_frame = np.ascontiguousarray(np.asarray(cropped, dtype=np.uint8))
         tracker.register(input_frame)
         options = _segment_options(request)
@@ -1604,6 +1606,7 @@ def _produce_cut_frame(
         segmented.tobytes(order="C"),
     )
     tracker.register(result)
+    exclude_alpha(result, model_boxes)
     del segmented
     return result, actual_pts
 
