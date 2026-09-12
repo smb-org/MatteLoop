@@ -64,6 +64,7 @@ from matteloop.ui.copy import (
     section_title,
 )
 from matteloop.ui.crop_presentation import CropPresentation
+from matteloop.ui.exclusion_controls import ExclusionControls
 from matteloop.ui.inspector_disclosure import configure_disclosure, read_bool
 from matteloop.ui.inspector_reset import action_availability, build_reset_button
 from matteloop.ui.parameter_presentation import (
@@ -307,6 +308,8 @@ class Inspector(QFrame):
         self.stretch_spinbox.setAccessibleName(
             QCoreApplication.translate("Inspector", "Horizontal stretch")
         )
+        self.exclusion_controls = ExclusionControls()
+        self.exclusion_controls.command_requested.connect(self.command_requested.emit)
 
     def _build_output_parameter_controls(self) -> None:
         self.output_directory_edit = compact_field(MiddleElidingLineEdit())
@@ -510,6 +513,7 @@ class Inspector(QFrame):
             self.max_size_spinbox,
         ):
             widget.setEnabled(available)
+        self.exclusion_controls.apply(presentation, editable)
         clear_enabled, reset_enabled = action_availability(presentation)
         self.clear_output_directory_button.setEnabled(available and clear_enabled)
         self.reset_parameters_button.setEnabled(available and reset_enabled)
@@ -769,6 +773,7 @@ class Inspector(QFrame):
         layout.addRow(self._form_label("Alpha threshold"), self.alpha_threshold_spinbox)
         layout.addRow(self._form_label("Padding"), self.padding_spinbox)
         layout.addRow(self._form_label("Horizontal stretch"), self.stretch_spinbox)
+        layout.addRow(self._form_label("Exclusions"), self.exclusion_controls)
         return controls
 
     def _output_controls(self) -> QWidget:
@@ -826,6 +831,7 @@ class Inspector(QFrame):
             self.alpha_threshold_spinbox,
             self.padding_spinbox,
             self.stretch_spinbox,
+            *self.exclusion_controls.tab_widgets(),
             self.output_directory_button,
             self.clear_output_directory_button,
             self.output_filename_edit,
@@ -846,6 +852,7 @@ class Inspector(QFrame):
             *self.crop_tab_widgets(),
             self.trim_checkbox, self.alpha_threshold_spinbox, self.padding_spinbox,
             self.stretch_spinbox,
+            *self.exclusion_controls.tab_widgets(),
             self.disclosures["transform"][0],
             *self.transform_group.tab_widgets(),
             self.disclosures["output"][0],

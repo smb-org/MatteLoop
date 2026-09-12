@@ -8,7 +8,7 @@ import pytest
 from PySide6.QtCore import QSettings, Qt
 from PySide6.QtWidgets import QAbstractSpinBox, QComboBox
 
-from matteloop.core.parameters import ParametersReset, ParameterState
+from matteloop.core.parameters import ExclusionsChanged, ParametersReset, ParameterState
 from matteloop.core.specs import CropSpec, EdgeMode, TransformSpec
 from matteloop.core.state import AppState, SourceState
 from matteloop.core.timeline import TimelineState
@@ -258,6 +258,41 @@ def test_inspector_emits_parameter_commands_from_standard_controls(qtbot) -> Non
         "GlobalTrimChanged",
         "PaddingChanged",
     ]
+
+
+def test_exclusion_controls_toggle_edit_mode_and_clear_regions(qtbot) -> None:
+    inspector = Inspector(_settings())
+    qtbot.addWidget(inspector)
+    state = AppState(
+        parameters=ParameterState(exclusions=(CropSpec(10, 10, 20, 20),)),
+        timeline=TimelineState(Fraction(4), Fraction(0), Fraction(4), Fraction(0)),
+    )
+    inspector.apply_parameters(present_parameters(state), editable=True)
+    commands: list[object] = []
+    modes: list[bool] = []
+    inspector.command_requested.connect(commands.append)
+    inspector.exclusion_controls.edit_toggled.connect(modes.append)
+
+    controls = inspector.exclusion_controls
+    assert controls.edit_button.text() == "Edit"
+    assert controls.edit_button.accessibleName() == "Edit exclusion regions"
+    assert controls.edit_button.toolTip() == "Edit exclusion regions"
+    assert controls.clear_button.text() == "Clear"
+    assert controls.clear_button.accessibleName() == "Clear exclusion regions"
+    assert controls.count_label.text() == "1 region(s)"
+    assert controls.clear_button.isEnabled()
+
+    controls.edit_button.click()
+    controls.clear_button.click()
+
+    assert modes == [True]
+    assert commands == [ExclusionsChanged(())]
+
+    inspector.apply_parameters(present_parameters(state), editable=False)
+
+    assert modes == [True, False]
+    assert not controls.edit_button.isEnabled()
+    assert not controls.clear_button.isEnabled()
 
 
 def test_inspector_emits_edge_mode_from_the_standard_combo(qtbot) -> None:

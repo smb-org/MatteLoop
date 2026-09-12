@@ -643,6 +643,7 @@ def inspector_label(value: str) -> str:
         "Horizontal stretch": QCoreApplication.translate(
             "Inspector", "Horizontal stretch"
         ),
+        "Exclusions": QCoreApplication.translate("Inspector", "Exclusions"),
         "Directory": QCoreApplication.translate("Inspector", "Directory"),
         "Filename": QCoreApplication.translate("Inspector", "Filename"),
         "Maximum size": QCoreApplication.translate("Inspector", "Maximum size"),

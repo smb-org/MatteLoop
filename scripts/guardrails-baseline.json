@@ -88,7 +88,7 @@
     "long_functions": 1
   },
   "src/matteloop/ui/inspector.py": {
-    "lines": 897,
+    "lines": 904,
     "long_functions": 0
   },
   "src/matteloop/ui/timeline.py": {
