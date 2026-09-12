@@ -264,13 +264,22 @@ def test_exclusion_controls_toggle_edit_mode_and_clear_regions(qtbot) -> None:
     inspector = Inspector(_settings())
     qtbot.addWidget(inspector)
     state = AppState(
+        source=SourceState.READY,
+        source_id="source",
+        source_value=object(),
         parameters=ParameterState(exclusions=(CropSpec(10, 10, 20, 20),)),
         timeline=TimelineState(Fraction(4), Fraction(0), Fraction(4), Fraction(0)),
     )
-    inspector.apply_parameters(present_parameters(state), editable=True)
+    store = ReducerStore(state)
+    controller = SourceController.__new__(SourceController)
+    controller._store = store
+    controller._settings = None
+    controller._closed = False
+    inspector.apply_parameters(present_parameters(store.state), editable=True)
     commands: list[object] = []
     modes: list[bool] = []
     inspector.command_requested.connect(commands.append)
+    inspector.command_requested.connect(controller.dispatch)
     inspector.exclusion_controls.edit_toggled.connect(modes.append)
 
     controls = inspector.exclusion_controls
@@ -287,12 +296,14 @@ def test_exclusion_controls_toggle_edit_mode_and_clear_regions(qtbot) -> None:
 
     assert modes == [True]
     assert commands == [ExclusionsChanged(())]
+    assert store.state.parameters.exclusions == ()
 
-    inspector.apply_parameters(present_parameters(state), editable=False)
+    inspector.apply_parameters(present_parameters(store.state), editable=False)
 
     assert modes == [True, False]
     assert not controls.edit_button.isEnabled()
     assert not controls.clear_button.isEnabled()
+    assert controls.count_label.text() == "0 region(s)"
 
 
 def test_inspector_emits_edge_mode_from_the_standard_combo(qtbot) -> None:

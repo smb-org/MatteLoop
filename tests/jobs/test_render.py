@@ -1550,6 +1550,14 @@ def test_render_stores_unexcluded_cuts_but_unions_and_encodes_without_the_region
 
 
 def test_render_peak_rgba_owner_count_is_unchanged_by_exclusions(tmp_path) -> None:
+    baseline_path = tmp_path / "baseline"
+    baseline_path.mkdir()
+    baseline_request = request(baseline_path)
+    baseline_request.source.write_bytes(b"baseline-video")
+    baseline = render_service(encoder=FakeEncoder()).render(
+        baseline_request,
+        job(baseline_path, "unexcluded-owners", JobKind.RENDER),
+    )
     encoder = FakeEncoder()
     render_request = replace(
         request(tmp_path),
@@ -1566,8 +1574,16 @@ def test_render_peak_rgba_owner_count_is_unchanged_by_exclusions(tmp_path) -> No
         render_request, job(tmp_path, "excluded-owners", JobKind.RENDER)
     )
 
-    assert artifact.ownership_peak <= 3
-    assert artifact.ownership_current == 0
+    assert artifact.ownership_peak == baseline.ownership_peak
+    assert artifact.ownership_current == baseline.ownership_current == 0
+    with artifact.cut_workspace.read_promoted_cut(0) as stored:
+        assert stored.getpixel((40, 30)) == (0, 60, 90, 255)
+    with Image.open(artifact.output_path) as output:
+        output.seek(0)
+        output.load()
+        assert output.getpixel((40, 30)) == (0, 0, 0, 0)
+    assert artifact.manifest.union_metadata is not None
+    assert artifact.manifest.union_metadata.bounds == (64, 24, 96, 104)
 
 
 def test_render_with_trim_and_an_empty_mask_encodes_the_untrimmed_canvas_and_notes_it(

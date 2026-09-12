@@ -441,6 +441,7 @@ class SourceController(QObject):
                 _as_app_error(TypeError("source adapter returned an invalid result")),
             )
             return
+        before = self._store.state
         self._store.dispatch(
             SourceLoaded(
                 source_id,
@@ -449,6 +450,9 @@ class SourceController(QObject):
                 loaded.frame,
             )
         )
+        after = self._store.state
+        if after is not before and self._settings is not None:
+            persist_parameters(self._settings, after.parameters)
 
     @Slot(str, str, object)
     def _source_failed(self, source_id: str, request_id: str, error: object) -> None:

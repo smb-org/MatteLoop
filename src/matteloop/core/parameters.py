@@ -387,14 +387,17 @@ def _reduce_exclusions(state: AppState, event: ExclusionsChanged) -> AppState:
         not isinstance(exclusion, CropSpec) for exclusion in event.exclusions
     ):
         return state
+    updated = replace(state.parameters, exclusions=event.exclusions)
+    if updated == state.parameters:
+        return state
     crop = state.crop
     if crop is None or cut_exclusions(event.exclusions, crop) == cut_exclusions(
         state.parameters.exclusions, crop
     ):
-        return state
+        return replace(state, parameters=updated)
     return _invalidate(
         state,
-        replace(state.parameters, exclusions=event.exclusions),
+        updated,
         PreviewInvalidationReason.CROP_CLEANUP,
     )
 

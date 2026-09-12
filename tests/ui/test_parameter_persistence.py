@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from decimal import Decimal
+from fractions import Fraction
 from pathlib import Path
 
 from PySide6.QtCore import QSettings
+from PySide6.QtGui import QImage
 
 from matteloop.core.execution_providers import (
     CPU_EXECUTION_PROVIDER,
@@ -16,8 +19,13 @@ from matteloop.core.parameters import (
     ParameterState,
 )
 from matteloop.core.specs import CropSpec, EdgeMode, TransformSpec
-from matteloop.core.state import AppState, SourceState
-from matteloop.ui.controller import SourceController
+from matteloop.core.state import (
+    AppState,
+    SourceLoadRequested,
+    SourceState,
+    reduce,
+)
+from matteloop.ui.controller import LoadedSource, SourceController
 from matteloop.ui.preferences import load_parameters, persist_parameters
 from matteloop.ui.store import ReducerStore
 
@@ -31,6 +39,14 @@ def _settings() -> QSettings:
     )
     settings.clear()
     return settings
+
+
+@dataclass(frozen=True)
+class _SourceMetadata:
+    width: int
+    height: int
+    duration: Fraction = Fraction(2)
+    average_rate: Fraction = Fraction(30)
 
 
 def test_parameter_preferences_round_trip_as_qsettings_primitives() -> None:
@@ -91,9 +107,57 @@ def test_unavailable_saved_provider_falls_back_to_the_available_cpu_choice() -> 
 
 def test_malformed_exclusions_preference_falls_back_to_empty_regions() -> None:
     settings = _settings()
+    settings.setValue("parameters/model_id", "u2net")
     settings.setValue("parameters/exclusions", "8,9,40,50;malformed")
 
-    assert load_parameters(settings).exclusions == ()
+    class ReadingSettings:
+        def __init__(self, source: QSettings) -> None:
+            self.source = source
+            self.keys: list[str] = []
+
+        def value(self, key: str) -> object:
+            self.keys.append(key)
+            return self.source.value(key)
+
+    reading = ReadingSettings(settings)
+    actual = load_parameters(reading)  # type: ignore[arg-type]
+
+    assert actual.model_id == "u2net"
+    assert actual.exclusions == ()
+    assert "parameters/exclusions" in reading.keys
+
+
+def test_source_load_persists_clipped_exclusions_for_the_next_start() -> None:
+    settings = _settings()
+    saved = ParameterState(
+        exclusions=(CropSpec(60, 70, 80, 20), CropSpec(120, 0, 10, 10))
+    )
+    persist_parameters(settings, saved)
+
+    store = ReducerStore(
+        reduce(
+            AppState(parameters=load_parameters(settings)),
+            SourceLoadRequested("smaller", "load-2"),
+        )
+    )
+    controller = SourceController.__new__(SourceController)
+    controller._store = store
+    controller._settings = settings
+    controller._closed = False
+
+    controller._source_loaded(
+        "smaller",
+        "load-2",
+        LoadedSource(
+            _SourceMetadata(100, 80),
+            QImage(100, 80, QImage.Format.Format_RGBA8888),
+        ),
+    )
+
+    assert store.state.source is SourceState.READY
+    assert store.state.parameters.exclusions == (CropSpec(60, 70, 40, 10),)
+    restarted = AppState(parameters=load_parameters(settings))
+    assert restarted.parameters.exclusions == (CropSpec(60, 70, 40, 10),)
 
 
 def test_failed_provider_is_not_reintroduced_by_a_later_parameter_save() -> None:

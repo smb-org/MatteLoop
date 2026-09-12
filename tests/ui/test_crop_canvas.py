@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 from PySide6.QtCore import QPoint, Qt
-from PySide6.QtGui import QImage
+from PySide6.QtGui import QColor, QImage
 
 from matteloop.core.crop_state import CropChanged
 from matteloop.core.geometry import MediaTransform, PointF
@@ -129,7 +129,11 @@ def test_region_mode_rubber_band_adds_a_region_on_release(qtbot) -> None:
         Qt.MouseButton.LeftButton,
         pos=_source_pos(canvas, 10, 10),
     )
-    qtbot.mouseMove(canvas, _source_pos(canvas, 30, 25))
+    for x in range(11, 31):
+        y = round(10 + (x - 10) * 15 / 20)
+        qtbot.mouseMove(canvas, _source_pos(canvas, x, y))
+
+    assert events == []
     qtbot.mouseRelease(
         canvas,
         Qt.MouseButton.LeftButton,
@@ -171,13 +175,32 @@ def test_region_mode_gives_the_crop_no_hit_targets(qtbot) -> None:
     events: list[object] = []
     canvas.command_requested.connect(events.append)
 
-    qtbot.mouseClick(
+    qtbot.mousePress(
         canvas,
         Qt.MouseButton.LeftButton,
         pos=_source_pos(canvas, 10, 10),
     )
+    for x in range(11, 31):
+        y = round(10 + (x - 10) * 15 / 20)
+        qtbot.mouseMove(canvas, _source_pos(canvas, x, y))
 
     assert events == []
+    assert canvas._dragged is None
+    assert canvas._rubber_start is not None
+    qtbot.mouseRelease(
+        canvas,
+        Qt.MouseButton.LeftButton,
+        pos=_source_pos(canvas, 30, 25),
+    )
+
+    assert events == [
+        ExclusionsChanged(
+            (
+                CropSpec(70, 30, 20, 10),
+                CropSpec(10, 10, 20, 15),
+            )
+        )
+    ]
     assert canvas._dragged is None
 
 
@@ -205,6 +228,39 @@ def test_click_selects_a_region_and_the_same_drag_moves_it(qtbot) -> None:
     )
 
     assert events == [ExclusionsChanged((CropSpec(30, 10, 30, 20),))]
+
+
+def test_resizing_a_region_dispatches_exactly_once_on_release(qtbot) -> None:
+    canvas = _canvas(qtbot)
+    region = CropSpec(20, 10, 30, 20)
+    canvas.apply_presentation(
+        _presentation(exclusions=(region,)), active=True, editable=True
+    )
+    canvas.set_exclusion_edit(True)
+    qtbot.mouseClick(
+        canvas,
+        Qt.MouseButton.LeftButton,
+        pos=_source_pos(canvas, 25, 15),
+    )
+    events: list[object] = []
+    canvas.command_requested.connect(events.append)
+
+    qtbot.mousePress(
+        canvas,
+        Qt.MouseButton.LeftButton,
+        pos=_source_pos(canvas, 50, 20),
+    )
+    for x in range(51, 61):
+        qtbot.mouseMove(canvas, _source_pos(canvas, x, 20))
+
+    assert events == []
+    qtbot.mouseRelease(
+        canvas,
+        Qt.MouseButton.LeftButton,
+        pos=_source_pos(canvas, 60, 20),
+    )
+
+    assert events == [ExclusionsChanged((CropSpec(20, 10, 40, 20),))]
 
 
 def test_delete_removes_the_selected_region(qtbot) -> None:
@@ -264,23 +320,46 @@ def test_leaving_region_mode_restores_crop_handles_and_keeps_painting_regions(
     canvas.apply_presentation(
         _presentation(exclusions=(region,)), active=True, editable=True
     )
+    frame = QImage(100, 50, QImage.Format.Format_RGBA8888)
+    frame.fill(QColor("#123456"))
+    canvas.set_frame(frame)
     canvas.set_exclusion_edit(True)
+    qtbot.wait(10)
+    region_mode_image = canvas.grab().toImage()
+    assert canvas._geometry is not None
+    handle = canvas._geometry.visual["north_west"]
+    handle_box = (
+        max(0, round(handle.left)),
+        max(0, round(handle.top)),
+        min(region_mode_image.width(), round(handle.right)),
+        min(region_mode_image.height(), round(handle.bottom)),
+    )
+
+    def accent_pixels(image: QImage) -> int:
+        accent = QColor("#B7F34A").rgba()
+        return sum(
+            image.pixelColor(x, y).rgba() == accent
+            for x in range(handle_box[0], handle_box[2] + 1)
+            for y in range(handle_box[1], handle_box[3] + 1)
+        )
+
+    region_point = _source_pos(canvas, 35, 20)
+    region_pixel = region_mode_image.pixelColor(region_point)
+    assert accent_pixels(region_mode_image) == 0
+
     qtbot.mouseClick(
         canvas,
         Qt.MouseButton.LeftButton,
         pos=_source_pos(canvas, 25, 15),
     )
     canvas.set_exclusion_edit(False)
+    qtbot.wait(10)
+    crop_mode_image = canvas.grab().toImage()
 
     assert canvas._selected_exclusion is None
     assert canvas._painted_exclusions() == (region,)
-    assert canvas._geometry is not None
-    assert set(canvas._geometry.visual) >= {
-        "crop",
-        "north_west",
-        "north",
-        "north_east",
-    }
+    assert accent_pixels(crop_mode_image) > 0
+    assert crop_mode_image.pixelColor(region_point) == region_pixel
 
 
 def test_region_mode_announces_the_selected_region_bounds(qtbot) -> None:

@@ -175,7 +175,12 @@ def test_moving_a_region_outside_the_crop_does_not_invalidate_the_preview() -> N
         ),
     )
 
-    assert reduce(state, ExclusionsChanged((CropSpec(1, 1, 8, 8),))) is state
+    changed = reduce(state, ExclusionsChanged((CropSpec(1, 1, 8, 8),)))
+
+    assert changed is not state
+    assert changed.parameters.exclusions == (CropSpec(1, 1, 8, 8),)
+    assert changed.preview is state.preview
+    assert changed.stale_category is state.stale_category
 
 
 def test_output_fps_changes_sampling_and_stales_the_current_preview() -> None:
