@@ -12,6 +12,7 @@ from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QLabel, QPushButton
 
 from matteloop.core.errors import AppError, ErrorCode
+from matteloop.core.exclusion import cut_exclusions
 from matteloop.core.geometry import PointF
 from matteloop.core.parameters import ExclusionsChanged
 from matteloop.core.specs import CropSpec
@@ -615,6 +616,90 @@ def test_source_context_menu_edit_action_keeps_inspector_mode_in_sync(
 
     assert canvas._exclusion_edit is True  # noqa: SLF001
     assert value.inspector.exclusion_controls.edit_button.isChecked()
+
+
+def test_selected_region_readout_shows_its_stored_oriented_rectangle(
+    window, qtbot
+) -> None:
+    value, _ = window
+    region = CropSpec(20, 10, 30, 20)
+    state = replace(
+        _ready_with_crop(),
+        parameters=replace(_ready_with_crop().parameters, exclusions=(region,)),
+    )
+    value.render_state(state)
+    qtbot.mouseClick(
+        value.inspector.exclusion_controls.edit_button,
+        Qt.MouseButton.LeftButton,
+    )
+    canvas = value.original_canvas
+    assert canvas._geometry is not None  # noqa: SLF001
+    point = canvas._geometry.transform.source_to_widget(PointF(25, 15))
+    qtbot.mouseClick(
+        canvas,
+        Qt.MouseButton.LeftButton,
+        pos=QPoint(round(point.x), round(point.y)),
+    )
+
+    assert value.inspector.exclusion_controls.selected_readout.text() == (
+        "Selected region: x 20, y 10, width 30, height 20 source pixels"
+    )
+    assert (
+        value.inspector.exclusion_controls.selected_readout.accessibleDescription()
+        == value.inspector.exclusion_controls.selected_readout.text()
+    )
+
+
+def test_region_readout_reports_no_selection_after_leaving_region_mode(
+    window, qtbot
+) -> None:
+    value, _ = window
+    region = CropSpec(20, 10, 30, 20)
+    state = replace(
+        _ready_with_crop(),
+        parameters=replace(_ready_with_crop().parameters, exclusions=(region,)),
+    )
+    value.render_state(state)
+    controls = value.inspector.exclusion_controls
+    qtbot.mouseClick(controls.edit_button, Qt.MouseButton.LeftButton)
+    canvas = value.original_canvas
+    assert canvas._geometry is not None  # noqa: SLF001
+    point = canvas._geometry.transform.source_to_widget(PointF(25, 15))
+    qtbot.mouseClick(
+        canvas,
+        Qt.MouseButton.LeftButton,
+        pos=QPoint(round(point.x), round(point.y)),
+    )
+    canvas.set_exclusion_edit(False)
+
+    assert controls.selected_readout.text() == "No region selected"
+
+
+def test_overhanging_region_readout_uses_the_cut_exclusions_intersection(
+    window, qtbot
+) -> None:
+    value, _ = window
+    region = CropSpec(60, 20, 20, 10)
+    state = _ready_with_crop()
+    state = replace(state, parameters=replace(state.parameters, exclusions=(region,)))
+    value.render_state(state)
+    controls = value.inspector.exclusion_controls
+    qtbot.mouseClick(controls.edit_button, Qt.MouseButton.LeftButton)
+    canvas = value.original_canvas
+    assert canvas._geometry is not None  # noqa: SLF001
+    point = canvas._geometry.transform.source_to_widget(PointF(61, 21))
+    qtbot.mouseClick(
+        canvas,
+        Qt.MouseButton.LeftButton,
+        pos=QPoint(round(point.x), round(point.y)),
+    )
+
+    effective = cut_exclusions((region,), state.crop)
+    assert effective
+    assert controls.selected_readout.text() == (
+        "Selected region: x 60, y 20, width 20, height 10 source pixels; "
+        "partly outside crop"
+    )
 
 
 def test_invalid_saved_geometry_falls_back_to_default(window) -> None:

@@ -2,11 +2,19 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import QCoreApplication, Signal
-from PySide6.QtWidgets import QHBoxLayout, QLabel, QToolButton, QWidget
+from PySide6.QtCore import QCoreApplication, Qt, Signal
+from PySide6.QtWidgets import (
+    QHBoxLayout,
+    QLabel,
+    QSizePolicy,
+    QToolButton,
+    QVBoxLayout,
+    QWidget,
+)
 
+from matteloop.core.exclusion import cut_exclusions
 from matteloop.core.parameters import ExclusionsChanged
-from matteloop.ui.compact_widgets import compact_field
+from matteloop.core.specs import CropSpec
 from matteloop.ui.parameter_presentation import ParameterPresentation
 
 
@@ -38,6 +46,41 @@ class ExclusionControls(QWidget):
         if not available and self.edit_button.isChecked():
             self.edit_button.setChecked(False)
 
+    def set_selected_exclusion(
+        self, exclusion: CropSpec | None, crop: CropSpec | None
+    ) -> None:
+        """Render the selected stored rectangle and its effective crop status."""
+        if exclusion is None or crop is None:
+            text = QCoreApplication.translate("Inspector", "No region selected")
+        else:
+            text = QCoreApplication.translate(
+                "Inspector",
+                "Selected region: x %1, y %2, width %3, height %4 source pixels",
+            )
+            values = (exclusion.x, exclusion.y, exclusion.width, exclusion.height)
+            for number, value in enumerate(values, start=1):
+                text = text.replace(f"%{number}", str(value))
+            boxes = cut_exclusions((exclusion,), crop)
+            if not boxes:
+                text += QCoreApplication.translate(
+                    "Inspector", "; entirely outside crop"
+                )
+            else:
+                box = boxes[0]
+                effective = CropSpec(
+                    crop.x + box.left,
+                    crop.y + box.top,
+                    box.width,
+                    box.height,
+                )
+                if effective != exclusion:
+                    text += QCoreApplication.translate(
+                        "Inspector", "; partly outside crop"
+                    )
+        self.selected_readout.setText(text)
+        self.selected_readout.setToolTip(text)
+        self.selected_readout.setAccessibleDescription(text)
+
     def tab_widgets(self) -> tuple[QWidget, ...]:
         """Return the row's keyboard controls in visual order."""
         return (self.edit_button, self.clear_button)
@@ -59,18 +102,37 @@ class ExclusionControls(QWidget):
         self.clear_button.setAccessibleName(
             QCoreApplication.translate("Inspector", "Clear exclusion regions")
         )
-        self.count_label = compact_field(QLabel())
+        self.count_label = QLabel()
         self.count_label.setObjectName("exclusion_count")
         self.count_label.setProperty("secondary", True)
+        self.count_label.setAlignment(
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+        )
         self.count_label.setText(self.tr("%n region(s)", "", 0))
         self.count_label.setAccessibleDescription(self.count_label.text())
+        self.selected_readout = QLabel()
+        self.selected_readout.setObjectName("exclusion_selected_readout")
+        self.selected_readout.setProperty("secondary", True)
+        self.selected_readout.setWordWrap(True)
+        self.selected_readout.setSizePolicy(
+            QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred
+        )
+        self.selected_readout.setAccessibleName(
+            QCoreApplication.translate("Inspector", "Selected exclusion region")
+        )
+        self.set_selected_exclusion(None, None)
         self.edit_button.setEnabled(False)
         self.clear_button.setEnabled(False)
 
     def _build_layout(self) -> None:
-        layout = QHBoxLayout(self)
+        layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(8)
-        layout.addWidget(self.edit_button)
-        layout.addWidget(self.clear_button)
-        layout.addWidget(self.count_label, 1)
+        layout.setSpacing(4)
+        actions = QHBoxLayout()
+        actions.setContentsMargins(0, 0, 0, 0)
+        actions.setSpacing(8)
+        actions.addWidget(self.edit_button)
+        actions.addWidget(self.clear_button)
+        layout.addLayout(actions)
+        layout.addWidget(self.count_label)
+        layout.addWidget(self.selected_readout)

@@ -30,22 +30,22 @@
         <translation>Original video frame</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="705"/>
+        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="709"/>
         <source>Exclusion region mode: %1 region(s); no region selected</source>
         <translation>Exclusion region mode: %1 region(s); no region selected</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="718"/>
+        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="722"/>
         <source>Exclusion region %1 of %2: x %3, y %4, width %5, height %6 source pixels; entirely outside crop</source>
         <translation>Exclusion region %1 of %2: x %3, y %4, width %5, height %6 source pixels; entirely outside crop</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="724"/>
+        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="728"/>
         <source>Exclusion region %1 of %2: x %3, y %4, width %5, height %6 source pixels; partly outside crop</source>
         <translation>Exclusion region %1 of %2: x %3, y %4, width %5, height %6 source pixels; partly outside crop</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="730"/>
+        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="734"/>
         <source>Exclusion region %1 of %2: x %3, y %4, width %5, height %6 source pixels</source>
         <translation>Exclusion region %1 of %2: x %3, y %4, width %5, height %6 source pixels</translation>
     </message>
@@ -81,8 +81,8 @@
 <context>
     <name>ExclusionControls</name>
     <message numerus="yes">
-        <location filename="../src/matteloop/ui/exclusion_controls.py" line="32"/>
-        <location filename="../src/matteloop/ui/exclusion_controls.py" line="65"/>
+        <location filename="../src/matteloop/ui/exclusion_controls.py" line="40"/>
+        <location filename="../src/matteloop/ui/exclusion_controls.py" line="111"/>
         <source>%n region(s)</source>
         <translation>
             <numerusform>%n region</numerusform>
@@ -371,26 +371,51 @@
         <translation>Choose output directory</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/exclusion_controls.py" line="49"/>
+        <location filename="../src/matteloop/ui/exclusion_controls.py" line="54"/>
+        <source>No region selected</source>
+        <translation>No region selected</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/exclusion_controls.py" line="56"/>
+        <source>Selected region: x %1, y %2, width %3, height %4 source pixels</source>
+        <translation>Selected region: x %1, y %2, width %3, height %4 source pixels</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/exclusion_controls.py" line="65"/>
+        <source>; entirely outside crop</source>
+        <translation>; entirely outside crop</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/exclusion_controls.py" line="77"/>
+        <source>; partly outside crop</source>
+        <translation>; partly outside crop</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/exclusion_controls.py" line="92"/>
         <source>Edit</source>
         <translation>Edit</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/exclusion_controls.py" line="51"/>
-        <location filename="../src/matteloop/ui/exclusion_controls.py" line="54"/>
+        <location filename="../src/matteloop/ui/exclusion_controls.py" line="94"/>
+        <location filename="../src/matteloop/ui/exclusion_controls.py" line="97"/>
         <source>Edit exclusion regions</source>
         <translation>Edit exclusion regions</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/exclusion_controls.py" line="58"/>
+        <location filename="../src/matteloop/ui/exclusion_controls.py" line="101"/>
         <location filename="../src/matteloop/ui/inspector.py" line="330"/>
         <source>Clear</source>
         <translation>Clear</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/exclusion_controls.py" line="60"/>
+        <location filename="../src/matteloop/ui/exclusion_controls.py" line="103"/>
         <source>Clear exclusion regions</source>
         <translation>Clear exclusion regions</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/exclusion_controls.py" line="121"/>
+        <source>Selected exclusion region</source>
+        <translation>Selected exclusion region</translation>
     </message>
     <message>
         <location filename="../src/matteloop/ui/inspector.py" line="334"/>

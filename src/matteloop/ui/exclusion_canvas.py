@@ -50,6 +50,7 @@ class ExclusionCanvas(CropCanvas):
     """Add source-region editing while retaining CropCanvas's crop hooks."""
 
     exclusion_edit_toggled = Signal(bool)
+    exclusion_selection_changed = Signal(object, object)
 
     def __init__(
         self,
@@ -129,6 +130,8 @@ class ExclusionCanvas(CropCanvas):
         super().apply_presentation(
             presentation, active=active, editable=editable
         )
+        if presentation is None:
+            self._emit_exclusion_selection()
 
     def paintEvent(self, event) -> None:  # type: ignore[no-untyped-def]
         PreviewCanvas.paintEvent(self, event)
@@ -697,6 +700,7 @@ class ExclusionCanvas(CropCanvas):
         presentation = self._presentation
         if presentation is None:
             return
+        self._emit_exclusion_selection()
         index = self._selected_exclusion
         if self._exclusion_edit and (
             index is None or index >= len(presentation.exclusions)
@@ -743,3 +747,16 @@ class ExclusionCanvas(CropCanvas):
         for number, value in enumerate(values, start=1):
             text = text.replace(f"%{number}", str(value))
         self.setAccessibleDescription(text)
+
+    def _emit_exclusion_selection(self) -> None:
+        presentation = self._presentation
+        if presentation is None:
+            self.exclusion_selection_changed.emit(None, None)
+            return
+        index = self._selected_exclusion
+        exclusion = (
+            presentation.exclusions[index]
+            if index is not None and index < len(presentation.exclusions)
+            else None
+        )
+        self.exclusion_selection_changed.emit(exclusion, presentation.crop)

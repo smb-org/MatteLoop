@@ -3,8 +3,11 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from PySide6.QtCore import QSettings
+from PySide6.QtGui import QFontMetrics
 from PySide6.QtWidgets import QApplication
 
+from matteloop.core.parameters import ParameterState
+from matteloop.core.specs import CropSpec
 from matteloop.core.state import AppState, SourceLoaded, SourceLoadRequested, reduce
 from matteloop.ui.main_window import MainWindow
 from matteloop.ui.theme import install_theme
@@ -94,6 +97,40 @@ def test_inspector_content_minimum_width_fits_each_scroll_viewport(qtbot) -> Non
             assert window.inspector_content.width() == viewport_width
             assert content_minimum <= viewport_width
             assert not window.inspector_scroll.horizontalScrollBar().isVisible()
+    finally:
+        application.setStyleSheet(original_style_sheet)
+        application.setFont(original_font)
+
+
+def test_exclusion_count_is_fully_visible_at_the_narrowest_inspector_width(
+    qtbot,
+) -> None:
+    application = QApplication.instance()
+    assert application is not None
+    original_style_sheet = application.styleSheet()
+    original_font = application.font()
+    try:
+        install_theme(application)
+        settings = QSettings(
+            QSettings.IniFormat, QSettings.UserScope, "matteloop-test", "count-width"
+        )
+        settings.clear()
+        state = AppState(
+            parameters=ParameterState(exclusions=(CropSpec(10, 10, 20, 20),))
+        )
+        window = MainWindow(Store(state), Services(), settings)
+        qtbot.addWidget(window)
+        window.resize(1100, 720)
+        window.show()
+        for _button, body in window.inspector.disclosures.values():
+            body.setVisible(True)
+        application.processEvents()
+
+        count = window.inspector.exclusion_controls.count_label
+        text_width = QFontMetrics(count.font()).horizontalAdvance(count.text())
+
+        assert window.inspector_scroll.viewport().width() == 322
+        assert "…" in count.text() or text_width <= count.contentsRect().width()
     finally:
         application.setStyleSheet(original_style_sheet)
         application.setFont(original_font)
