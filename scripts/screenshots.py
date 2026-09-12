@@ -29,6 +29,7 @@ from PySide6.QtGui import QImage
 from PySide6.QtWidgets import QApplication, QStyleFactory, QWidget
 
 from matteloop.core.parameters import ParameterState
+from matteloop.core.specs import CropSpec
 from matteloop.core.state import (
     AppState,
     PreviewRequested,
@@ -123,6 +124,7 @@ def _state(metadata: object, source_frame: QImage, result_frame: QImage) -> AppS
             parameters=ParameterState(
                 model_id=_MODEL_ID,
                 output_directory=_OUTPUT_DIRECTORY,
+                exclusions=(CropSpec(560, 32, 150, 88),),
             )
         ),
         SourceLoadRequested(_SOURCE_ID, _LOAD_REQUEST_ID),
