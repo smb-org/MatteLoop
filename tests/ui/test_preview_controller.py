@@ -15,8 +15,10 @@ from matteloop.core.crop_state import CropChanged
 from matteloop.core.errors import AppError, ErrorCode
 from matteloop.core.specs import CropSpec
 from matteloop.core.state import (
+    CancelAcknowledged,
     CancelRequested,
     JobStageChanged,
+    ModelAvailabilityChanged,
     ModelPrepared,
     PreviewRequested,
     PreviewState,
@@ -109,6 +111,42 @@ class FakePreviewRuntime(PreviewRuntime):
 
     def close(self) -> None:
         return
+
+
+class DownloadedModelFailureRuntime(FakePreviewRuntime):
+    def prepare(
+        self, model_id: str, extras: dict[str, object], context: JobContext
+    ) -> PreparedSegmentation:
+        super().prepare(model_id, extras, context)
+        context.progress(
+            ProgressStage.DOWNLOADING_MODEL,
+            128,
+            total=128,
+            detail="128 / 128 bytes",
+        )
+        raise RuntimeError("segmentation process timed out")
+
+
+class DownloadedModelCancellationRuntime(FakePreviewRuntime):
+    def __init__(self) -> None:
+        super().__init__()
+        self.downloaded = Event()
+
+    def prepare(
+        self, model_id: str, extras: dict[str, object], context: JobContext
+    ) -> PreparedSegmentation:
+        prepared = super().prepare(model_id, extras, context)
+        context.progress(
+            ProgressStage.DOWNLOADING_MODEL,
+            128,
+            total=128,
+            detail="128 / 128 bytes",
+        )
+        self.downloaded.set()
+        while not context.cancellation.requested:
+            Event().wait(0.01)
+        context.checkpoint("model-preparation")
+        return prepared
 
 
 class BlockingPreviewRuntime(FakePreviewRuntime):
@@ -293,6 +331,69 @@ def test_preview_request_uses_the_selected_oriented_crop(tmp_path: Path, qtbot) 
 
     assert request.crop == CropSpec(10, 12, 80, 70)
     controller.shutdown()
+
+
+def test_completed_model_stays_available_when_preview_setup_fails(
+    tmp_path: Path, qtbot, request
+) -> None:
+    path = tmp_path / "source.mp4"
+    path.write_bytes(b"fixture")
+    runtime = DownloadedModelFailureRuntime()
+    store = RecordingStore()
+    store.dispatch(ModelAvailabilityChanged(False))
+    controller = SourceController(
+        store,
+        source_adapter=FakeSourceAdapter(path),
+        preview_runtime=runtime,
+    )
+    request.addfinalizer(controller.shutdown)
+    window = MainWindow(store, controller, _settings())
+    qtbot.addWidget(window)
+    window.show()
+
+    controller.dispatch(VideoDropped(path))
+    qtbot.waitUntil(lambda: store.state.source.value == "ready", timeout=5000)
+    controller.dispatch(PreviewFrameRequested())
+
+    qtbot.waitUntil(lambda: store.state.preview is PreviewState.ERROR, timeout=5000)
+
+    assert store.state.model_available is True
+    assert window.preview_button.text() == "Preview Frame"
+    assert window.inspector.model_status.text() == "● Ready"
+    assert not window.inspector.model_download_notice.isVisible()
+
+
+def test_completed_model_stays_available_when_preview_is_cancelled(
+    tmp_path: Path, qtbot, request
+) -> None:
+    path = tmp_path / "source.mp4"
+    path.write_bytes(b"fixture")
+    runtime = DownloadedModelCancellationRuntime()
+    store = RecordingStore()
+    store.dispatch(ModelAvailabilityChanged(False))
+    preview_controller = PreviewController(store, runtime=runtime)
+    controller = SourceController(
+        store,
+        source_adapter=FakeSourceAdapter(path),
+        preview_controller=preview_controller,
+    )
+    request.addfinalizer(controller.shutdown)
+    window = MainWindow(store, controller, _settings())
+    qtbot.addWidget(window)
+    window.show()
+
+    controller.dispatch(VideoDropped(path))
+    qtbot.waitUntil(lambda: store.state.source.value == "ready", timeout=5000)
+    controller.dispatch(PreviewFrameRequested())
+    qtbot.waitUntil(runtime.downloaded.is_set, timeout=5000)
+    dialog = preview_controller.dialog
+    assert dialog is not None
+    qtbot.mouseClick(dialog.cancel_button, Qt.MouseButton.LeftButton)
+
+    qtbot.waitUntil(lambda: store.state.job.phase.value == "idle", timeout=5000)
+
+    assert store.state.model_available is True
+    assert any(isinstance(event, CancelAcknowledged) for event in store.events)
 
 
 @pytest.mark.parametrize("use_escape", [False, True])

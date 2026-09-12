@@ -176,6 +176,11 @@ class ModelDownloader:
         if _entry_exists(bound, target_name, spec.id):
             if _verified_file(bound, target_name, artifact, cancelled, spec.id):
                 _assert_bound_named(bound)
+                # Every path that leaves a usable weight on disk reports the
+                # terminal progress, because a caller reads it as "the weight
+                # is now usable". Skipping it here would make selecting an
+                # already-cached model report the model as missing.
+                progress(artifact.size_bytes, artifact.size_bytes)
                 return target
             _safe_unlink(bound, target_name, spec.id)
         _remove_stale_part(bound, part_name, spec.id)
@@ -234,7 +239,7 @@ class ModelDownloader:
                     except OSError as error:
                         raise _disk_error(spec.id, error) from error
                     digest.update(chunk)
-                    if known_total is not None:
+                    if known_total is not None and completed < known_total:
                         progress(completed, known_total)
                 _raise_if_cancelled(cancelled, spec.id)
                 if completed != artifact.size_bytes:
@@ -267,6 +272,11 @@ class ModelDownloader:
                 if _verified_file(bound, target_name, artifact, cancelled, spec.id):
                     _safe_unlink(bound, part_name, spec.id)
                     _assert_bound_named(bound)
+                    # Report completion on this path too: a caller that
+                    # treats the terminal progress as "the weight is now
+                    # usable" would otherwise never hear it for a weight
+                    # that was already cached and verified.
+                    progress(artifact.size_bytes, artifact.size_bytes)
                     return target
                 _safe_unlink(bound, target_name, spec.id)
             _before_model_promotion(bound)
@@ -292,6 +302,7 @@ class ModelDownloader:
                 raise _permission_error(spec.id, error) from error
             except OSError as error:
                 raise _disk_error(spec.id, error) from error
+            progress(artifact.size_bytes, artifact.size_bytes)
             return target
         except BaseException as error:
             try:
