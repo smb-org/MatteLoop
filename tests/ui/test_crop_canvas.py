@@ -10,6 +10,7 @@ from matteloop.core.parameters import ExclusionsChanged
 from matteloop.core.specs import CropSpec
 from matteloop.ui.crop_canvas import CropCanvas
 from matteloop.ui.crop_presentation import CropPresentation
+from matteloop.ui.exclusion_canvas import ExclusionCanvas
 from matteloop.ui.preview_canvas import PreviewStage
 
 
@@ -31,7 +32,7 @@ def _presentation(
 
 
 def _canvas(qtbot) -> CropCanvas:
-    canvas = CropCanvas()
+    canvas = ExclusionCanvas()
     qtbot.addWidget(canvas)
     canvas.resize(200, 100)
     canvas.set_frame(QImage(100, 50, QImage.Format.Format_RGBA8888))
@@ -89,6 +90,85 @@ def test_a_region_drag_dispatches_exactly_once_on_release(qtbot) -> None:
 
     assert len(events) == 1
     assert events[0] == ExclusionsChanged((CropSpec(40, 10, 30, 20),))
+
+
+@pytest.mark.parametrize(
+    ("index", "updated"),
+    [
+        (0, (CropSpec(60, 10, 20, 20),)),
+        (1, (CropSpec(20, 10, 20, 20),)),
+        (0, (CropSpec(30, 10, 20, 20), CropSpec(60, 10, 20, 20))),
+    ],
+)
+def test_region_state_change_cancels_an_in_flight_drag(
+    qtbot, index: int, updated: tuple[CropSpec, ...]
+) -> None:
+    regions = (CropSpec(20, 10, 20, 20), CropSpec(60, 10, 20, 20))
+    canvas = _canvas(qtbot)
+    canvas.apply_presentation(
+        _presentation(exclusions=regions), active=True, editable=True
+    )
+    canvas.set_exclusion_edit(True)
+    events: list[object] = []
+    canvas.command_requested.connect(events.append)
+
+    x = 25 if index == 0 else 65
+    qtbot.mousePress(canvas, Qt.MouseButton.LeftButton, pos=_source_pos(canvas, x, 15))
+    qtbot.mouseMove(canvas, _source_pos(canvas, x + 5, 15))
+    canvas.apply_presentation(
+        _presentation(exclusions=updated), active=True, editable=True
+    )
+
+    qtbot.mouseRelease(
+        canvas,
+        Qt.MouseButton.LeftButton,
+        pos=_source_pos(canvas, x + 5, 15),
+    )
+
+    assert events == []
+    assert canvas._drag_exclusion is None  # noqa: SLF001
+
+
+def test_exclusion_editing_stays_active_when_crop_is_disabled(qtbot) -> None:
+    canvas = _canvas(qtbot)
+    canvas.apply_presentation(
+        _presentation(), active=False, editable=True
+    )
+    canvas.set_exclusion_edit(True)
+    events: list[object] = []
+    canvas.command_requested.connect(events.append)
+
+    qtbot.mousePress(
+        canvas,
+        Qt.MouseButton.LeftButton,
+        pos=_source_pos(canvas, 10, 10),
+    )
+    qtbot.mouseMove(canvas, _source_pos(canvas, 30, 25))
+    qtbot.mouseRelease(
+        canvas,
+        Qt.MouseButton.LeftButton,
+        pos=_source_pos(canvas, 30, 25),
+    )
+
+    assert events == [ExclusionsChanged((CropSpec(10, 10, 20, 15),))]
+
+
+def test_persisted_exclusions_are_painted_when_crop_is_disabled(qtbot) -> None:
+    canvas = _canvas(qtbot)
+    frame = QImage(100, 50, QImage.Format.Format_RGBA8888)
+    frame.fill(QColor("#ffffff"))
+    canvas.set_frame(frame)
+    canvas.apply_presentation(
+        _presentation(exclusions=(CropSpec(20, 10, 30, 20),)),
+        active=False,
+        editable=True,
+    )
+    canvas.show()
+    qtbot.wait(10)
+
+    color = canvas.grab().toImage().pixelColor(_source_pos(canvas, 30, 20))
+
+    assert color.red() > color.green()
 
 
 def test_an_abandoned_rubber_band_dispatches_nothing(qtbot) -> None:
@@ -310,6 +390,75 @@ def test_arrow_key_nudges_the_selected_region_once(qtbot) -> None:
     qtbot.keyClick(canvas, Qt.Key.Key_Right)
 
     assert events == [ExclusionsChanged((CropSpec(21, 10, 30, 20),))]
+
+
+def test_arrow_key_can_move_a_region_onto_the_crop_bounds(qtbot) -> None:
+    canvas = _canvas(qtbot)
+    region = CropSpec(19, 10, 30, 20)
+    canvas.apply_presentation(
+        _presentation(crop=CropSpec(20, 10, 30, 20), exclusions=(region,)),
+        active=True,
+        editable=True,
+    )
+    canvas.set_exclusion_edit(True)
+    qtbot.mouseClick(
+        canvas,
+        Qt.MouseButton.LeftButton,
+        pos=_source_pos(canvas, 25, 15),
+    )
+    canvas.setFocus()
+    qtbot.waitUntil(canvas.hasFocus, timeout=1000)
+    events: list[object] = []
+    canvas.command_requested.connect(events.append)
+
+    qtbot.keyClick(canvas, Qt.Key.Key_Right)
+
+    assert events == [ExclusionsChanged((CropSpec(20, 10, 30, 20),))]
+
+
+def test_region_mode_keyboard_creates_a_region(qtbot) -> None:
+    canvas = _canvas(qtbot)
+    canvas.set_exclusion_edit(True)
+    canvas.setFocus()
+    qtbot.waitUntil(canvas.hasFocus, timeout=1000)
+    events: list[object] = []
+    canvas.command_requested.connect(events.append)
+
+    qtbot.keyClick(canvas, Qt.Key.Key_Insert)
+
+    assert len(events) == 1
+    assert isinstance(events[0], ExclusionsChanged)
+    assert len(events[0].exclusions) == 1
+
+
+def test_region_mode_keyboard_cycles_selection_and_deletes_it(qtbot) -> None:
+    regions = (CropSpec(20, 10, 20, 20), CropSpec(60, 10, 20, 20))
+    canvas = _canvas(qtbot)
+    canvas.apply_presentation(
+        _presentation(exclusions=regions), active=True, editable=True
+    )
+    canvas.set_exclusion_edit(True)
+    canvas.setFocus()
+    qtbot.waitUntil(canvas.hasFocus, timeout=1000)
+    events: list[object] = []
+    canvas.command_requested.connect(events.append)
+
+    qtbot.keyClick(canvas, Qt.Key.Key_Tab)
+    assert canvas._selected_exclusion == 0  # noqa: SLF001
+    qtbot.keyClick(canvas, Qt.Key.Key_Tab)
+    assert canvas._selected_exclusion == 1  # noqa: SLF001
+    qtbot.keyClick(canvas, Qt.Key.Key_Delete)
+
+    assert events == [ExclusionsChanged((regions[0],))]
+
+
+def test_region_mode_announces_mode_without_a_selection(qtbot) -> None:
+    canvas = _canvas(qtbot)
+    canvas.set_exclusion_edit(True)
+
+    assert canvas.accessibleDescription() == (
+        "Exclusion region mode: 0 region(s); no region selected"
+    )
 
 
 def test_leaving_region_mode_restores_crop_handles_and_keeps_painting_regions(

@@ -355,7 +355,9 @@ class TransformStageController(QObject):
             return
         parameters = state.parameters
         framing = _framing_from_parameters(parameters)
-        framing_changed = framing != self._framing
+        framing_changed = _effective_framing_changed(
+            framing, self._framing, self._session
+        )
         edit_scan_completed = (
             self._edited_cuts_request_id is not None
             and state.edited_cuts_request_id is None
@@ -365,8 +367,7 @@ class TransformStageController(QObject):
         refresh_external_edits = edit_scan_completed or edited_cuts_became_true
         self._edited_cuts = state.edited_cuts
         self._edited_cuts_request_id = state.edited_cuts_request_id
-        if framing_changed:
-            self._framing = framing
+        self._framing = framing
         if self._session is not None and (framing_changed or refresh_external_edits):
             self._schedule_facts(refresh_external_edits=refresh_external_edits)
         transform = parameters.transform
@@ -651,6 +652,27 @@ def _framing_from_parameters(parameters: ParameterState) -> FramingSpec:
         parameters.padding,
         parameters.stretch_x,
         parameters.exclusions,
+    )
+
+
+def _effective_framing_changed(
+    current: FramingSpec,
+    previous: FramingSpec,
+    session: CutSession | None,
+) -> bool:
+    """Compare framing inputs after source regions are mapped into cut space."""
+    if (
+        current.trim != previous.trim
+        or current.alpha_threshold != previous.alpha_threshold
+        or current.padding != previous.padding
+        or current.stretch_x != previous.stretch_x
+    ):
+        return True
+    if session is None:
+        return current.exclusions != previous.exclusions
+    crop = _crop_from_manifest(session.manifest)
+    return cut_exclusions(current.exclusions, crop) != cut_exclusions(
+        previous.exclusions, crop
     )
 
 

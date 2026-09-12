@@ -2,15 +2,19 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, replace
+from fractions import Fraction
 from pathlib import Path
 
 import pytest
-from PySide6.QtCore import QByteArray, QMimeData, QSettings, Qt, QUrl
+from PySide6.QtCore import QByteArray, QMimeData, QPoint, QSettings, Qt, QUrl
 from PySide6.QtGui import QDragEnterEvent, QDragLeaveEvent, QDropEvent, QFontMetrics
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QLabel, QPushButton
 
 from matteloop.core.errors import AppError, ErrorCode
+from matteloop.core.geometry import PointF
+from matteloop.core.parameters import ExclusionsChanged
+from matteloop.core.specs import CropSpec
 from matteloop.core.state import (
     AppState,
     ArtifactResult,
@@ -60,11 +64,27 @@ class Services:
         self.commands.append(command)
 
 
+@dataclass(frozen=True)
+class _SourceMetadata:
+    width: int = 100
+    height: int = 50
+    duration: Fraction = Fraction(2)
+    average_rate: Fraction = Fraction(30)
+
+
 def _ready() -> AppState:
     return reduce(
         reduce(AppState(), SourceLoadRequested("source", "load")),
         SourceLoaded("source", "load", "metadata"),
     )
+
+
+def _ready_with_crop() -> AppState:
+    state = reduce(
+        reduce(AppState(), SourceLoadRequested("source", "load")),
+        SourceLoaded("source", "load", _SourceMetadata()),
+    )
+    return replace(state, crop=CropSpec(10, 10, 60, 30))
 
 
 def _current() -> AppState:
@@ -543,6 +563,36 @@ def test_replace_dispatch_includes_replace_intent(window, qtbot) -> None:
     value.render_state(_ready())
     qtbot.mouseClick(value.replace_video_button, Qt.MouseButton.LeftButton)
     assert services.commands == [ChooseVideoRequested(replace=True)]
+
+
+def test_edit_regions_switches_the_original_canvas_to_region_mode(
+    window, qtbot
+) -> None:
+    value, services = window
+    value.render_state(_ready_with_crop())
+    qtbot.mouseClick(
+        value.inspector.exclusion_controls.edit_button,
+        Qt.MouseButton.LeftButton,
+    )
+    canvas = value.original_canvas
+    assert canvas._geometry is not None  # noqa: SLF001
+    start = canvas._geometry.transform.source_to_widget(PointF(20, 20))
+    end = canvas._geometry.transform.source_to_widget(PointF(50, 35))
+
+    qtbot.mousePress(
+        canvas,
+        Qt.MouseButton.LeftButton,
+        pos=QPoint(round(start.x), round(start.y)),
+    )
+    qtbot.mouseMove(canvas, QPoint(round(end.x), round(end.y)))
+    qtbot.mouseRelease(
+        canvas,
+        Qt.MouseButton.LeftButton,
+        pos=QPoint(round(end.x), round(end.y)),
+    )
+
+    assert services.commands
+    assert isinstance(services.commands[-1], ExclusionsChanged)
 
 
 def test_invalid_saved_geometry_falls_back_to_default(window) -> None:

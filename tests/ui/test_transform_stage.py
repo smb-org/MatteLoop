@@ -415,6 +415,41 @@ def test_region_change_recomputes_facts_and_reloads_player_frames_without_the_re
     controller.shutdown()
 
 
+def test_region_change_outside_the_cut_does_not_recompute_or_reload_frames(
+    tmp_path, qtbot
+) -> None:
+    artifact = _seed_cut(tmp_path, "region-outside-cut")
+    initial_region = CropSpec(200, 0, 8, 8)
+    ready = _ready_state(tmp_path / "source.mp4")
+    state = replace(
+        ready,
+        parameters=replace(
+            ready.parameters,
+            exclusions=(initial_region,),
+        ),
+    )
+    reader = _CountingReader()
+    store = ReducerStore(state)
+    controller = TransformStageController(store, frame_reader=reader)
+    canvas = ResultPlayerCanvas()
+    qtbot.addWidget(canvas)
+    group = TransformGroup(lambda _event: None)
+    qtbot.addWidget(group)
+    controller.attach(group, canvas)
+    controller.open_artifact(artifact)
+    qtbot.waitUntil(lambda: canvas._frames is not None, timeout=5000)
+    initial_reads = reader.calls
+
+    store.dispatch(ExclusionsChanged((CropSpec(208, 0, 8, 8),)))
+    qtbot.wait(500)
+
+    assert reader.calls == initial_reads
+    assert controller._framing.exclusions == (  # noqa: SLF001
+        CropSpec(208, 0, 8, 8),
+    )
+    controller.shutdown()
+
+
 def test_facts_ready_clamps_a_crop_left_over_from_a_larger_framed_size(
     tmp_path, qtbot
 ) -> None:

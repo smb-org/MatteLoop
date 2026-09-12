@@ -495,6 +495,43 @@ def test_rebuild_with_a_region_misses_the_cached_union_and_recomputes_it(
     assert metadata.bounds == (64, 24, 96, 104)
 
 
+def test_rebuild_reuses_union_metadata_when_region_inputs_match(tmp_path) -> None:
+    workspace = FilesystemWorkspacePort()
+    seed_request = replace(
+        request(tmp_path),
+        framing=FramingSpec(
+            True,
+            Decimal("2"),
+            48,
+            Decimal("1"),
+            exclusions=(CropSpec(32, 24, 32, 80),),
+        ),
+    )
+    original = render_service(workspace=workspace).render(
+        seed_request, job(tmp_path, "seed-reusable-region-union", JobKind.RENDER)
+    )
+
+    class CountingWorkspace(FilesystemWorkspacePort):
+        def __init__(self) -> None:
+            super().__init__()
+            self.reads = 0
+
+        def read_cut(self, workspace, index, ownership):
+            self.reads += 1
+            return super().read_cut(workspace, index, ownership)
+
+    counting = CountingWorkspace()
+    _rebuild_service(counting, FakeEncoder()).rebuild(
+        replace(seed_request, rebuild=True, output=replace(
+            seed_request.output, filename="reused-region-union.webp"
+        )),
+        original.cut_workspace,
+        job(tmp_path, "reuse-region-union", JobKind.REBUILD),
+    )
+
+    assert counting.reads == original.manifest.frame_count
+
+
 def test_trim_keeps_exactly_the_selected_frames_and_their_delays(tmp_path) -> None:
     """AC 2 / E2 / T7: the kept delays are a *slice* of the full non-uniform
     grid, not a recomputation over the kept count."""

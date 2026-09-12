@@ -25,17 +25,22 @@
 <context>
     <name>CropCanvas</name>
     <message>
-        <location filename="../src/matteloop/ui/crop_canvas.py" line="115"/>
+        <location filename="../src/matteloop/ui/crop_canvas.py" line="96"/>
         <source>Original video frame</source>
         <translation>Original video frame</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/crop_canvas.py" line="650"/>
+        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="561"/>
+        <source>Exclusion region mode: %1 region(s); no region selected</source>
+        <translation>Exclusion region mode: %1 region(s); no region selected</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="572"/>
         <source>Exclusion region %1 of %2: x %3, y %4, width %5, height %6 source pixels</source>
         <translation>Exclusion region %1 of %2: x %3, y %4, width %5, height %6 source pixels</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/crop_canvas.py" line="668"/>
+        <location filename="../src/matteloop/ui/crop_canvas.py" line="384"/>
         <source>Crop bounds: x %s, y %s, width %s, height %s source pixels; source %s × %s</source>
         <translation>Crop bounds: x %s, y %s, width %s, height %s source pixels; source %s × %s</translation>
     </message>
@@ -238,17 +243,17 @@
         <translation>Manage Workspaces…</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector_reset.py" line="50"/>
+        <location filename="../src/matteloop/ui/inspector_reset.py" line="51"/>
         <source>Reset to defaults</source>
         <translation>Reset to defaults</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector_reset.py" line="54"/>
+        <location filename="../src/matteloop/ui/inspector_reset.py" line="55"/>
         <source>Reset inspector parameters</source>
         <translation>Reset inspector parameters</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector_reset.py" line="56"/>
+        <location filename="../src/matteloop/ui/inspector_reset.py" line="57"/>
         <source>Compute acceleration, transform, output directory, and output filename are not affected.</source>
         <translation>Compute acceleration, transform, output directory, and output filename are not affected.</translation>
     </message>
@@ -2093,7 +2098,7 @@ Freed %s.</translation>
         <translation>Video files (*.mp4 *.mov *.webm *.mkv)</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/controller.py" line="553"/>
+        <location filename="../src/matteloop/ui/controller.py" line="557"/>
         <source>Choose output directory</source>
         <translation>Choose output directory</translation>
     </message>

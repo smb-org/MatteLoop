@@ -297,13 +297,28 @@ def test_exclusion_controls_toggle_edit_mode_and_clear_regions(qtbot) -> None:
     assert modes == [True]
     assert commands == [ExclusionsChanged(())]
     assert store.state.parameters.exclusions == ()
-
     inspector.apply_parameters(present_parameters(store.state), editable=False)
 
     assert modes == [True, False]
     assert not controls.edit_button.isEnabled()
     assert not controls.clear_button.isEnabled()
     assert controls.count_label.text() == "0 region(s)"
+
+
+def test_reset_is_enabled_when_exclusion_regions_differ_from_defaults(qtbot) -> None:
+    inspector = Inspector(_settings())
+    qtbot.addWidget(inspector)
+    state = AppState(
+        source=SourceState.READY,
+        source_id="source",
+        source_value=object(),
+        parameters=ParameterState(exclusions=(CropSpec(10, 10, 20, 20),)),
+        timeline=TimelineState(Fraction(4), Fraction(0), Fraction(4), Fraction(0)),
+    )
+
+    inspector.apply_parameters(present_parameters(state), editable=True)
+
+    assert inspector.reset_parameters_button.isEnabled()
 
 
 def test_inspector_emits_edge_mode_from_the_standard_combo(qtbot) -> None:

@@ -48,6 +48,7 @@ from matteloop.jobs.render import (
     RenderService,
     ValidatedCandidate,
 )
+from matteloop.jobs.source import DecodedFrame
 from tests.fixtures.media_factory import make_video
 from tests.jobs.render_support import (
     FakeClock,
@@ -55,11 +56,32 @@ from tests.jobs.render_support import (
     FakeEncoder,
     FakeSegmenter,
     FakeSource,
+    FakeSourceInfo,
     frozen_segmentation_result,
     job,
     render_service,
     request,
 )
+
+
+class _OffsetSource(FakeSource):
+    def probe(self, path, context):
+        del path, context
+        self.probe_calls += 1
+        return FakeSourceInfo(width=160, height=160)
+
+    def decode(self, path, timestamp, request_id, source_info, context, ownership):
+        del path, source_info, context
+        self.decode_calls.append(timestamp)
+        image = Image.new("RGBA", (160, 160), (0, 60, 90, 255))
+        ownership.register(image)
+        return DecodedFrame(
+            image,
+            timestamp,
+            timestamp,
+            request_id,
+            FakeSourceInfo().revision,
+        )
 
 
 def _validated_candidate(
@@ -1547,6 +1569,29 @@ def test_render_stores_unexcluded_cuts_but_unions_and_encodes_without_the_region
         assert output.getpixel((65, 30)) == (0, 60, 90, 255)
     assert artifact.manifest.union_metadata is not None
     assert artifact.manifest.union_metadata.bounds == (64, 24, 96, 104)
+
+
+def test_render_maps_offset_source_exclusions_into_cut_coordinates(tmp_path) -> None:
+    render_request = replace(
+        request(tmp_path, crop=CropSpec(16, 16, 128, 128)),
+        framing=FramingSpec(
+            False,
+            Decimal("2"),
+            0,
+            Decimal("1"),
+            exclusions=(CropSpec(48, 40, 16, 16),),
+        ),
+    )
+
+    artifact = render_service(source=_OffsetSource()).render(
+        render_request, job(tmp_path, "offset-exclusion", JobKind.RENDER)
+    )
+
+    with Image.open(artifact.output_path) as output:
+        output.seek(0)
+        output.load()
+        assert output.getpixel((32, 24)) == (0, 0, 0, 0)
+        assert output.getpixel((48, 40)) == (0, 60, 90, 255)
 
 
 def test_render_peak_rgba_owner_count_is_unchanged_by_exclusions(tmp_path) -> None:
