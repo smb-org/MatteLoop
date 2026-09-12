@@ -663,6 +663,9 @@ events at the selected region, or the frame centre when no region is selected.
 The Inspector row remains the discovery surface and the keyboard path. Its
 toggle and the menu's checkable toggle stay synchronized in both directions;
 the menu is an accelerator, not a replacement for the Inspector controls.
+The checkable Edit action changes UI-local mode and emits no
+`ExclusionsChanged`; only actions that change the region tuple dispatch that
+reducer command.
 
 **`CropCanvas` in region mode** (`set_exclusion_edit(enabled: bool)`):
 - `CropPresentation` gains `exclusions: tuple[CropSpec, ...] = ()`
