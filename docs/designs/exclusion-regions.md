@@ -3,8 +3,11 @@
 Architecture pass on 2026-09-12 for issue #80
 Branch: feat/issue-80-exclusion-regions
 Repo: smb-org/MatteLoop
-Status: REVISED after an independent adversarial review; no implementation yet.
-Every `file:line` below was read on this branch.
+Status: Decisions 1–6 are REVISED after an independent adversarial review
+and are **implemented on this branch** (`b1caf0a` … `70293e0`). Decision 7
+(pre-model regions) is a second architecture pass on 2026-09-12 and is **not
+implemented**; its `file:line` citations were read at `70293e0`, the earlier
+decisions' at the commit that preceded their implementation.
 
 ## Review findings addressed
 
@@ -37,11 +40,17 @@ forced to alpha 0 **after segmentation**, as part of `FramingSpec`. Two
 decisions are settled by the maintainer and are not revisited here:
 
 - **Rectangles only, several of them.** No polygon, no ellipse.
-- **Post-segmentation, not pre-model.** The crop is part of the cut key
-  (`core/fingerprints.py:207`), so a pre-segmentation mask would re-segment
-  the whole clip on every drag, and rembg models judge the frame globally, so
+- **Post-segmentation by default.** The crop is part of the cut key
+  (`core/fingerprints.py:212`), so a pre-segmentation mask re-segments the
+  whole clip on every change, and rembg models judge the frame globally, so
   blanking an input region is model-dependent. Zeroing alpha afterwards is
   deterministic and reuses the stored cut set.
+
+  **Reopened 2026-09-12, Decision 7.** With the post path alone the model
+  still reads a bystander at the frame edge as foreground and that distorts
+  the matte of the wanted subject. A region can now *also* be applied before
+  the model; the re-segmentation cost is accepted and keyed in the cut. The
+  post path stays as the default and the instant-feedback path.
 
 ## What already exists (verified)
 
@@ -133,9 +142,12 @@ first draft listed it as frozen at 328 and that was wrong on both counts.
 
 ## Constraints
 
-- Regions apply after segmentation and never enter the cut key. A region
-  change must not invalidate the stored cut set, and must invalidate the
-  preview, the render fingerprint and the union cache.
+- Post regions apply after segmentation and never enter the cut key. A
+  post-region change must not invalidate the stored cut set, and must
+  invalidate the preview, the render fingerprint and the union cache.
+  **Pre-model regions (Decision 7) are the one exception by design:** they
+  enter the cut key, and only they do; a user without them keeps the key
+  0.4.1 wrote.
 - **The re-segmentation promise, stated precisely** (review finding 5). What
   holds: the stored cut set stays valid under any regions, so **Render and
   Rebuild never re-segment** for a region change — they reread the stored
@@ -764,6 +776,503 @@ region in its `ParameterState` so `main-window.png` shows a rectangle on the
 Original canvas; README gains a short paragraph in the crop/cleanup
 description; regeneration per `README.md:150-159`.
 
+## Decision 7 — Pre-model regions: blank the model input, keyed in the cut
+
+Second architecture pass, 2026-09-12, on top of the landed post path
+(`70293e0`). Settled by the maintainer and not re-argued here: a region can
+optionally be applied **before** the model sees the frame; that changes the
+segmentation input, so it enters the **cut cache key** and a change to it
+re-segments the clip; the post path **stays** and keeps its instant feedback.
+
+The reason it is urgent, in one sentence: with the post path alone the model
+still reads the bystander as foreground, and a person at the frame edge
+changes how the model resolves the wanted subject — the post mask removes the
+bystander's pixels, not the model's opinion of them.
+
+### 7.1 Data model — one global switch, the rectangles reused
+
+**Chosen: a global switch.** One new boolean on the parameters and one new
+tuple on the segmentation spec; no new rectangle type, no second tuple in the
+reducer, no per-region flag.
+
+```python
+# core/specs.py
+@dataclass(frozen=True)
+class SegmentationSpec:
+    model_id: str = "birefnet-portrait"
+    edge_mode: EdgeMode = EdgeMode.STANDARD
+    alpha_matting: AlphaMattingSpec = field(default_factory=AlphaMattingSpec)
+    execution_provider: str = CPU_EXECUTION_PROVIDER
+    exclusions: tuple[CropSpec, ...] = ()   # regions the model must not see
+
+# core/parameters.py
+@dataclass(frozen=True, slots=True)
+class ParameterState:
+    ...
+    exclusions: tuple[CropSpec, ...] = ()
+    exclusions_before_model: bool = False
+```
+
+- **Where each kind lives.** A pre-model region is segmentation input, so the
+  request carries it on `SegmentationSpec` (`core/specs.py:205-240`), the spec
+  the cut key already hashes through `model` and `_edge_settings`
+  (`core/fingerprints.py:213-220`). It is *not* framing: `FramingSpec`
+  (`specs.py:244-298`) keeps `exclusions` exactly as landed and the post path
+  is untouched.
+- **Same rectangles, oriented source pixels.** `SegmentationSpec.exclusions`
+  has the same type and the same validation as `FramingSpec.exclusions`
+  (`specs.py:291-298`, copied verbatim): a tuple of `CropSpec`, no bound
+  against the source, no count cap. They are mapped into the cut with the
+  existing `cut_exclusions` (`core/exclusion.py:40-52`) — verified in 7.4.
+- **The switch, not the spec, is what the user edits.** The request builder
+  (`ui/request_builder.py:94-105`) fills both specs from the one tuple:
+
+  ```python
+  segmentation=SegmentationSpec(
+      ..., exclusions=parameters.exclusions if parameters.exclusions_before_model else ()
+  ),
+  framing=FramingSpec(..., exclusions=parameters.exclusions),
+  ```
+
+  With the switch on, every region is blanked before the model **and** still
+  zeroed after it. Pre-model is a superset of post-model, never an
+  alternative to it, so the request builder is one expression and the six
+  post sites (Decision 3) need no change.
+- **The stored cut carries the blank.** `_produce_cut_frame` zeroes the
+  pre-model boxes in its result (7.4), so a pre-model cut set has alpha 0
+  there *by construction*. That is what makes the two tuples independent: a
+  request whose `framing.exclusions` differs from the set's
+  `segmentation.exclusions` (the picker's Rebuild with a changed layout,
+  `ui/workspace_presentation.py:142-183`) is still correct, because nothing
+  the model produced inside a pre-model box survives in the stored bytes. No
+  cross-spec invariant, no validation in `RenderRequest.validate`.
+- **Reducer.** One event, `ExclusionsBeforeModelChanged(enabled: bool)`,
+  reduced like `_reduce_trim` (`core/parameters.py:352-361`): reject a
+  non-`bool`, no-op on an equal value, and — like `_reduce_exclusions`
+  (`:383-402`) — **no preview invalidation when `cut_exclusions(exclusions,
+  crop)` is empty**, because the request is then byte-identical either way.
+  Otherwise `PreviewInvalidationReason.SEGMENTATION` (`core/tokens.py:26`).
+  `_reduce_exclusions` picks its reason by the switch: `SEGMENTATION` when it
+  is on, `CROP_CLEANUP` when it is off (`:398-402`). `_reduce_parameters_reset`
+  resets the flag and compares it in the `SEGMENTATION` branch (`:255-259`).
+- **Persistence.** One QSettings bool `parameters/exclusions_before_model`,
+  parsed by the existing `_bool_value` (`parameters.py:569-577`) with its
+  per-key fallback; absent → `False`. `ui/preferences.py:15-27` gains the key,
+  `:44-72` persists it. The region string is unchanged.
+- **Why not per-region (the fork).** A per-region flag is the more general
+  model and it is *not* chosen now, for three measured reasons:
+  1. It is not the smaller diff. Two tuples through `ParameterState`,
+     `ParameterPresentation`, `CropPresentation`, preferences, the request
+     builder and the reducer, plus a selection identity that spans two tuples
+     in `ui/exclusion_canvas.py` (745 lines; the mode/select/drag code is
+     `:252-690`), plus a per-region checkable action in
+     `ui/exclusion_context_menu.py`. Estimated +200 lines and a split of the
+     canvas module. The global switch is ≈ +60 lines of `src/`.
+  2. The coexistence case — a post-only chat box *and* a pre-model bystander
+     in one clip — is plausible and unmeasured. The maintainer's report names
+     one bystander. Ship the switch, measure whether mixed clips occur.
+  3. It is upgradeable without a migration. The request-level shape
+     (`SegmentationSpec.exclusions`, the cut key, the manifest key, the
+     pipeline call, the fill, the tests in 7.8) is identical under a
+     per-region model; only the reducer/UI grain differs. A later
+     per-region flag reads the bool as "all regions flagged".
+  The alternative is recorded under *Rejected alternatives* with the two
+  shapes it could take.
+
+### 7.2 Cache and fingerprint — the non-empty rule, verified against the cut key
+
+`cut_cache_key_inputs` (`core/fingerprints.py:188-222`) gains one entry,
+**present only when the effective boxes are non-empty**, and the preview
+identity gains the same entry under its `segmentation` sub-object
+(`:154-158`):
+
+```python
+def _model_exclusions(request: RenderRequest) -> dict[str, object]:
+    boxes = cut_exclusions(request.segmentation.exclusions, request.crop)
+    if not boxes:
+        return {}
+    return {
+        "model_exclusions": {
+            "fill": MODEL_FILL_ID,                       # core/exclusion.py
+            "boxes": tuple((b.left, b.top, b.right, b.bottom) for b in boxes),
+        }
+    }
+# cut_cache_key_inputs: {..., "edge_settings": _edge_settings(request), **_model_exclusions(request)}
+# preview_fingerprint:  "segmentation": {"model_id": ..., **_edge_settings(request), **_model_exclusions(request)}
+```
+
+**Why the fill identifier is inside the value.** The fill (7.3) is part of
+what the model saw. If a later measurement changes it, the cut sets it must
+invalidate are exactly the pre-model ones; bumping `PIPELINE_SCHEMA_VERSION`
+(`fingerprints.py:30`) would orphan every set of every user. Carrying the id
+inside the only-when-present value scopes the invalidation correctly.
+
+**Why tuples, not lists.** `_freeze_mapping` (`fingerprints.py:382-391`)
+turns a list into a tuple but does not descend into it (`:387-388`), so a
+list of lists would leave mutable inner lists behind the "recursively
+immutable" docstring (`:197`). Tuples of ints freeze as-is, and
+`_canonical_value` (`:394-399`) renders tuples as JSON arrays.
+
+**The key does not change for a user without pre-model regions — verified
+case by case:**
+
+| Case | `segmentation.exclusions` | `cut_exclusions(…, crop)` | Entry | Key |
+|---|---|---|---|---|
+| Switch off (every 0.4.1 request) | `()` — request builder | `()` | absent | **byte-identical** to `tests/core/test_fingerprints.py:610-646`, which pins the canonical JSON literally |
+| Switch on, no regions | `()` | `()` | absent | unchanged |
+| Switch on, region entirely outside the crop | non-empty | `()` — guard at `exclusion.py:50` | absent | unchanged, and correctly so: the model input is pixel-identical |
+| Switch on, region clipped to zero width or height by the crop | non-empty | `()` — same guard (`right > left and bottom > top`) | absent | unchanged |
+| Switch on, region intersecting the crop | non-empty | boxes in cut space | present | changes → new cut set |
+
+- **Crop.** Boxes are crop-relative (`exclusion.py:46-49`), so a crop move
+  changes `"crop"` (`fingerprints.py:212`) and the boxes together. The same
+  region under two crops yields two keys, which is right: the model input
+  differs.
+- **Rotation.** Regions and crop are both in oriented source pixels
+  (`specs.py:108-109`); rotation is decoded from the file and is covered by
+  `source_sha256`. The boxes are in cut space and carry no orientation, so
+  nothing further enters the key.
+- **Manifest round trip.** `CutManifest` re-derives the key from its stored
+  inputs and refuses a mismatch (`workspace/_manifest.py:168-171`, `:295-301`).
+  `_freeze_json` accepts lists and tuples (`_manifest_validation.py:188`),
+  `_thaw_json` gives lists back (`:198-199`), and `_canonical_value` passes
+  lists through to `json.dumps`, so the hash of the thawed manifest inputs
+  equals the hash of the request's tuples. Verified by reading; pinned by
+  the round-trip test in 7.8.
+- **The manifest validator must learn the key.** `_validate_cache_inputs`
+  (`_manifest_validation.py:76-90`) applies `_exact_keys` to
+  `cache_key_inputs`, so a manifest carrying `model_exclusions` is
+  `CUT_MANIFEST_INVALID` today — `find_matching_cut_workspace` would swallow
+  that (`render.py:592-599`) and re-segment on every render, and the set
+  would never be reusable. The validator gains an *optional* key: the exact
+  set is extended by `"model_exclusions"` when present, and a
+  `_validate_model_exclusions` helper checks `fill` with `_bounded_text`
+  (`:278`) and each box as four ints with `_bounded_int` (`:272`),
+  `0 <= left < right <= MAX_CUT_DIMENSION`, same for top/bottom. The module is
+  344 lines, so the ratchet does not apply (`scripts/check_guardrails.py:120-128`
+  fires only above 800); the helper stays under 60 lines. **Not a baseline
+  question.**
+- **Old binaries.** A 0.4.1 build reading a pre-model manifest gets
+  `CUT_MANIFEST_INVALID` from the strict schema and treats it as "no cut
+  set": it re-segments without the blank — degraded, not broken — and its
+  picker lists that set the way it lists any unreadable manifest today.
+  Sets without the key are untouched. Residual, accepted.
+- **Two sets on disk.** Flipping the switch produces a new key; the old set
+  stays. Flipping back is a cache hit (`find_matching_cut_workspace`,
+  `render.py:571-600`, called at `:1049`) with no re-segmentation. The disk
+  cost is one extra set per clip, visible in the workspace dialog like any
+  other.
+- **The picker's Rebuild.** `request_for_workspace`
+  (`ui/workspace_presentation.py:142-183`) rebuilds a request from a manifest
+  and must reproduce the key (`render.py:1224-1231` refuses a mismatch). It
+  restores `SegmentationSpec.exclusions` from `inputs["model_exclusions"]` by
+  translating each box back through the manifest crop:
+  `CropSpec(crop.x + left, crop.y + top, right - left, bottom - top)`. A
+  clipped box is inside the crop, so `cut_exclusions` maps it back onto
+  itself and the key matches.
+
+### 7.3 What the blank is filled with — measured, not guessed
+
+A hard black rectangle is an edge, and a segmentation network can read an
+edge as an object boundary. If it does, the feature is worse than not using
+it: the bystander is gone and a rectangle-shaped artefact takes its place.
+**The fill is not chosen in this document.** It is chosen by the measurement
+below, and the identifier of the winner is what `MODEL_FILL_ID` carries into
+the key.
+
+**What the model actually sees** (`rembg/sessions/base.py:40-65`): the
+frame is converted to RGB (`:49` — alpha is dropped), resized to the model's
+input size (1024² for BiRefNet and ISNet, 320² for U²-Net; `birefnet_general.py:34-36`,
+`u2net.py:32`, `dis_general_use.py:27`), scaled by its own maximum (`:52`),
+then normalised per channel by `(x - mean) / std`. Twelve of the thirteen V1
+models use the ImageNet constants `(0.485, 0.456, 0.406) / (0.229, 0.224, 0.225)`;
+`isnet-general-use` uses `(0.5, 0.5, 0.5) / (1, 1, 1)`. So a flat fill at the
+model's *mean* is the input the network's first layer treats as zero — that
+is the one candidate with a model-independent argument, and why it is the
+fallback. It is still a rectangle.
+
+**Candidates**, each a pure function `(image: PIL RGBA, box: PixelBounds) -> None`
+in `scripts/measure_model_fill.py`, the winner promoted to
+`core/exclusion.py::blank_model_input`:
+
+| Id | Fill | Structure it introduces |
+|---|---|---|
+| `black` | `(0, 0, 0)` | a strong edge; normalises to ≈ −2.1 per channel |
+| `mid-grey` | `(128, 128, 128)` | an edge; ISNet's zero |
+| `imagenet-mean` | `(124, 116, 104)` | an edge; the zero for 12 of 13 models |
+| `ring-mean` | the mean colour of the 4 px ring around the box, inside the frame | a softer edge; adapts to the local background |
+| `blur` | the box contents under `GaussianBlur(radius = max(w, h) / 4)` | no edge, but a skin-coloured blob where a face was |
+| `mirror` | the adjacent in-frame strip reflected into the box | no edge; **re-introduces whatever was next to the box**, including the subject's own edge |
+
+**Measurement.** Needs a real model; runs by hand; recorded in this
+document, not in the test suite.
+
+- *Input.* Pairs of frames `(control, test)` at the same framing: `control`
+  has the wanted subject alone; `test` is `control` with a bystander
+  composited at the frame edge (a cutout of a second person from another
+  clip, pasted at two positions: touching the frame edge, and 40 px inside
+  it). At least three subjects × two bystander positions × two models
+  (`birefnet-portrait`, `u2net_human_seg`) = 12 pairs. The #80 clip has real
+  bystander frames and no control; it is used for the inside-box metric and
+  a visual check only, never for the decision.
+- *Procedure.* For each pair and candidate `C`: fill the bystander box in
+  `test`, segment, take the alpha `A_C`. Also `A_none` (unfilled `test`) and
+  `A_ctrl` (`control`). Inference is deterministic on CPU, so the noise floor
+  is the spread *across pairs*, not across runs.
+- *Compared.* Outside the box: `err_C = mean |A_C − A_ctrl|` and the IoU of
+  `A > 2 %` (the default threshold, `specs.py:248`) against `A_ctrl`. In a 16
+  px band around the box: the same error, reported separately — this is where
+  "the rectangle edge became an object" shows up. Inside the box: `mean A_C`,
+  diagnostic only, because 7.4 zeroes it anyway.
+- *Rejects a candidate.* `err_C > err_none` or band error above `err_none`
+  on **any** pair: the fill did more harm than the bystander it replaced.
+- *Decides.* Among the survivors, the lowest mean `err_C`; the winner must
+  beat the runner-up by more than 1 IoU point on the majority of pairs.
+- *Inconclusive.* Winner within 1 IoU point of the runner-up on most pairs,
+  or fewer than two survivors: **fallback `imagenet-mean`**, on the argument
+  above (the network's zero for 12 of 13 models, zero structure of its own).
+  `mirror` is never the fallback: it is the only candidate whose structure
+  depends on what stands beside the box.
+
+Whatever wins, `blank_model_input` is Pillow only (`image.paste`, at most
+`ImageFilter.GaussianBlur` — both already in the tree) and `MODEL_FILL_ID`
+names it. A different winner later is a one-line change in
+`core/exclusion.py` that invalidates exactly the pre-model sets (7.2).
+
+### 7.4 Pipeline call site — inside `_produce_cut_frame`, two lines apart
+
+`_produce_cut_frame` (`jobs/render.py:1529-1608`) is the only
+decode → crop → segment → cleanup path (`render.py:13`), shared by preview
+(`:923`) and render (`:1104`). Both calls therefore see the blank without a
+change of their own.
+
+- **The regions map with the existing `cut_exclusions`.** `apply_source_crop`
+  (`core/geometry.py:718-724`) returns `image.crop(...)` — the frame in cut
+  space with the crop's top-left at (0, 0); pre-model regions are oriented
+  source rectangles like the post ones; `cut_exclusions(regions, request.crop)`
+  (`exclusion.py:40-52`) is exactly the translation-and-clip both kinds need.
+  Verified: no second mapping.
+- **Fill on the Pillow image, not the array.** `np.asarray(cropped)` at
+  `:1564` hands back a **read-only** view (measured on this branch:
+  `flags.writeable == False`, and `ascontiguousarray` returns it unchanged),
+  so writing into `input_frame` would raise. `cropped` is a fresh image from
+  `.crop()` and `paste` works in place — the same call `exclude_alpha` makes
+  (`exclusion.py:55-58`). So:
+
+  ```python
+  cropped = apply_source_crop(decoded_image, crop_bounds)        # :1558
+  tracker.register(cropped)                                       # :1559
+  model_boxes = cut_exclusions(request.segmentation.exclusions, request.crop)
+  blank_model_input(cropped, model_boxes)                         # new
+  ...
+  input_frame = np.ascontiguousarray(np.asarray(cropped, dtype=np.uint8))  # :1564
+  ```
+
+  The fill sits **after the crop and before the array conversion**, i.e.
+  before the model at `:1574`. No extra allocation, no tracker change.
+- **Zero the box in the result.** rembg composites the *input* RGB with the
+  mask (`jobs/rembg_runtime.py:159-165`; `rembg/bg.py:296-314`), so the
+  filler pixels come back with whatever alpha the model gave them. After
+  `tracker.register(result)` at `:1606`:
+
+  ```python
+  exclude_alpha(result, model_boxes)                              # new
+  ```
+
+  In place on the returned image; `result` is the only owner. This is what
+  guarantees 7.1's "stored cut carries the blank" and keeps filler RGB out of
+  every consumer, the preview's `_immutable_rgba(cut)` included (`:968`).
+- **Relative to `_decontaminate_edge_colors_in_place`** (`:1611-1631`, called
+  at `:1600` on the model output): the fill runs before the model, the
+  decontamination on its output, the zeroing after both. Order between the
+  last two is immaterial — decontamination writes canonical black under
+  alpha 0 (`:1620`) and `exclude_alpha` writes `(0,0,0,0)` — but zeroing on
+  `result` rather than on `segmented` avoids touching the read-only array the
+  host hands back (`tests/jobs/render_support.py:114-117` models that).
+- **Cost.** Three lines in a frozen module (2886, baseline `scripts/guardrails-baseline.json`).
+  `_produce_cut_frame` is already over the 60-line function budget, so the
+  `long_functions` count does not move (`check_guardrails.py:130-133`); the
+  module line count does, and that fails the ratchet. **This is a baseline
+  question for the maintainer**; the alternative — a wrapper module that
+  re-implements the pipeline to avoid the three lines — is rejected below.
+- **The segmentation host is untouched.** It accepts any `H×W×3/4` uint8
+  frame (`jobs/segmentation_host.py:605-621`) and never sees the regions.
+- **The post path is not slower.** Nothing on it changed; with the switch
+  off `model_boxes` is `()` and both new calls are loops over nothing.
+
+### 7.5 What the user sees — the cost is named where it is paid
+
+Two rounds on this branch shipped controls that looked live and were not.
+Everything below either dispatches a reducer event or is derived from state
+the reducer already changed; nothing holds a checked state of its own.
+
+- **Inspector.** `ExclusionControls` (`ui/exclusion_controls.py`) gains a
+  `QCheckBox`, object name `exclusion_before_model`, text
+  `translate("Inspector", "Blank before the model")`, tooltip and accessible
+  description `translate("Inspector", "Re-segments the clip: the stored cut set is not reused")`.
+  `apply()` sets it from `presentation.exclusions_before_model` with signals
+  blocked, and enables it as `available and count > 0`, exactly like
+  `clear_button` (`:37`): a switch with no regions is inert, so it is
+  disabled rather than checked-and-idle. Toggling emits
+  `ExclusionsBeforeModelChanged(checked)` through the existing
+  `command_requested` signal (`:25`, wired at `inspector.py:312`); no
+  `main_window.py` change.
+- **Count label.** Two literals, chosen by the flag, both Qt numerus forms:
+  `tr("%n region(s)", "", n)` as today (`:31-32`) and
+  `tr("%n region(s), blanked before the model", "", n)`. The literal is at
+  the call site; the flag selects which call runs.
+- **Canvas.** `_paint_exclusions` (`ui/exclusion_canvas.py:174-221`) keeps
+  its colours and, when `presentation.exclusions_before_model`, draws the
+  effective rectangle with a `Qt.BrushStyle.BDiagPattern` brush in the same
+  `#E5484D` over the translucent fill and a 2 px solid pen instead of 1 px.
+  Hatched = the model never sees it; plain = removed afterwards. Not
+  colour-only. `CropPresentation` gains `exclusions_before_model: bool = False`
+  (`ui/crop_presentation.py:21`, filled at `:64`).
+- **Announcement.** `_announce_crop` (`exclusion_canvas.py:699-745`) appends
+  `translate("CropCanvas", "; blanked before the model")` when the flag is
+  set — the same append pattern the selected-region readout already uses
+  (`exclusion_controls.py:57-59`, `:69-71`). No variable reaches `translate`.
+- **The cost is shown by the stale-preview banner, for free.** The reducer
+  invalidates with `SEGMENTATION` (7.1), which the presentation model already
+  words as "Segmentation" (`ui/presentation_model.py:14`) — the same banner
+  a model change produces, which is the honest comparison: the next Preview
+  runs the model, the next Render segments the clip. With the switch on, a
+  region drag also invalidates as `SEGMENTATION`, so the user sees at the
+  first nudge that regions are now a segmentation setting.
+- **Nothing new in the job dialog.** A render with a new key is an ordinary
+  render; the progress stages already say "Cut frame n of m"
+  (`render.py:1129`).
+- **New strings** (all literals, German entries required):
+  `"Blank before the model"`, `"Re-segments the clip: the stored cut set is not reused"`,
+  `"%n region(s), blanked before the model"`, `"; blanked before the model"`.
+- **README.** The bullet at `README.md:29-30` ("made transparent after
+  segmentation") gains one sentence on the switch; `main-window.png` is
+  regenerated with `scripts/screenshots.py:127`'s region and the switch on,
+  so the hatch is visible.
+
+### 7.6 Degradation — the post path's empty-mask handling carries over
+
+- **A pre-model region covers the whole frame.** The model sees a flat
+  fill. BiRefNet then min-max-normalises a near-constant prediction
+  (`birefnet_general.py:41-44`), which can produce NaN and an arbitrary
+  mask; alpha matting raises on an empty trimap and rembg falls back to the
+  naive cutout (`rembg/bg.py:298-309`). None of that reaches the output:
+  7.4 zeroes the box in the result, and a whole-frame box zeroes the whole
+  frame. Every cut frame is fully transparent → the union is empty →
+  Decision 5 applies unchanged: trim is skipped, the untrimmed canvas is
+  encoded, `notes` records it (`render.py:1378-1381`), the UI facts worker
+  degrades through `union_alpha_bounds_or_none`. **Carries over; nothing
+  new.**
+- **A pre-model region covers the whole subject.** Same path; what the
+  model does with the filler's edge inside the box is zeroed, and what it
+  does *outside* is exactly the band metric in 7.3.
+- **A pre-model region entirely outside the crop.** No box, no key change,
+  no re-segmentation — the 7.2 table.
+- **Switch on, no regions.** Inert control (7.5), no invalidation (7.1).
+- **Switch flipped while a job runs.** `ExclusionsBeforeModelChanged` is a
+  `ParameterEvent` and goes through the same `can_edit` gate as the others
+  (`parameters.py:191`); the controls are disabled.
+- **A persisted `True` from a build that knew the switch, read by one that
+  does not.** Ignored — `load_parameters` reads only `_KEYS`
+  (`preferences.py:30-34`). Regions still apply post. Degraded, honest.
+- **Nothing refuses.** No new `ValidationError` on a user-reachable path.
+
+### 7.7 File-by-file change list
+
+Estimates; **bold** = frozen in `scripts/guardrails-baseline.json` and over
+800 lines, so growth fails the ratchet.
+
+| File | Now | Δ | Notes |
+|---|---|---|---|
+| `src/matteloop/core/exclusion.py` | 97 | +22 | `MODEL_FILL_ID`, `blank_model_input(image, boxes)`, docstring: the model-input site |
+| `src/matteloop/core/specs.py` | 706 | +9 | `SegmentationSpec.exclusions` + the validation block copied from `FramingSpec` |
+| `src/matteloop/core/fingerprints.py` | 484 | +14 | `_model_exclusions(request)`; spread into `cut_cache_key_inputs` and `preview_fingerprint`'s `segmentation` |
+| `src/matteloop/core/parameters.py` | 638 | +34 | field, `ExclusionsBeforeModelChanged`, `_reduce_exclusions_before_model`, reason selection in `_reduce_exclusions`, reset, `parameters_from_values` |
+| `src/matteloop/jobs/workspace/_manifest_validation.py` | 344 | +16 | optional `model_exclusions` in `_validate_cache_inputs` + `_validate_model_exclusions`. Under 800: not a baseline question |
+| **`src/matteloop/jobs/render.py`** | 2886 | **+3** | `_produce_cut_frame`: `model_boxes`, `blank_model_input`, `exclude_alpha(result, …)`. **Flag: needs `--update` with agreement.** |
+| `src/matteloop/ui/request_builder.py` | 112 | +1 | `exclusions=` on `SegmentationSpec` |
+| `src/matteloop/ui/workspace_presentation.py` | 214 | +8 | restore `exclusions` from `model_exclusions` in `request_for_workspace` |
+| `src/matteloop/ui/preferences.py` | 91 | +2 | key + persist |
+| `src/matteloop/ui/parameter_presentation.py` | 85 | +2 | field + mapping |
+| `src/matteloop/ui/crop_presentation.py` | 63 | +2 | field + mapping |
+| `src/matteloop/ui/inspector_reset.py` | — | +1 | compare the flag |
+| `src/matteloop/ui/exclusion_controls.py` | ~95 (in flux) | +18 | checkbox, `apply`, `tab_widgets`, count-label variant |
+| `src/matteloop/ui/exclusion_canvas.py` | 745 | +12 | hatch in `_paint_exclusions`, suffix in `_announce_crop` → **~757 of 800. Tight; nothing else may land here without a split** |
+| **`src/matteloop/ui/inspector.py`** | 904 | 0 | the checkbox lives inside `ExclusionControls`; `tab_widgets()` already spreads (`:834`, `:855`) |
+| `src/matteloop/ui/main_window.py` | 357 | 0 | `command_requested` already routed |
+| `resources/matteloop_{en,de}.ts`, `.qm` | — | regen | four new strings, German by hand |
+| `scripts/measure_model_fill.py` | new | +90 | the 7.3 harness: six candidates, the pair loop, the table. Run by hand, not a test |
+| `scripts/screenshots.py` | — | +1 | switch on in `_state` |
+| `README.md`, `assets/screenshots/main-window.png` | — | +1, regen | |
+| `docs/v1-scope.md` | — | +3 | extend the exclusion-regions row: pre-model option, keyed in the cut. **First** (G8) |
+| `scripts/guardrails-baseline.json` | — | 1 entry | `jobs/render.py`, only after agreement |
+| `tests/jobs/render_support.py` | — | +2 | `FakeSegmenter` keeps `frames.append(frame.copy())` so a test can see what the model saw (`:119-128` records only requests today) |
+
+**One baseline question for the maintainer:** `jobs/render.py` +3. Everything
+else is under budget. Nothing touches `core/state.py`, `core/geometry.py`,
+`jobs/segmentation_host.py` or `jobs/transform_stage.py`.
+
+### 7.8 Test list
+
+One test per behaviour, named after it (G7). "Fails without" names the
+missing piece. **unit** = cheap and Qt-free; **Qt** = offscreen widgets;
+**model** = a real rembg session, run by hand.
+
+| Test | Fails without | Kind |
+|---|---|---|
+| `tests/core/test_specs.py::test_segmentation_spec_rejects_exclusions_that_are_not_crop_specs` | the validation block | unit |
+| `tests/core/test_exclusion.py::test_blank_model_input_fills_each_box_and_nothing_else` — every RGB inside is `MODEL_FILL_ID`'s value, alpha untouched, outside byte-identical | `blank_model_input` | unit |
+| `…::test_blank_model_input_with_no_boxes_leaves_the_image_byte_identical` | the empty loop (post-path cost) | unit |
+| `tests/core/test_fingerprints.py::test_cut_key_without_model_exclusions_matches_the_canonical_schema` — extends `:610-646`: switch semantics with `segmentation.exclusions=()` produce the pinned JSON, and `"model_exclusions"` is absent from `cut_cache_key_inputs` | the non-empty rule; failing it orphans every 0.4.1 cut set | unit |
+| `…::test_cut_key_ignores_a_model_exclusion_outside_the_crop_or_clipped_to_nothing` | the `cut_exclusions` guard feeding the key | unit |
+| `…::test_cut_key_tracks_model_exclusion_boxes_and_the_fill_identifier` — two regions, two keys; monkeypatched `MODEL_FILL_ID` changes the key | `_model_exclusions` | unit |
+| `…::test_cut_key_inputs_with_model_exclusions_are_recursively_immutable` | tuples, not lists, in the payload | unit |
+| `…::test_preview_identity_tracks_model_exclusions` | the `segmentation` spread | unit |
+| `…::test_render_and_union_identities_ignore_model_exclusions` — they depend on `cut_key` only | that nothing was added to `_framing` / `cut_union_fingerprint` | unit |
+| `tests/jobs/test_workspace.py::test_manifest_accepts_model_exclusions_and_reproduces_the_cut_key` — `CutManifest.create` with the new inputs, JSON round trip, `cache_key_for` equals `cut_cache_key` | the validator's optional key and the list/tuple round trip | unit |
+| `…::test_manifest_rejects_malformed_model_exclusion_boxes` — inverted box, negative, non-int | `_validate_model_exclusions` | unit |
+| `…::test_manifest_without_model_exclusions_still_validates` — a 0.4.1 payload verbatim | that the key stayed optional | unit |
+| `tests/core/test_parameters.py::test_exclusions_before_model_invalidates_the_preview_as_segmentation` | the reducer | unit |
+| `…::test_exclusions_before_model_with_no_effective_region_changes_state_without_invalidating` | the empty-box no-op | unit |
+| `…::test_region_change_invalidates_as_segmentation_while_the_switch_is_on` | reason selection in `_reduce_exclusions` | unit |
+| `…::test_parameters_reset_clears_exclusions_before_model` | reset | unit |
+| `…::test_exclusions_before_model_settings_value_round_trips_and_a_malformed_value_falls_back_to_false` | parse | unit |
+| `tests/jobs/test_render.py::test_render_blanks_model_exclusions_in_the_model_input_and_zeroes_them_in_the_stored_cut` — `FakeSegmenter.frames[i]` carries the fill inside the box and the original outside; the stored PNG is `(0,0,0,0)` there | the two `_produce_cut_frame` lines; masking only after the model passes the second assertion and fails the first | unit |
+| `…::test_render_with_model_exclusions_reads_the_original_pixels_outside_the_box` | that the fill did not leak (e.g. a ring or blur candidate overrunning the box) | unit |
+| `…::test_render_with_the_switch_off_sends_the_model_the_unblanked_frame` | the post path's cost contract | unit |
+| `…::test_render_reuses_the_unblanked_cut_set_after_the_switch_is_turned_off` — render, flip, render, flip, render: the third finds the first set | 7.2's two-sets claim | unit |
+| `tests/jobs/test_render.py::test_render_with_a_whole_frame_model_exclusion_encodes_the_untrimmed_canvas_and_notes_it` | Decision 5 carrying over; a NaN mask from a flat input must not surface | unit |
+| `tests/jobs/test_preview.py::test_preview_shows_no_filler_pixels_inside_a_model_exclusion` — `PreviewResult.cut` is `(0,0,0,0)` in the box | `exclude_alpha(result, …)` | unit |
+| `tests/jobs/test_rebuild.py::test_rebuild_of_a_model_exclusion_set_reproduces_its_key_from_the_manifest` — through `request_for_workspace` | the reverse mapping in `workspace_presentation.py` | unit |
+| `tests/ui/test_parameter_inspector.py::test_before_model_checkbox_dispatches_and_is_inert_without_regions` — dispatch count 1 per toggle; disabled at count 0; reflects state, never holds it | the checkbox wiring; a stayed-checked control scores 0 dispatches | Qt |
+| `…::test_before_model_count_label_names_the_blank` | the second literal | Qt |
+| `tests/ui/test_crop_canvas.py::test_model_exclusions_are_painted_hatched_and_announced` — sample a pixel of the pattern; accessible description ends with the suffix | canvas + announcement | Qt |
+| `tests/ui/test_parameter_persistence.py::test_exclusions_before_model_persists_as_a_bool` | preferences | Qt |
+| `tests/ui/test_parameter_requests.py` (+2 assertions) — switch on fills `segmentation.exclusions`, off leaves `()`, `framing.exclusions` both times | request builder | Qt |
+| `tests/test_translations.py::test_catalogues_match_lupdate_extraction` (existing) | German entries | Qt |
+| `scripts/measure_model_fill.py` on the 12 pairs of 7.3, table pasted into this document under 7.3 | the fill decision — **must run before `MODEL_FILL_ID` is set** | model |
+| A real render of the #80 clip with the switch on and off, compared by eye | the reason this exists | model |
+
+### 7.9 Implementation order
+
+0. `docs/v1-scope.md` row (G8), and the one baseline question answered.
+1. **The measurement first**, because its result is a constant every later
+   step reads: `scripts/measure_model_fill.py`, the pairs, the table into
+   7.3, `MODEL_FILL_ID` decided. If it is inconclusive, `imagenet-mean`, and
+   the table still goes into the document.
+2. `core/exclusion.py`, `specs.py`, `fingerprints.py`,
+   `workspace/_manifest_validation.py` + their tests.
+3. `render.py`'s three lines, `render_support.py`, the jobs tests. **Measure
+   the delta; stop for the maintainer if the baseline is not yet agreed.**
+4. `parameters.py`, `preferences.py`, `request_builder.py`,
+   `workspace_presentation.py`, the presentations + tests.
+5. `exclusion_controls.py`, `exclusion_canvas.py`, catalogues + Qt tests.
+   **Check `exclusion_canvas.py` against 800 here.**
+6. Screenshot, README.
+
+Each step verified with the standard command from `CLAUDE.md`.
+
+
 ## Not in scope
 
 - Numeric x/y/w/h fields per region, region naming, a region list widget.
@@ -778,6 +1287,11 @@ description; regeneration per `README.md:150-159`.
 - Touch hit-testing beyond what `InteractionGeometry.hit_test(touch=…)`
   already gives the selected region.
 - Anything in `core/geometry.py`, `core/state.py`.
+- A per-region pre/post flag (Decision 7.1 chooses one global switch).
+- Choosing the model-input fill by argument; it is chosen by the
+  measurement in Decision 7.3.
+- Retaining an unblanked cut set's frames for a pre-model set, or any
+  migration between the two (they are two keys, both kept on disk).
 
 ## Failure modes considered
 
@@ -804,11 +1318,16 @@ description; regeneration per `README.md:150-159`.
 - **External edit of a stored frame** — the union cache is already dropped
   (`_cut_ops.py:380`); exclusions are applied on read, so edited pixels inside
   a box are zeroed like any other.
+- **Pre-model regions** — whole frame, whole subject, outside the crop,
+  switch without regions, an old binary reading a new manifest: Decision 7.6.
 - **`render.py` growth** — see the change list. The first draft's "≈0" was a
   guess; this revision budgets +5…+15 and makes measuring it a gate in the
   implementation order, not a hope.
 
 ## File-by-file change list
+
+**Landed** with Decisions 1–6; kept as the record of that work. The
+pre-model addition has its own list in Decision 7.7.
 
 Line deltas are estimates; **bold** = frozen in the baseline.
 
@@ -854,6 +1373,8 @@ Line deltas are estimates; **bold** = frozen in the baseline.
 if it measures positive after the collapse.
 
 ## Test plan
+
+**Landed** with Decisions 1–6; Decision 7.8 lists the pre-model tests.
 
 Named after behaviour (G7). "Fails without" names the missing piece.
 
@@ -919,6 +1440,9 @@ Screenshot regeneration and a real render on the #80 clip are manual.
 
 ## Implementation order
 
+**Landed** for Decisions 1–6; Decision 7.9 gives the order for the
+pre-model addition.
+
 **0. `docs/v1-scope.md` first.** G8 (`docs/engineering-guardrails.md:244`)
 makes that file authoritative and forbids implementing an out-of-scope design
 requirement, so the scope entry is step zero, not a tidy-up at the end. Nothing
@@ -956,8 +1480,10 @@ Each step is verified with the standard command from `CLAUDE.md`.
 
 - **Regions in cut space.** Moving the crop would drag the overlay mask with
   it; the overlay is fixed in the source frame.
-- **A pre-segmentation mask.** Settled by the maintainer: re-segments on every
-  drag (crop is in the cut key) and is model-dependent.
+- **A pre-segmentation mask *instead of* the post mask.** Re-segments on
+  every drag (crop is in the cut key) and is model-dependent. The post path
+  stays the default; the pre-model path is an *addition* (Decision 7), not a
+  replacement.
 - **Zeroing inside `read_cut` / `FrameReader.read`.** Would corrupt the
   identity consumers (hash scans, external-edit detection, CAS) that share the
   readers and must see the stored bytes.
@@ -1020,3 +1546,44 @@ Each step is verified with the standard command from `CLAUDE.md`.
   the render must not abort for it. Recorded as the fork; degrade chosen.
 - **A region count cap.** Nothing measured needs one; clipping bounds the
   cost per region to one `paste`.
+- **A per-region pre/post flag** (Decision 7.1). Either a second tuple
+  (`ParameterState.model_exclusions`) plumbed through every presentation,
+  the preferences, the reducer and a two-tuple selection identity in the
+  745-line canvas, or an `ExclusionRegion(CropSpec)` subclass carrying
+  `before_model` that every drag helper would have to re-wrap because
+  `crop_from_drag`/`nudge_crop` construct plain `CropSpec`s. Both are larger
+  than the switch, the mixed-clip case is unmeasured, and the request-level
+  shape is identical, so the switch can grow into either later.
+- **Pre-model boxes in cut space on `SegmentationSpec`.** Would save the
+  reverse mapping in `request_for_workspace`, but puts a crop-dependent
+  rectangle type on a spec that is otherwise crop-independent, and the
+  regions the user draws are source rectangles; `cut_exclusions` already
+  does the one mapping for both kinds.
+- **Requiring `segmentation.exclusions ⊆ framing.exclusions` in
+  `RenderRequest.validate`.** Unnecessary once `_produce_cut_frame` zeroes
+  the pre-model boxes in its result (7.4): the stored set is correct under
+  any framing, and the picker's Rebuild needs no union of the two tuples.
+- **Keeping the filler RGB in the cut and relying on the post mask.** The
+  picker can rebuild a pre-model set with a different post layout, and the
+  filler would then show through with whatever alpha the model gave it.
+  Zeroing costs one `exclude_alpha` in the producer.
+- **The fill identifier in `PIPELINE_SCHEMA_VERSION`.** Invalidates every
+  cut set of every user for a change that touches only pre-model sets.
+- **Always emitting `"model_exclusions"` in the cut key.** Same rejection as
+  the framing case: it invalidates every 0.4.1 cut set on update.
+- **Filling the numpy array instead of the Pillow image.** `np.asarray` of a
+  Pillow image is read-only (measured); a writable copy is one crop-sized
+  allocation per frame and an ownership-tracker entry, for nothing.
+- **A wrapper module around `_produce_cut_frame` to keep `render.py` at
+  2886.** The pipeline is one function on purpose (`render.py:13`); a second
+  copy of decode → crop → segment for three lines is the spiral the
+  guardrails describe.
+- **Declaring a fill without measuring.** A hard rectangle may read as an
+  object edge to the model; if it does, the feature is worse than not
+  using it. The measurement in 7.3 decides, and `imagenet-mean` is the
+  fallback only because it is the network's own zero for 12 of 13 models.
+- **`mirror` as the fallback fill.** Its structure depends on what stands
+  beside the box; a mirrored bystander is a bystander.
+- **Reducing the switch as `CROP_CLEANUP`.** The banner would say "Crop &
+  cleanup" for a change that reruns the model; `SEGMENTATION` is the reason
+  a model change already uses and is the honest cost signal.
