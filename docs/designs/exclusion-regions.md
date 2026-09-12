@@ -672,12 +672,15 @@ reducer command.
   (`ui/crop_presentation.py:12-21`), filled by `present_crop` from
   `state.parameters.exclusions`. The default keeps every existing constructor
   call and test valid.
-- **Painting, both modes:** every region is painted whenever it exists — a
-  translucent fill (`#E5484D` at alpha 90) with a 1 px solid border — so a
-  persisted region is always visible on a new video. In crop mode that is all;
-  the crop keeps its handles. In region mode the crop is drawn as its dimmed
-  outline **without handles**, and the selected region gets the eight handles
-  and the focus ring.
+- **Painting, both modes:** every region is painted whenever it exists. The
+  effective part is derived through `cut_exclusions` and keeps the current
+  translucent fill (`#E5484D` at alpha 90) with a 1 px solid border. Any
+  ineffective remainder is faded further and uses a dashed border, so the
+  distinction is not colour-only; a fully ineffective region is faded in full.
+  In crop mode the crop keeps its handles. In region mode the crop is drawn as
+  its dimmed outline **without handles**, and the selected region gets the
+  eight handles and the focus ring. Handles always follow the full stored
+  region, not its effective part.
 - **Geometry:** `_rebuild_geometry` builds `build_crop_geometry` for
   `_edited_rect()` — the selected region in region mode, else the crop. That
   is the entire reuse: the same eight handles, the same

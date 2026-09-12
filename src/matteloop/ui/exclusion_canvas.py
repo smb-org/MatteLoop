@@ -11,6 +11,7 @@ from PySide6.QtGui import (
     QKeyEvent,
     QMouseEvent,
     QPainter,
+    QPainterPath,
     QPen,
 )
 from PySide6.QtWidgets import QMenu, QWidget
@@ -20,6 +21,7 @@ from matteloop.core.crop import (
     nudge_crop,
     oriented_point_from_widget,
 )
+from matteloop.core.exclusion import cut_exclusions
 from matteloop.core.geometry import InteractionGeometry, MediaTransform, PointF
 from matteloop.core.parameters import ExclusionsChanged
 from matteloop.core.specs import CropSpec
@@ -172,12 +174,77 @@ class ExclusionCanvas(CropCanvas):
     def _paint_exclusions(
         self, painter: QPainter, geometry: InteractionGeometry
     ) -> None:
-        fill = QColor("#E5484D")
-        fill.setAlpha(90)
-        painter.setPen(QPen(QColor("#E5484D"), 1))
-        painter.setBrush(fill)
+        effective_fill = QColor("#E5484D")
+        effective_fill.setAlpha(90)
+        effective_pen = QPen(QColor("#E5484D"), 1)
+        ineffective_fill = QColor("#E5484D")
+        ineffective_fill.setAlpha(32)
+        ineffective_pen = QPen(
+            QColor("#E5484D"), 1, Qt.PenStyle.DashLine
+        )
         for exclusion in self._painted_exclusions():
-            painter.drawRect(self._widget_rect(geometry, exclusion))
+            region_rect = self._widget_rect(geometry, exclusion)
+            effective = self._effective_exclusion(exclusion)
+            if effective is None:
+                self._paint_exclusion_rect(
+                    painter,
+                    region_rect,
+                    fill=ineffective_fill,
+                    pen=ineffective_pen,
+                )
+                continue
+            effective_rect = self._widget_rect(geometry, effective)
+            if effective == exclusion:
+                self._paint_exclusion_rect(
+                    painter,
+                    effective_rect,
+                    fill=effective_fill,
+                    pen=effective_pen,
+                )
+                continue
+            region_path = QPainterPath()
+            region_path.addRect(region_rect)
+            effective_path = QPainterPath()
+            effective_path.addRect(effective_rect)
+            painter.fillPath(
+                region_path.subtracted(effective_path), ineffective_fill
+            )
+            self._paint_exclusion_rect(
+                painter, region_rect, fill=None, pen=ineffective_pen
+            )
+            self._paint_exclusion_rect(
+                painter,
+                effective_rect,
+                fill=effective_fill,
+                pen=effective_pen,
+            )
+
+    @staticmethod
+    def _paint_exclusion_rect(
+        painter: QPainter,
+        rect: QRectF,
+        *,
+        fill: QColor | None,
+        pen: QPen,
+    ) -> None:
+        painter.setBrush(fill if fill is not None else Qt.BrushStyle.NoBrush)
+        painter.setPen(pen)
+        painter.drawRect(rect)
+
+    def _effective_exclusion(self, exclusion: CropSpec) -> CropSpec | None:
+        if self._presentation is None:
+            return None
+        boxes = cut_exclusions((exclusion,), self._presentation.crop)
+        if not boxes:
+            return None
+        box = boxes[0]
+        crop = self._presentation.crop
+        return CropSpec(
+            crop.x + box.left,
+            crop.y + box.top,
+            box.width,
+            box.height,
+        )
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
         if not self._exclusion_edit:
@@ -646,11 +713,25 @@ class ExclusionCanvas(CropCanvas):
             return
         assert index is not None
         crop = self._edited_rect()
-        text = QCoreApplication.translate(
-            "CropCanvas",
-            "Exclusion region %1 of %2: x %3, y %4, width %5, height %6 "
-            "source pixels",
-        )
+        effective = self._effective_exclusion(crop)
+        if effective is None:
+            text = QCoreApplication.translate(
+                "CropCanvas",
+                "Exclusion region %1 of %2: x %3, y %4, width %5, height %6 "
+                "source pixels; entirely outside crop",
+            )
+        elif effective != crop:
+            text = QCoreApplication.translate(
+                "CropCanvas",
+                "Exclusion region %1 of %2: x %3, y %4, width %5, height %6 "
+                "source pixels; partly outside crop",
+            )
+        else:
+            text = QCoreApplication.translate(
+                "CropCanvas",
+                "Exclusion region %1 of %2: x %3, y %4, width %5, height %6 "
+                "source pixels",
+            )
         values = (
             index + 1,
             len(presentation.exclusions),

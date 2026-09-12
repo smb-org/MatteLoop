@@ -6,6 +6,7 @@ from PySide6.QtGui import QColor, QImage
 from PySide6.QtWidgets import QPushButton, QVBoxLayout, QWidget
 
 from matteloop.core.crop_state import CropChanged
+from matteloop.core.exclusion import cut_exclusions
 from matteloop.core.geometry import MediaTransform, PointF
 from matteloop.core.parameters import ExclusionsChanged
 from matteloop.core.specs import CropSpec
@@ -32,12 +33,16 @@ def _presentation(
     )
 
 
-def _canvas(qtbot) -> CropCanvas:
+def _canvas(
+    qtbot, crop: CropSpec = CropSpec(10, 10, 40, 20)
+) -> CropCanvas:
     canvas = ExclusionCanvas()
     qtbot.addWidget(canvas)
     canvas.resize(200, 100)
     canvas.set_frame(QImage(100, 50, QImage.Format.Format_RGBA8888))
-    canvas.apply_presentation(_presentation(), active=True, editable=True)
+    canvas.apply_presentation(
+        _presentation(crop=crop), active=True, editable=True
+    )
     canvas.show()
     return canvas
 
@@ -212,6 +217,89 @@ def test_persisted_exclusions_are_painted_when_crop_is_disabled(qtbot) -> None:
 
     color = canvas.grab().toImage().pixelColor(_source_pos(canvas, 30, 20))
 
+    assert color.red() > color.green()
+
+
+def test_partly_outside_exclusion_paints_only_the_cut_intersection(qtbot) -> None:
+    crop = CropSpec(10, 10, 60, 30)
+    region = CropSpec(60, 20, 20, 10)
+    canvas = _canvas(qtbot, crop)
+    frame = QImage(100, 50, QImage.Format.Format_RGBA8888)
+    frame.fill(QColor("#ffffff"))
+    canvas.set_frame(frame)
+    canvas.apply_presentation(
+        _presentation(crop=crop, exclusions=(region,)),
+        active=False,
+        editable=True,
+    )
+    canvas.show()
+    qtbot.wait(10)
+
+    boxes = cut_exclusions((region,), crop)
+    assert len(boxes) == 1
+    box = boxes[0]
+    assert canvas._effective_exclusion(region) == CropSpec(  # noqa: SLF001
+        crop.x + box.left,
+        crop.y + box.top,
+        box.width,
+        box.height,
+    )
+
+    image = canvas.grab().toImage()
+    effective = image.pixelColor(_source_pos(canvas, 65, 25))
+    ineffective = image.pixelColor(_source_pos(canvas, 75, 25))
+    assert effective.red() > effective.green()
+    assert ineffective.red() > ineffective.green()
+    assert effective != ineffective
+
+
+def test_wholly_outside_exclusion_is_faded_and_has_no_effective_part(qtbot) -> None:
+    crop = CropSpec(10, 10, 60, 30)
+    inside = CropSpec(20, 15, 10, 10)
+    outside = CropSpec(75, 20, 10, 10)
+    canvas = _canvas(qtbot, crop)
+    frame = QImage(100, 50, QImage.Format.Format_RGBA8888)
+    frame.fill(QColor("#ffffff"))
+    canvas.set_frame(frame)
+    canvas.apply_presentation(
+        _presentation(crop=crop, exclusions=(inside, outside)),
+        active=False,
+        editable=True,
+    )
+    canvas.show()
+    qtbot.wait(10)
+
+    assert cut_exclusions((outside,), crop) == ()
+    assert canvas._effective_exclusion(outside) is None  # noqa: SLF001
+    image = canvas.grab().toImage()
+    assert image.pixelColor(_source_pos(canvas, 20, 20)) != image.pixelColor(
+        _source_pos(canvas, 80, 25)
+    )
+
+
+def test_wholly_inside_exclusion_keeps_the_solid_treatment(qtbot) -> None:
+    crop = CropSpec(10, 10, 60, 30)
+    region = CropSpec(20, 15, 10, 10)
+    canvas = _canvas(qtbot, crop)
+    frame = QImage(100, 50, QImage.Format.Format_RGBA8888)
+    frame.fill(QColor("#ffffff"))
+    canvas.set_frame(frame)
+    canvas.apply_presentation(
+        _presentation(crop=crop, exclusions=(region,)),
+        active=False,
+        editable=True,
+    )
+    canvas.show()
+    qtbot.wait(10)
+
+    box = cut_exclusions((region,), crop)[0]
+    assert canvas._effective_exclusion(region) == CropSpec(  # noqa: SLF001
+        crop.x + box.left,
+        crop.y + box.top,
+        box.width,
+        box.height,
+    )
+    color = canvas.grab().toImage().pixelColor(_source_pos(canvas, 25, 20))
     assert color.red() > color.green()
 
 
@@ -614,6 +702,35 @@ def test_region_mode_announces_the_selected_region_bounds(qtbot) -> None:
     assert canvas.accessibleDescription() == (
         "Exclusion region 1 of 1: x 20, y 10, width 30, height 20 source pixels"
     )
+
+
+@pytest.mark.parametrize(
+    ("region", "status"),
+    [
+        (CropSpec(60, 20, 20, 10), "partly outside crop"),
+        (CropSpec(75, 20, 10, 10), "entirely outside crop"),
+    ],
+    ids=["partly-outside", "wholly-outside"],
+)
+def test_selected_exclusion_announces_when_crop_does_not_apply(
+    qtbot, region: CropSpec, status: str
+) -> None:
+    crop = CropSpec(10, 10, 60, 30)
+    canvas = _canvas(qtbot, crop)
+    canvas.apply_presentation(
+        _presentation(crop=crop, exclusions=(region,)),
+        active=True,
+        editable=True,
+    )
+    canvas.set_exclusion_edit(True)
+
+    qtbot.mouseClick(
+        canvas,
+        Qt.MouseButton.LeftButton,
+        pos=_source_pos(canvas, region.x + 1, region.y + 1),
+    )
+
+    assert canvas.accessibleDescription().endswith(f"; {status}")
 
 
 def test_crop_canvas_keyboard_moves_overlay_by_one_source_pixel(qtbot) -> None:

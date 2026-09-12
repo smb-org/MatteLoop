@@ -30,12 +30,22 @@
         <translation>Original video frame</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="740"/>
+        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="705"/>
         <source>Exclusion region mode: %1 region(s); no region selected</source>
         <translation>Exclusion region mode: %1 region(s); no region selected</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="751"/>
+        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="718"/>
+        <source>Exclusion region %1 of %2: x %3, y %4, width %5, height %6 source pixels; entirely outside crop</source>
+        <translation>Exclusion region %1 of %2: x %3, y %4, width %5, height %6 source pixels; entirely outside crop</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="724"/>
+        <source>Exclusion region %1 of %2: x %3, y %4, width %5, height %6 source pixels; partly outside crop</source>
+        <translation>Exclusion region %1 of %2: x %3, y %4, width %5, height %6 source pixels; partly outside crop</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="730"/>
         <source>Exclusion region %1 of %2: x %3, y %4, width %5, height %6 source pixels</source>
         <translation>Exclusion region %1 of %2: x %3, y %4, width %5, height %6 source pixels</translation>
     </message>
@@ -48,23 +58,22 @@
 <context>
     <name>ExclusionCanvas</name>
     <message>
-        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="101"/>
+        <location filename="../src/matteloop/ui/exclusion_context_menu.py" line="57"/>
         <source>Exclude this area</source>
         <translation>Exclude this area</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="108"/>
+        <location filename="../src/matteloop/ui/exclusion_context_menu.py" line="69"/>
         <source>Remove this region</source>
         <translation>Remove this region</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="117"/>
-        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="125"/>
+        <location filename="../src/matteloop/ui/exclusion_context_menu.py" line="76"/>
         <source>Remove all regions</source>
         <translation>Remove all regions</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="134"/>
+        <location filename="../src/matteloop/ui/exclusion_context_menu.py" line="87"/>
         <source>Edit exclusion regions</source>
         <translation>Edit exclusion regions</translation>
     </message>
