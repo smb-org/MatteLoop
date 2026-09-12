@@ -164,6 +164,23 @@ def test_unknown_content_length_reports_post_promotion_completion(
     assert events == [(6, 6)]
 
 
+def test_an_already_cached_weight_still_reports_completion(tmp_path: Path) -> None:
+    """A cached weight takes the early return, and a caller that reads the
+    terminal progress as "usable now" must still hear it there -- otherwise
+    selecting an already-downloaded model reports it as missing.
+    """
+    data = b"abcdef"
+    first: list[tuple[int, int]] = []
+    _download(tmp_path, data, progress=lambda done, total: first.append((done, total)))
+    assert first == [(6, 6)]
+
+    second: list[tuple[int, int]] = []
+
+    _download(tmp_path, data, progress=lambda done, total: second.append((done, total)))
+
+    assert second == [(6, 6)]
+
+
 @pytest.mark.parametrize("cancel_after_call", [1, 3, 6])
 def test_cancellation_before_between_and_after_native_reads_cleans_part(
     tmp_path: Path, cancel_after_call: int
