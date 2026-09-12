@@ -26,6 +26,10 @@ composite. MatteLoop is the whole path from that clip to that loop:
 - **Preview a single frame** to judge the cutout before committing to a render.
 - **Trim, crop and resize** the finished cut, and watch it loop on screen until
   it is right.
+- **Mark exclusion regions** over burned-in overlays or other unwanted
+  foreground; those areas are made transparent after segmentation. Turn on
+  **Blank before the model** when an excluded bystander is distorting the
+  matte; this re-segments the clip and uses a separate cached cut set.
 - **Render** a lossless transparent animated WebP.
 - **Choose or clear the output directory** in the inspector's Output section.
 - **Replace the open clip** by dropping another video onto the window, or with

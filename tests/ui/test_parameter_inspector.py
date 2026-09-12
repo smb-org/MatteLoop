@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from decimal import Decimal
 from fractions import Fraction
 from pathlib import Path
@@ -8,7 +9,12 @@ import pytest
 from PySide6.QtCore import QSettings, Qt
 from PySide6.QtWidgets import QAbstractSpinBox, QComboBox
 
-from matteloop.core.parameters import ParametersReset, ParameterState
+from matteloop.core.parameters import (
+    ExclusionsBeforeModelChanged,
+    ExclusionsChanged,
+    ParametersReset,
+    ParameterState,
+)
 from matteloop.core.specs import CropSpec, EdgeMode, TransformSpec
 from matteloop.core.state import AppState, SourceState
 from matteloop.core.timeline import TimelineState
@@ -258,6 +264,129 @@ def test_inspector_emits_parameter_commands_from_standard_controls(qtbot) -> Non
         "GlobalTrimChanged",
         "PaddingChanged",
     ]
+
+
+def test_exclusion_controls_toggle_edit_mode_and_clear_regions(qtbot) -> None:
+    inspector = Inspector(_settings())
+    qtbot.addWidget(inspector)
+    state = AppState(
+        source=SourceState.READY,
+        source_id="source",
+        source_value=object(),
+        parameters=ParameterState(exclusions=(CropSpec(10, 10, 20, 20),)),
+        timeline=TimelineState(Fraction(4), Fraction(0), Fraction(4), Fraction(0)),
+    )
+    store = ReducerStore(state)
+    controller = SourceController.__new__(SourceController)
+    controller._store = store
+    controller._settings = None
+    controller._closed = False
+    inspector.apply_parameters(present_parameters(store.state), editable=True)
+    commands: list[object] = []
+    modes: list[bool] = []
+    inspector.command_requested.connect(commands.append)
+    inspector.command_requested.connect(controller.dispatch)
+    inspector.exclusion_controls.edit_toggled.connect(modes.append)
+
+    controls = inspector.exclusion_controls
+    assert controls.edit_button.text() == "Edit"
+    assert controls.edit_button.accessibleName() == "Edit exclusion regions"
+    assert controls.edit_button.toolTip() == "Edit exclusion regions"
+    assert controls.clear_button.text() == "Clear"
+    assert controls.clear_button.accessibleName() == "Clear exclusion regions"
+    assert controls.count_label.text() == "1 region(s)"
+    assert controls.clear_button.isEnabled()
+
+    controls.edit_button.click()
+    controls.clear_button.click()
+
+    assert modes == [True]
+    assert commands == [ExclusionsChanged(())]
+    assert store.state.parameters.exclusions == ()
+    inspector.apply_parameters(present_parameters(store.state), editable=False)
+
+    assert modes == [True, False]
+    assert not controls.edit_button.isEnabled()
+    assert not controls.clear_button.isEnabled()
+    assert controls.count_label.text() == "0 region(s)"
+
+
+def test_before_model_checkbox_dispatches_and_is_inert_without_regions(qtbot) -> None:
+    inspector = Inspector(_settings())
+    qtbot.addWidget(inspector)
+    empty = AppState(
+        source=SourceState.READY,
+        source_id="source",
+        source_value=object(),
+        timeline=TimelineState(Fraction(4), Fraction(0), Fraction(4), Fraction(0)),
+    )
+    inspector.apply_parameters(present_parameters(empty), editable=True)
+    commands: list[object] = []
+    inspector.command_requested.connect(commands.append)
+
+    checkbox = inspector.exclusion_controls.before_model_checkbox
+    assert not checkbox.isEnabled()
+    checkbox.click()
+    assert commands == []
+
+    region = CropSpec(10, 10, 20, 20)
+    with_region = replace(
+        empty,
+        parameters=replace(empty.parameters, exclusions=(region,)),
+    )
+    inspector.apply_parameters(present_parameters(with_region), editable=True)
+    assert checkbox.isEnabled()
+    checkbox.click()
+    assert commands == [ExclusionsBeforeModelChanged(True)]
+
+    enabled = replace(
+        with_region,
+        parameters=replace(
+            with_region.parameters, exclusions_before_model=True
+        ),
+    )
+    inspector.apply_parameters(present_parameters(enabled), editable=True)
+    assert checkbox.isChecked()
+    assert inspector.exclusion_controls.count_label.text() == (
+        "1 region(s), blanked before the model"
+    )
+
+
+def test_before_model_count_label_names_the_blank(qtbot) -> None:
+    inspector = Inspector(_settings())
+    qtbot.addWidget(inspector)
+    state = AppState(
+        source=SourceState.READY,
+        source_id="source",
+        source_value=object(),
+        parameters=ParameterState(
+            exclusions=(CropSpec(10, 10, 20, 20),),
+            exclusions_before_model=True,
+        ),
+        timeline=TimelineState(Fraction(4), Fraction(0), Fraction(4), Fraction(0)),
+    )
+
+    inspector.apply_parameters(present_parameters(state), editable=True)
+
+    assert inspector.exclusion_controls.count_label.text() == (
+        "1 region(s), blanked before the model"
+    )
+
+
+def test_reset_is_enabled_when_exclusion_regions_differ_from_defaults(qtbot) -> None:
+    inspector = Inspector(_settings())
+    qtbot.addWidget(inspector)
+    state = AppState(
+        source=SourceState.READY,
+        source_id="source",
+        source_value=object(),
+        parameters=ParameterState(exclusions=(CropSpec(10, 10, 20, 20),)),
+        timeline=TimelineState(Fraction(4), Fraction(0), Fraction(4), Fraction(0)),
+    )
+
+    inspector.apply_parameters(present_parameters(state), editable=True)
+
+    assert inspector.reset_parameters_button.isEnabled()
 
 
 def test_inspector_emits_edge_mode_from_the_standard_combo(qtbot) -> None:

@@ -2120,6 +2120,64 @@ def test_manifest_rejects_non_authoritative_cache_key_inputs() -> None:
     assert exc.value.code is ErrorCode.CUT_MANIFEST_INVALID
 
 
+def test_manifest_accepts_model_exclusions_and_reproduces_the_cut_key(
+    tmp_path: Path,
+) -> None:
+    inputs = _cache_inputs()
+    inputs["model_exclusions"] = {
+        "fill": "imagenet-mean",
+        "boxes": [[1, 1, 3, 3]],
+    }
+    staged, manifest = _completed_staging(tmp_path, inputs=inputs)
+    decoded = CutManifest.from_json_bytes(manifest.to_json_bytes())
+    request = RenderRequest(
+        source=tmp_path / "source.mp4",
+        sampling=SamplingSpec(Fraction(0), Fraction(1), 15),
+        crop=CropSpec(0, 0, 8, 6),
+        segmentation=SegmentationSpec(
+            exclusions=(CropSpec(1, 1, 2, 2),)
+        ),
+        framing=FramingSpec(),
+        output=OutputSpec(tmp_path, "output.webp"),
+    )
+
+    assert decoded == manifest
+    assert decoded.cache_key == cut_cache_key(
+        request,
+        source_sha256="a" * 64,
+        model_weight_sha256="b" * 64,
+    )
+    assert staged.cache_key == decoded.cache_key
+
+
+@pytest.mark.parametrize(
+    "box",
+    [
+        [2, 1, 1, 2],
+        [-1, 0, 1, 1],
+        ["1", 0, 1, 1],
+    ],
+    ids=["inverted", "negative", "non-integer"],
+)
+def test_manifest_rejects_malformed_model_exclusion_boxes(
+    box: list[object],
+) -> None:
+    inputs = _cache_inputs()
+    inputs["model_exclusions"] = {
+        "fill": "imagenet-mean",
+        "boxes": [box],
+    }
+
+    with pytest.raises(AppError) as exc:
+        CutManifest.cache_key_for(inputs)
+
+    assert exc.value.code is ErrorCode.CUT_MANIFEST_INVALID
+
+
+def test_manifest_without_model_exclusions_still_validates() -> None:
+    assert CutManifest.cache_key_for(_cache_inputs())
+
+
 def test_manifest_cache_key_matches_the_task_4_authoritative_fingerprint(
     tmp_path: Path,
 ) -> None:

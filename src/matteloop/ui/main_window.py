@@ -223,6 +223,15 @@ class MainWindow(QMainWindow):
         )
         for widget in (self.timeline_widget, self.original_canvas, self.inspector):
             widget.command_requested.connect(self._services.dispatch)
+        self.inspector.exclusion_controls.edit_toggled.connect(
+            self.original_canvas.set_exclusion_edit
+        )
+        self.original_canvas.exclusion_selection_changed.connect(
+            self.inspector.exclusion_controls.set_selected_exclusion
+        )
+        self.original_canvas.exclusion_edit_toggled.connect(
+            self.inspector.exclusion_controls.edit_button.setChecked
+        )
         self.render_button.clicked.connect(
             lambda: self._services.dispatch(RenderVideoRequested())
         )

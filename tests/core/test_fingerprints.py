@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import threading
+from collections.abc import Mapping
 from dataclasses import replace
 from decimal import Decimal, localcontext
 from fractions import Fraction
@@ -18,6 +19,7 @@ from matteloop.core.fingerprints import (
     complete_source_sha256,
     cut_cache_key,
     cut_cache_key_inputs,
+    cut_union_fingerprint,
     provisional_source_fingerprint,
     render_fingerprint,
     union_fingerprint,
@@ -411,6 +413,82 @@ def test_union_identity_tracks_only_cut_content_and_alpha_threshold(
     assert union_fingerprint(new_threshold, cut_key=cut_key) != baseline
 
 
+def test_render_and_preview_identity_track_effective_exclusions_only(
+    tmp_path: Path,
+) -> None:
+    request = request_a(tmp_path)
+    outside = replace(
+        request,
+        framing=replace(
+            request.framing, exclusions=(CropSpec(0, 0, 1, 1),)
+        ),
+    )
+    inside = replace(
+        request,
+        framing=replace(
+            request.framing, exclusions=(CropSpec(10, 10, 20, 20),)
+        ),
+    )
+
+    assert render_fingerprint(outside, cut_key="ef" * 32) == render_fingerprint(
+        request, cut_key="ef" * 32
+    )
+    assert preview_fingerprint(outside, Fraction(1, 5)) == preview_fingerprint(
+        request, Fraction(1, 5)
+    )
+    assert render_fingerprint(inside, cut_key="ef" * 32) != render_fingerprint(
+        request, cut_key="ef" * 32
+    )
+    assert preview_fingerprint(inside, Fraction(1, 5)) != preview_fingerprint(
+        request, Fraction(1, 5)
+    )
+
+
+def test_union_identity_tracks_effective_exclusions(tmp_path: Path) -> None:
+    request = request_a(tmp_path)
+    first_region = CropSpec(10, 10, 20, 20)
+    second_region = CropSpec(40, 40, 10, 10)
+    first = replace(
+        request,
+        framing=replace(
+            request.framing, exclusions=(first_region, second_region)
+        ),
+    )
+    reordered = replace(
+        request,
+        framing=replace(
+            request.framing,
+            exclusions=(second_region, first_region),
+        ),
+    )
+    outside = replace(
+        request,
+        framing=replace(
+            request.framing, exclusions=(CropSpec(0, 0, 1, 1),)
+        ),
+    )
+
+    assert union_fingerprint(first, cut_key="ef" * 32) == union_fingerprint(
+        reordered, cut_key="ef" * 32
+    )
+    assert union_fingerprint(first, cut_key="ef" * 32) != union_fingerprint(
+        outside, cut_key="ef" * 32
+    )
+
+
+def test_identities_without_exclusions_match_the_previous_schema(
+    tmp_path: Path,
+) -> None:
+    request = replace(request_a(tmp_path), framing=FramingSpec())
+
+    assert "exclusions" not in fingerprints_module._framing(request)
+    assert cut_union_fingerprint(
+        request.framing, request.crop, cut_key="ef" * 32
+    ) == (
+        "8e9f72c32c74a7feb4a7bc60345c74dfeee018fd73d4864d6bbc92e5bc96fb17"
+    )
+
+
 def test_render_fingerprint_distinguishes_long_exact_decimal_values(
     tmp_path: Path,
 ) -> None:
@@ -530,7 +608,9 @@ def test_fingerprints_reject_malformed_canonical_identities(
     assert exc.value.code is ErrorCode.INVALID_RENDER_REQUEST
 
 
-def test_cut_key_uses_a_canonical_versioned_json_schema(tmp_path: Path) -> None:
+def test_cut_key_without_model_exclusions_matches_the_canonical_schema(
+    tmp_path: Path,
+) -> None:
     request = request_a(tmp_path)
     canonical_json = json.dumps(
         {
@@ -566,6 +646,143 @@ def test_cut_key_uses_a_canonical_versioned_json_schema(tmp_path: Path) -> None:
     assert (
         cut_cache_key(request, source_sha256=SOURCE_SHA, model_weight_sha256=MODEL_SHA)
         == hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
+    )
+    for segmentation in (
+        request.segmentation,
+        replace(request.segmentation, exclusions=()),
+    ):
+        no_regions = replace(request, segmentation=segmentation)
+        inputs = cut_cache_key_inputs(
+            no_regions,
+            source_sha256=SOURCE_SHA,
+            model_weight_sha256=MODEL_SHA,
+        )
+        assert "model_exclusions" not in inputs
+        assert cut_cache_key(
+            no_regions,
+            source_sha256=SOURCE_SHA,
+            model_weight_sha256=MODEL_SHA,
+        ) == cut_cache_key(
+            request,
+            source_sha256=SOURCE_SHA,
+            model_weight_sha256=MODEL_SHA,
+        )
+
+
+def test_cut_key_ignores_a_model_exclusion_outside_the_crop_or_clipped_to_nothing(
+    tmp_path: Path,
+) -> None:
+    request = request_a(tmp_path)
+    baseline = cut_cache_key(
+        request, source_sha256=SOURCE_SHA, model_weight_sha256=MODEL_SHA
+    )
+    for exclusion in (CropSpec(0, 0, 1, 1), CropSpec(0, 3, 2, 1)):
+        changed = replace(
+            request,
+            segmentation=replace(
+                request.segmentation, exclusions=(exclusion,)
+            ),
+        )
+        inputs = cut_cache_key_inputs(
+            changed,
+            source_sha256=SOURCE_SHA,
+            model_weight_sha256=MODEL_SHA,
+        )
+        assert "model_exclusions" not in inputs
+        assert cut_cache_key(
+            changed, source_sha256=SOURCE_SHA, model_weight_sha256=MODEL_SHA
+        ) == baseline
+
+
+def test_cut_key_tracks_model_exclusion_boxes_and_the_fill_identifier(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    request = request_a(tmp_path)
+    first = replace(
+        request,
+        segmentation=replace(
+            request.segmentation,
+            exclusions=(CropSpec(2, 3, 20, 30), CropSpec(40, 50, 10, 12)),
+        ),
+    )
+    second = replace(
+        first,
+        segmentation=replace(
+            first.segmentation,
+            exclusions=(CropSpec(2, 3, 20, 31), CropSpec(40, 50, 10, 12)),
+        ),
+    )
+
+    first_inputs = cut_cache_key_inputs(
+        first, source_sha256=SOURCE_SHA, model_weight_sha256=MODEL_SHA
+    )
+    assert first_inputs["model_exclusions"] == {
+        "fill": fingerprints_module.MODEL_FILL_ID,
+        "boxes": ((0, 0, 20, 30), (38, 47, 48, 59)),
+    }
+    original_key = cut_cache_key(
+        first, source_sha256=SOURCE_SHA, model_weight_sha256=MODEL_SHA
+    )
+    assert original_key != cut_cache_key(
+        second, source_sha256=SOURCE_SHA, model_weight_sha256=MODEL_SHA
+    )
+
+    monkeypatch.setattr(fingerprints_module, "MODEL_FILL_ID", "future-fill")
+    assert original_key != cut_cache_key(
+        first, source_sha256=SOURCE_SHA, model_weight_sha256=MODEL_SHA
+    )
+
+
+def test_cut_key_inputs_with_model_exclusions_are_recursively_immutable(
+    tmp_path: Path,
+) -> None:
+    request = replace(
+        request_a(tmp_path),
+        segmentation=SegmentationSpec(
+            exclusions=(CropSpec(2, 3, 20, 30),)
+        ),
+    )
+
+    inputs = cut_cache_key_inputs(
+        request, source_sha256=SOURCE_SHA, model_weight_sha256=MODEL_SHA
+    )
+    model_exclusions = inputs["model_exclusions"]
+    assert isinstance(model_exclusions, Mapping)
+    assert isinstance(model_exclusions["boxes"], tuple)
+    assert isinstance(model_exclusions["boxes"][0], tuple)
+    with pytest.raises(TypeError):
+        model_exclusions["boxes"] = ()  # type: ignore[index]
+
+
+def test_preview_identity_tracks_model_exclusions(tmp_path: Path) -> None:
+    request = request_a(tmp_path)
+    changed = replace(
+        request,
+        segmentation=replace(
+            request.segmentation, exclusions=(CropSpec(2, 3, 20, 30),)
+        ),
+    )
+
+    assert preview_fingerprint(changed, Fraction(1, 5)) != preview_fingerprint(
+        request, Fraction(1, 5)
+    )
+
+
+def test_render_and_union_identities_ignore_model_exclusions(tmp_path: Path) -> None:
+    request = request_a(tmp_path)
+    changed = replace(
+        request,
+        segmentation=replace(
+            request.segmentation, exclusions=(CropSpec(2, 3, 20, 30),)
+        ),
+    )
+    cut_key = "ef" * 32
+
+    assert render_fingerprint(changed, cut_key=cut_key) == render_fingerprint(
+        request, cut_key=cut_key
+    )
+    assert union_fingerprint(changed, cut_key=cut_key) == union_fingerprint(
+        request, cut_key=cut_key
     )
 
 

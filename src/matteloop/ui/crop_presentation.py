@@ -18,6 +18,8 @@ class CropPresentation:
     rotation: int
     pixel_aspect: float
     crop: CropSpec
+    exclusions: tuple[CropSpec, ...] = ()
+    exclusions_before_model: bool = False
 
 
 def present_crop(state: AppState) -> CropPresentation | None:
@@ -60,4 +62,6 @@ def present_crop(state: AppState) -> CropPresentation | None:
         rotation,
         aspect,
         state.crop,
+        state.parameters.exclusions,
+        state.parameters.exclusions_before_model,
     )

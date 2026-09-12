@@ -147,6 +147,25 @@ def request_for_workspace(manifest: CutManifest, base: RenderRequest) -> RenderR
     model = _mapping(inputs["model"])
     edge_settings = _mapping(inputs["edge_settings"])
     matting = _mapping(edge_settings["alpha_matting"])
+    model_exclusions = inputs.get("model_exclusions")
+    segmentation_exclusions: tuple[CropSpec, ...] = ()
+    if model_exclusions is not None:
+        model_box_values = _mapping(model_exclusions)
+        raw_boxes = model_box_values["boxes"]
+        if not isinstance(raw_boxes, (list, tuple)):
+            raise ValueError("manifest model exclusions are not an array")
+        crop_x = _integer(crop["x"])
+        crop_y = _integer(crop["y"])
+        segmentation_exclusions = tuple(
+            CropSpec(
+                crop_x + _integer(box[0]),
+                crop_y + _integer(box[1]),
+                _integer(box[2]) - _integer(box[0]),
+                _integer(box[3]) - _integer(box[1]),
+            )
+            for box in raw_boxes
+            if isinstance(box, (list, tuple)) and len(box) == 4
+        )
     mode = {
         "standard": EdgeMode.STANDARD,
         "decontaminate": EdgeMode.DECONTAMINATE_COLORS,
@@ -173,6 +192,7 @@ def request_for_workspace(manifest: CutManifest, base: RenderRequest) -> RenderR
                 _integer(matting["erode_size"]),
             ),
             base.segmentation.execution_provider,
+            exclusions=segmentation_exclusions,
         ),
         framing=base.framing,
         output=base.output,

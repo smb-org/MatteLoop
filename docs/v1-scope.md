@@ -51,6 +51,7 @@ Nothing else gates V1. When that sentence is true end to end, V1 is done.
 | Output | Lossless animated WebP, plus the still-image single-frame case. |
 | Timeline | Filmstrip, playhead, IN/OUT range handles, exact time/frame readout. |
 | Crop | Visual rectangle with handles, plus numeric fields. |
+| Exclusion regions | Several user-drawn rectangles over the source frame, forced to alpha 0 after segmentation so a burned-in overlay does not survive into the cutout. **Scope reopened 2026-09-12 (issue #80):** an optional global switch also blanks those regions before the model; effective boxes are part of the cut key, so changing them re-segments while post-only edits keep the stored cut set. |
 | Preview | `Preview Frame` through the exact render pipeline, with the stale-result contract. |
 | Jobs | Exclusive modal job dialog with truthful stage/progress and working cancellation. |
 | Accessibility | Full keyboard reachability, correct tab order, accessible names and values on **standard** widgets, no colour-only status. |
@@ -77,6 +78,12 @@ Nothing else gates V1. When that sentence is true end to end, V1 is done.
   `Delete outdated` as the agreed handling for a rembg namespace move (issue
   #22). Bulk re-download returned in #29 with confirmation, cancellation, batch
   progress and per-model deletion after verification.
+- **Exclusion regions carry across a source change, 2026-09-12:** the
+  rectangles are a parameter, not a per-source value, because the use case is
+  many clips of one stream sharing an overlay layout. They are clipped — not
+  slid — to each newly loaded source, so what the canvas paints and what the
+  renderer masks are the same rectangle by construction. Sliding, which is what
+  `clamp_crop` does for a crop, would move an exclusion onto wanted content.
 - **Cut workspace location, 2026-09-10:** durable cut sets and disposable
   scratch now live under MatteLoop's user cache at
   `<platformdirs.user_cache_dir("matteloop")>/workspace/`, rather than inside

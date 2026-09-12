@@ -6,10 +6,8 @@ from decimal import Decimal
 from fractions import Fraction
 from pathlib import Path
 
-import pytest
 from PIL import Image
 
-from matteloop.core.errors import ErrorCode, ValidationError
 from matteloop.core.geometry import FramingPlan, PixelBounds
 from matteloop.core.rgba import RgbaOwnershipTracker
 from matteloop.core.specs import CropSpec, FramingSpec, TransformSpec
@@ -31,11 +29,11 @@ def test_framing_plan_matches_direct_construction_for_the_identity_framing() -> 
     )
 
 
-def test_framing_plan_rejects_trim_without_a_union() -> None:
+def test_framing_plan_skips_trim_without_a_union() -> None:
     framing = FramingSpec(True, Decimal("2"), 0, Decimal("1"))
-    with pytest.raises(ValidationError) as exc:
-        framing_plan((200, 180), None, framing)
-    assert exc.value.code is ErrorCode.INVALID_FRAMING
+    assert framing_plan((200, 180), None, framing) == FramingPlan(
+        (200, 180), global_bounds=None, padding=0, stretch_x=Fraction(1)
+    )
 
 
 def test_framing_plan_accepts_trim_with_a_union() -> None:
@@ -96,6 +94,38 @@ def test_stage_encoder_frames_writes_the_framed_pixels_and_keeps_the_delays(
     assert returned_delays == delays
     assert [event.overall_completed for event in events] == [1, 2, 3]
     assert all(event.overall_total == 6 for event in events)
+
+
+def test_stage_encoder_frames_zeroes_excluded_boxes_before_framing(
+    tmp_path: Path,
+) -> None:
+    frame = _colour_frame((255, 0, 0, 255))
+
+    def read_cut(index: int, tracker: RgbaOwnershipTracker) -> Image.Image:
+        del index
+        image = frame.copy()
+        tracker.register(image)
+        return image
+
+    tracker = RgbaOwnershipTracker((128, 128))
+    paths, _ = stage_encoder_frames(
+        read_cut,
+        1,
+        FramingPlan((128, 128)),
+        TransformSpec(),
+        (100,),
+        tmp_path / "framed-inputs",
+        tracker,
+        job(tmp_path, "excluded", JobKind.RENDER),
+        (0, 1),
+        exclusions=(PixelBounds(10, 20, 30, 40),),
+    )
+
+    with Image.open(paths[0]) as saved:
+        saved.load()
+        assert saved.getpixel((10, 20)) == (0, 0, 0, 0)
+        assert saved.getpixel((29, 39)) == (0, 0, 0, 0)
+        assert saved.getpixel((9, 20)) == (255, 0, 0, 255)
 
 
 def test_stage_encoder_frames_clamps_a_crop_stored_against_a_larger_frame(

@@ -274,14 +274,14 @@ class PreviewStage(QFrame):
         self, parent: QWidget | None = None, *, runtime_root: Path | None = None
     ) -> None:
         super().__init__(parent)
-        from matteloop.ui.crop_canvas import CropCanvas
+        from matteloop.ui.exclusion_canvas import ExclusionCanvas
         from matteloop.ui.result_player import ResultPlayerCanvas
 
         self.setObjectName("preview_stage")
         layout = QHBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(8)
-        self.original_canvas = CropCanvas(
+        self.original_canvas = ExclusionCanvas(
             title=QCoreApplication.translate("PreviewCanvas", "Original")
         )
         self.result_canvas = ResultPlayerCanvas(runtime_root=runtime_root)

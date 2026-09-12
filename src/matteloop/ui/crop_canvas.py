@@ -84,6 +84,9 @@ class CropCanvas(PreviewCanvas):
         active: bool,
         editable: bool,
     ) -> None:
+        if presentation is None:
+            self._dragged = None
+            self._drag_crop = None
         self._presentation = presentation
         self._active = active
         self._editable = editable
@@ -99,17 +102,29 @@ class CropCanvas(PreviewCanvas):
 
     def paintEvent(self, event) -> None:  # type: ignore[no-untyped-def]
         super().paintEvent(event)
-        if not self._active or self._geometry is None:
+        if self._geometry is None or self._presentation is None:
+            return
+        if not self._active:
             return
         geometry = self._geometry
         transform = geometry.transform
         if not isinstance(transform, MediaTransform):
             return
         content = transform.content_rect
-        crop = _qt_rect(geometry.visual["crop"])
+        crop = self._widget_rect(geometry, self._presentation.crop)
         overlay = QColor(CANVAS_COLOR)
         overlay.setAlpha(105)
         painter = QPainter(self)
+        self._paint_crop_mask(painter, content, crop, overlay)
+        self._paint_crop_outline(painter, crop)
+        self._paint_handles(painter, geometry)
+        self._paint_focus_ring(painter, geometry)
+        painter.end()
+
+    @staticmethod
+    def _paint_crop_mask(
+        painter: QPainter, content: RectF, crop: QRectF, overlay: QColor
+    ) -> None:
         painter.fillRect(
             QRectF(content.x, content.y, content.width, crop.top() - content.y),
             overlay,
@@ -136,19 +151,32 @@ class CropCanvas(PreviewCanvas):
             ),
             overlay,
         )
+
+    def _paint_crop_outline(self, painter: QPainter, crop: QRectF) -> None:
+        painter.setBrush(Qt.BrushStyle.NoBrush)
         painter.setPen(QPen(QColor(ACCENT_COLOR), 2))
         painter.drawRect(crop)
+
+    @staticmethod
+    def _paint_handles(
+        painter: QPainter, geometry: InteractionGeometry
+    ) -> None:
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(QColor(ACCENT_COLOR))
         for name in _HANDLE_NAMES:
             painter.drawRect(_qt_rect(geometry.visual[name]))
-        if self.hasFocus():
-            focused = geometry.focus.get(self._focused_target)
-            if focused is not None:
-                painter.setBrush(Qt.BrushStyle.NoBrush)
-                painter.setPen(QPen(QColor(TEXT_COLOR), 1, Qt.PenStyle.DashLine))
-                painter.drawRect(_qt_rect(focused).adjusted(-3, -3, 3, 3))
-        painter.end()
+
+    def _paint_focus_ring(
+        self, painter: QPainter, geometry: InteractionGeometry
+    ) -> None:
+        if not self.hasFocus():
+            return
+        focused = geometry.focus.get(self._focused_target)
+        if focused is None:
+            return
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.setPen(QPen(QColor(TEXT_COLOR), 1, Qt.PenStyle.DashLine))
+        painter.drawRect(_qt_rect(focused).adjusted(-3, -3, 3, 3))
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
         if (
@@ -212,9 +240,10 @@ class CropCanvas(PreviewCanvas):
             super().keyPressEvent(event)
             return
         step = 10 if event.modifiers() & Qt.KeyboardModifier.ShiftModifier else 1
+        edited = self._edited_rect()
         try:
             crop = nudge_crop(
-                self._presentation.crop,
+                edited,
                 self._focused_target,
                 dx=delta[0] * step,
                 dy=delta[1] * step,
@@ -225,7 +254,7 @@ class CropCanvas(PreviewCanvas):
             super().keyPressEvent(event)
             return
         crop = self._constrain(crop, self._focused_target)
-        if crop != self._presentation.crop:
+        if crop != edited:
             self.command_requested.emit(self._crop_event(crop))
             self._announce_crop()
         event.accept()
@@ -267,6 +296,28 @@ class CropCanvas(PreviewCanvas):
         if self._presentation is None or crop != self._presentation.crop:
             self.command_requested.emit(self._crop_event(crop))
 
+    def _edited_rect(self) -> CropSpec:
+        return (
+            self._presentation.crop
+            if self._presentation is not None
+            else CropSpec(0, 0, 1, 1)
+        )
+
+    def _widget_rect(
+        self, geometry: InteractionGeometry, rect: CropSpec
+    ) -> QRectF:
+        presentation = self._presentation
+        if presentation is None or not isinstance(geometry.transform, MediaTransform):
+            return QRectF()
+        raw = oriented_rect_to_source_rect(
+            rect,
+            source_width=presentation.coded_width,
+            source_height=presentation.coded_height,
+            rotation=presentation.rotation,
+            pixel_aspect=presentation.pixel_aspect,
+        )
+        return _qt_rect(geometry.transform.source_rect_to_widget(raw))
+
     def _constrain(self, crop: CropSpec, target: str) -> CropSpec:
         """Re-fit a candidate crop before it is compared/emitted.
 
@@ -295,7 +346,7 @@ class CropCanvas(PreviewCanvas):
             return
         try:
             raw_crop = oriented_rect_to_source_rect(
-                presentation.crop,
+                self._edited_rect(),
                 source_width=presentation.coded_width,
                 source_height=presentation.coded_height,
                 display_width=presentation.width,
@@ -339,7 +390,7 @@ class CropCanvas(PreviewCanvas):
         presentation = self._presentation
         if presentation is None:
             return
-        crop = presentation.crop
+        crop = self._edited_rect()
         self.setAccessibleDescription(
             QCoreApplication.translate(
                 "CropCanvas",

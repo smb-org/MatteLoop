@@ -25,14 +25,84 @@
 <context>
     <name>CropCanvas</name>
     <message>
-        <location filename="../src/matteloop/ui/crop_canvas.py" line="93"/>
+        <location filename="../src/matteloop/ui/crop_canvas.py" line="96"/>
         <source>Original video frame</source>
         <translation>Original-Videobild</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/crop_canvas.py" line="333"/>
+        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="717"/>
+        <source>Exclusion region mode: %1 region(s); no region selected</source>
+        <translation>Ausschlussregion-Modus: %1 Region(en); keine Region ausgewählt</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="722"/>
+        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="732"/>
+        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="769"/>
+        <source>; blanked before the model</source>
+        <translation>; vor dem Modell ausgeblendet</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="741"/>
+        <source>Exclusion region %1 of %2: x %3, y %4, width %5, height %6 source pixels; entirely outside crop</source>
+        <translation>Ausschlussregion %1 von %2: x %3, y %4, Breite %5, Höhe %6 Quellpixel; vollständig außerhalb des Zuschnitts</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="747"/>
+        <source>Exclusion region %1 of %2: x %3, y %4, width %5, height %6 source pixels; partly outside crop</source>
+        <translation>Ausschlussregion %1 von %2: x %3, y %4, Breite %5, Höhe %6 Quellpixel; teilweise außerhalb des Zuschnitts</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="753"/>
+        <source>Exclusion region %1 of %2: x %3, y %4, width %5, height %6 source pixels</source>
+        <translation>Ausschlussregion %1 von %2: x %3, y %4, Breite %5, Höhe %6 Quellpixel</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/crop_canvas.py" line="384"/>
         <source>Crop bounds: x %s, y %s, width %s, height %s source pixels; source %s × %s</source>
         <translation>Zuschnittgrenzen: x %s, y %s, Breite %s, Höhe %s Quellpixel; Quelle %s × %s</translation>
+    </message>
+</context>
+<context>
+    <name>ExclusionCanvas</name>
+    <message>
+        <location filename="../src/matteloop/ui/exclusion_context_menu.py" line="57"/>
+        <source>Exclude this area</source>
+        <translation>Diesen Bereich ausschließen</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/exclusion_context_menu.py" line="69"/>
+        <source>Remove this region</source>
+        <translation>Diese Region entfernen</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/exclusion_context_menu.py" line="76"/>
+        <source>Remove all regions</source>
+        <translation>Alle Regionen entfernen</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/exclusion_context_menu.py" line="87"/>
+        <source>Edit exclusion regions</source>
+        <translation>Ausschlussregionen bearbeiten</translation>
+    </message>
+</context>
+<context>
+    <name>ExclusionControls</name>
+    <message numerus="yes">
+        <location filename="../src/matteloop/ui/exclusion_controls.py" line="51"/>
+        <source>%n region(s), blanked before the model</source>
+        <translation>
+            <numerusform>%n Region, vor dem Modell ausgeblendet</numerusform>
+            <numerusform>%n Regionen, vor dem Modell ausgeblendet</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../src/matteloop/ui/exclusion_controls.py" line="54"/>
+        <location filename="../src/matteloop/ui/exclusion_controls.py" line="137"/>
+        <source>%n region(s)</source>
+        <translation>
+            <numerusform>%n Region</numerusform>
+            <numerusform>%n Regionen</numerusform>
+        </translation>
     </message>
 </context>
 <context>
@@ -69,29 +139,29 @@
     </message>
     <message>
         <location filename="../src/matteloop/ui/copy.py" line="616"/>
-        <location filename="../src/matteloop/ui/copy.py" line="649"/>
-        <location filename="../src/matteloop/ui/copy.py" line="664"/>
+        <location filename="../src/matteloop/ui/copy.py" line="650"/>
+        <location filename="../src/matteloop/ui/copy.py" line="665"/>
         <source>X</source>
         <translation>X</translation>
     </message>
     <message>
         <location filename="../src/matteloop/ui/copy.py" line="617"/>
-        <location filename="../src/matteloop/ui/copy.py" line="650"/>
-        <location filename="../src/matteloop/ui/copy.py" line="665"/>
+        <location filename="../src/matteloop/ui/copy.py" line="651"/>
+        <location filename="../src/matteloop/ui/copy.py" line="666"/>
         <source>Y</source>
         <translation>Y</translation>
     </message>
     <message>
         <location filename="../src/matteloop/ui/copy.py" line="618"/>
-        <location filename="../src/matteloop/ui/copy.py" line="651"/>
-        <location filename="../src/matteloop/ui/copy.py" line="662"/>
+        <location filename="../src/matteloop/ui/copy.py" line="652"/>
+        <location filename="../src/matteloop/ui/copy.py" line="663"/>
         <source>Width</source>
         <translation>Breite</translation>
     </message>
     <message>
         <location filename="../src/matteloop/ui/copy.py" line="619"/>
-        <location filename="../src/matteloop/ui/copy.py" line="652"/>
-        <location filename="../src/matteloop/ui/copy.py" line="663"/>
+        <location filename="../src/matteloop/ui/copy.py" line="653"/>
+        <location filename="../src/matteloop/ui/copy.py" line="664"/>
         <source>Height</source>
         <translation>Höhe</translation>
     </message>
@@ -118,31 +188,31 @@
     </message>
     <message>
         <location filename="../src/matteloop/ui/copy.py" line="636"/>
-        <location filename="../src/matteloop/ui/inspector.py" line="253"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="254"/>
         <source>Edge treatment</source>
         <translation>Kantenbehandlung</translation>
     </message>
     <message>
         <location filename="../src/matteloop/ui/copy.py" line="637"/>
-        <location filename="../src/matteloop/ui/inspector.py" line="267"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="268"/>
         <source>Output FPS</source>
         <translation>Ausgabe-FPS</translation>
     </message>
     <message>
         <location filename="../src/matteloop/ui/copy.py" line="638"/>
-        <location filename="../src/matteloop/ui/copy.py" line="659"/>
+        <location filename="../src/matteloop/ui/copy.py" line="660"/>
         <source>Start</source>
         <translation>Start</translation>
     </message>
     <message>
         <location filename="../src/matteloop/ui/copy.py" line="639"/>
-        <location filename="../src/matteloop/ui/copy.py" line="660"/>
+        <location filename="../src/matteloop/ui/copy.py" line="661"/>
         <source>End</source>
         <translation>Ende</translation>
     </message>
     <message>
         <location filename="../src/matteloop/ui/copy.py" line="640"/>
-        <location filename="../src/matteloop/ui/copy.py" line="661"/>
+        <location filename="../src/matteloop/ui/copy.py" line="662"/>
         <source>Duration</source>
         <translation>Dauer</translation>
     </message>
@@ -158,246 +228,303 @@
     </message>
     <message>
         <location filename="../src/matteloop/ui/copy.py" line="643"/>
-        <location filename="../src/matteloop/ui/inspector.py" line="308"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="309"/>
         <source>Horizontal stretch</source>
         <translation>Horizontale Streckung</translation>
     </message>
     <message>
         <location filename="../src/matteloop/ui/copy.py" line="646"/>
+        <source>Exclusions</source>
+        <translation>Ausschlussregionen</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/copy.py" line="647"/>
         <source>Directory</source>
         <translation>Ordner</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="647"/>
+        <location filename="../src/matteloop/ui/copy.py" line="648"/>
         <source>Filename</source>
         <translation>Dateiname</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="648"/>
+        <location filename="../src/matteloop/ui/copy.py" line="649"/>
         <source>Maximum size</source>
         <translation>Maximale Größe</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="100"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="101"/>
         <source>Processing settings</source>
         <translation>Verarbeitungseinstellungen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="125"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="126"/>
         <source>Retry Rebuild</source>
         <translation>Neuaufbau wiederholen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="129"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="130"/>
         <source>Edited cut recovery</source>
         <translation>Wiederherstellung bearbeiteter Schnitte</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="132"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="133"/>
         <source>Edited cut frames could not be validated. Retry the rebuild scan.</source>
         <translation>Bearbeitete Schnittbilder konnten nicht validiert werden. Wiederholen Sie die Neuaufbauprüfung.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="139"/>
-        <location filename="../src/matteloop/ui/inspector.py" line="143"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="140"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="144"/>
         <source>Rebuild from edited cuts</source>
         <translation>Aus bearbeiteten Schnitten neu aufbauen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="147"/>
-        <location filename="../src/matteloop/ui/inspector.py" line="151"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="148"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="152"/>
         <source>Manage Models…</source>
         <translation>Modelle verwalten…</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="154"/>
-        <location filename="../src/matteloop/ui/inspector.py" line="158"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="155"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="159"/>
         <source>Manage Workspaces…</source>
         <translation>Arbeitsbereiche verwalten…</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector_reset.py" line="50"/>
+        <location filename="../src/matteloop/ui/inspector_reset.py" line="55"/>
         <source>Reset to defaults</source>
         <translation>Auf Standardwerte zurücksetzen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector_reset.py" line="54"/>
+        <location filename="../src/matteloop/ui/inspector_reset.py" line="59"/>
         <source>Reset inspector parameters</source>
         <translation>Inspector-Parameter zurücksetzen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector_reset.py" line="56"/>
+        <location filename="../src/matteloop/ui/inspector_reset.py" line="61"/>
         <source>Compute acceleration, transform, output directory, and output filename are not affected.</source>
         <translation>Beschleunigung, Transformation, Ausgabeordner und Dateiname bleiben unverändert.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="183"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="184"/>
         <source>Segmentation model</source>
         <translation>Segmentierungsmodell</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="197"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="198"/>
         <source>cached locally</source>
         <translation>lokal zwischengespeichert</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="199"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="200"/>
         <source>not cached yet</source>
         <translation>noch nicht zwischengespeichert</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="229"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="230"/>
         <source>Model status</source>
         <translation>Modellstatus</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="240"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="241"/>
         <source>Model download</source>
         <translation>Modelldownload</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="256"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="257"/>
         <source>Standard</source>
         <translation>Standard</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="259"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="260"/>
         <source>Decontaminate colors</source>
         <translation>Farben bereinigen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="270"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="271"/>
         <source> fps</source>
         <translation> FPS</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="272"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="273"/>
         <source>High output FPS may increase render cost</source>
         <translation>Hohe Ausgabe-FPS können den Renderaufwand erhöhen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="279"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="280"/>
         <source>Output FPS cost warning</source>
         <translation>Warnung zum Aufwand der Ausgabe-FPS</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="288"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="289"/>
         <source>Global trim</source>
         <translation>Globaler Randbeschnitt</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="292"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="293"/>
         <source>Global alpha trim</source>
         <translation>Globaler Alpha-Beschnitt</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="301"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="302"/>
         <source>Padding pixels</source>
         <translation>Randpixel</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="315"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="318"/>
         <source>Output directory</source>
         <translation>Ausgabeordner</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="320"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="323"/>
         <source>Choose…</source>
         <translation>Auswählen…</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="324"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="327"/>
         <source>Choose output directory</source>
         <translation>Ausgabeordner auswählen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="327"/>
+        <location filename="../src/matteloop/ui/exclusion_controls.py" line="76"/>
+        <source>No region selected</source>
+        <translation>Keine Region ausgewählt</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/exclusion_controls.py" line="181"/>
+        <source>Selected region: x %1, y %2, width %3, height %4 source pixels; entirely outside crop</source>
+        <translation>Ausgewählte Region: x %1, y %2, Breite %3, Höhe %4 Quellpixel; vollständig außerhalb des Zuschnitts</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/exclusion_controls.py" line="187"/>
+        <source>Selected region: x %1, y %2, width %3, height %4 source pixels; partly outside crop</source>
+        <translation>Ausgewählte Region: x %1, y %2, Breite %3, Höhe %4 Quellpixel; teilweise außerhalb des Zuschnitts</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/exclusion_controls.py" line="192"/>
+        <source>Selected region: x %1, y %2, width %3, height %4 source pixels</source>
+        <translation>Ausgewählte Region: x %1, y %2, Breite %3, Höhe %4 Quellpixel</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/exclusion_controls.py" line="108"/>
+        <source>Edit</source>
+        <translation>Bearbeiten</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/exclusion_controls.py" line="110"/>
+        <location filename="../src/matteloop/ui/exclusion_controls.py" line="113"/>
+        <source>Edit exclusion regions</source>
+        <translation>Ausschlussregionen bearbeiten</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/exclusion_controls.py" line="117"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="330"/>
         <source>Clear</source>
         <translation>Zurücksetzen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="331"/>
+        <location filename="../src/matteloop/ui/exclusion_controls.py" line="119"/>
+        <source>Clear exclusion regions</source>
+        <translation>Ausschlussregionen löschen</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/exclusion_controls.py" line="122"/>
+        <source>Blank before the model</source>
+        <translation>Vor dem Modell ausblenden</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/exclusion_controls.py" line="125"/>
+        <source>Re-segments the clip: the stored cut set is not reused</source>
+        <translation>Der Clip wird neu segmentiert: Der gespeicherte Schnitt wird nicht wiederverwendet</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/exclusion_controls.py" line="147"/>
+        <source>Selected exclusion region</source>
+        <translation>Ausgewählte Ausschlussregion</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/inspector.py" line="334"/>
         <source>Clear output directory</source>
         <translation>Ausgabeordner zurücksetzen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="337"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="340"/>
         <source>Output filename</source>
         <translation>Ausgabedateiname</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="342"/>
-        <location filename="../src/matteloop/ui/inspector.py" line="477"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="345"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="480"/>
         <source>Use one non-empty filename ending in .webp; path separators are not allowed.</source>
         <translation>Verwenden Sie einen einzelnen, nicht leeren Dateinamen mit der Endung .webp; Pfadtrenner sind nicht erlaubt.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="352"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="355"/>
         <source>Maximum file size</source>
         <translation>Maximale Dateigröße</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="355"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="358"/>
         <source>Unlimited</source>
         <translation>Unbegrenzt</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="357"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="360"/>
         <source> MiB</source>
         <translation> MiB</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="358"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="361"/>
         <source>Unlimited means no maximum file size.</source>
         <translation>Unbegrenzt bedeutet: Es gibt keine maximale Dateigröße.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="430"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="433"/>
         <source>%s — %s download required</source>
         <translation>%s — %s Download erforderlich</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="465"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="468"/>
         <source>Filename must be a single non-empty .webp filename.</source>
         <translation>Der Dateiname muss ein einzelner, nicht leerer .webp-Dateiname sein.</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="583"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="587"/>
         <source> s</source>
         <translation> s</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="599"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="603"/>
         <source>Crop</source>
         <translation>Zuschnitt</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="602"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="606"/>
         <source>Crop overlay</source>
         <translation>Zuschnitt-Overlay</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="606"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="610"/>
         <source>Reset Crop</source>
         <translation>Zuschnitt zurücksetzen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="610"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="614"/>
         <source>Reset crop</source>
         <translation>Zuschnitt zurücksetzen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="667"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="671"/>
         <source>Crop %s</source>
         <translation>Zuschnitt %s</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="810"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="815"/>
         <source>Model status: %s</source>
         <translation>Modellstatus: %s</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/inspector.py" line="888"/>
+        <location filename="../src/matteloop/ui/inspector.py" line="895"/>
         <source>Open a video to manage its workspaces.</source>
         <translation>Öffnen Sie ein Video, um dessen Arbeitsbereiche zu verwalten.</translation>
     </message>
@@ -448,7 +575,7 @@
         <translation>Ordner öffnen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/copy.py" line="671"/>
+        <location filename="../src/matteloop/ui/copy.py" line="672"/>
         <source>Segmentation is unavailable because ONNX Runtime could not enumerate any providers. Repair the installation with: %1</source>
         <translation>Segmentierung ist nicht verfügbar, weil ONNX Runtime keine Provider ermitteln konnte. Reparieren Sie die Installation mit: %1</translation>
     </message>
@@ -1883,39 +2010,39 @@ Freed %s.</source>
 <context>
     <name>ResultPlayerCanvas</name>
     <message>
-        <location filename="../src/matteloop/ui/result_player.py" line="83"/>
+        <location filename="../src/matteloop/ui/result_player.py" line="89"/>
         <source>Result</source>
         <translation>Ergebnis</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/result_player.py" line="100"/>
-        <location filename="../src/matteloop/ui/result_player.py" line="218"/>
+        <location filename="../src/matteloop/ui/result_player.py" line="106"/>
+        <location filename="../src/matteloop/ui/result_player.py" line="224"/>
         <source>Play</source>
         <translation>Wiedergeben</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/result_player.py" line="104"/>
-        <location filename="../src/matteloop/ui/result_player.py" line="223"/>
+        <location filename="../src/matteloop/ui/result_player.py" line="110"/>
+        <location filename="../src/matteloop/ui/result_player.py" line="229"/>
         <source>Play the result loop</source>
         <translation>Ergebniswiedergabe abspielen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/result_player.py" line="216"/>
+        <location filename="../src/matteloop/ui/result_player.py" line="222"/>
         <source>Pause</source>
         <translation>Pause</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/result_player.py" line="221"/>
+        <location filename="../src/matteloop/ui/result_player.py" line="227"/>
         <source>Pause the result loop</source>
         <translation>Ergebniswiedergabe pausieren</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/result_player.py" line="337"/>
+        <location filename="../src/matteloop/ui/result_player.py" line="343"/>
         <source>Previewing the first %s of %s frames</source>
         <translation>Die ersten %s von %s Bildern werden in der Vorschau angezeigt</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/result_player.py" line="425"/>
+        <location filename="../src/matteloop/ui/result_player.py" line="434"/>
         <source>Cut frames could not be read</source>
         <translation>Schnittbilder konnten nicht gelesen werden</translation>
     </message>
@@ -2054,7 +2181,7 @@ Freed %s.</source>
         <translation>Videodateien (*.mp4 *.mov *.webm *.mkv)</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/controller.py" line="553"/>
+        <location filename="../src/matteloop/ui/controller.py" line="557"/>
         <source>Choose output directory</source>
         <translation>Ausgabeordner auswählen</translation>
     </message>
@@ -2510,12 +2637,12 @@ Freed %s.</source>
 <context>
     <name>TransformStage</name>
     <message>
-        <location filename="../src/matteloop/ui/transform_stage.py" line="242"/>
+        <location filename="../src/matteloop/ui/transform_stage.py" line="246"/>
         <source>Discard unsaved transform changes?</source>
         <translation>Ungespeicherte Transformationsänderungen verwerfen?</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/transform_stage.py" line="245"/>
+        <location filename="../src/matteloop/ui/transform_stage.py" line="249"/>
         <source>The current cut has unsaved transform changes. Discard them and continue?</source>
         <translation>Das aktuelle Schnittset enthält ungespeicherte Transformationsänderungen. Sollen sie verworfen und fortgefahren werden?</translation>
     </message>
@@ -2881,7 +3008,7 @@ in
         <translation>%1; %2; %3; %4 bei %5; %6; erstellt %7; Zweck: %8; Lizenz: %9; %10</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/workspace_presentation.py" line="214"/>
+        <location filename="../src/matteloop/ui/workspace_presentation.py" line="234"/>
         <source>unknown time</source>
         <translation>unbekannte Zeit</translation>
     </message>

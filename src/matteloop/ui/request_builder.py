@@ -95,12 +95,18 @@ def _render_request(
             model_id=parameters.model_id,
             edge_mode=parameters.edge_mode,
             execution_provider=parameters.execution_provider,
+            exclusions=(
+                parameters.exclusions
+                if parameters.exclusions_before_model
+                else ()
+            ),
         ),
         framing=FramingSpec(
             trim=parameters.trim,
             alpha_threshold=parameters.alpha_threshold,
             padding=parameters.padding,
             stretch_x=parameters.stretch_x,
+            exclusions=parameters.exclusions,
         ),
         output=OutputSpec.from_mib(
             output_directory_for_source(parameters, inputs.source),

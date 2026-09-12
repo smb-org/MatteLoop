@@ -209,6 +209,7 @@ class SegmentationSpec:
     edge_mode: EdgeMode = EdgeMode.STANDARD
     alpha_matting: AlphaMattingSpec = field(default_factory=AlphaMattingSpec)
     execution_provider: str = CPU_EXECUTION_PROVIDER
+    exclusions: tuple[CropSpec, ...] = ()
 
     def __post_init__(self) -> None:
         self.validate()
@@ -238,6 +239,14 @@ class SegmentationSpec:
                 "segmentation",
                 "alpha_matting must be an AlphaMattingSpec",
             )
+        if not isinstance(self.exclusions, tuple) or any(
+            not isinstance(exclusion, CropSpec) for exclusion in self.exclusions
+        ):
+            raise ValidationError(
+                ErrorCode.INVALID_SEGMENTATION,
+                "segmentation",
+                "exclusions must be a tuple of CropSpec values",
+            )
 
 
 @dataclass(frozen=True)
@@ -248,6 +257,7 @@ class FramingSpec:
     alpha_threshold: Decimal = Decimal("2.0")
     padding: int = 0
     stretch_x: Decimal = Decimal("1.0")
+    exclusions: tuple[CropSpec, ...] = ()
 
     def __post_init__(self) -> None:
         self.validate()
@@ -286,6 +296,14 @@ class FramingSpec:
                 ErrorCode.INVALID_FRAMING,
                 "framing",
                 "horizontal stretch must be a positive Decimal",
+            )
+        if not isinstance(self.exclusions, tuple) or any(
+            not isinstance(exclusion, CropSpec) for exclusion in self.exclusions
+        ):
+            raise ValidationError(
+                ErrorCode.INVALID_FRAMING,
+                "framing",
+                "exclusions must be a tuple of CropSpec values",
             )
 
     def validate_final_dimensions(self, width: int, height: int) -> tuple[int, int]:

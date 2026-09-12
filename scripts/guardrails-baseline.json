@@ -4,7 +4,7 @@
     "long_functions": 1
   },
   "src/matteloop/core/state.py": {
-    "lines": 882,
+    "lines": 883,
     "long_functions": 1
   },
   "src/matteloop/core/webp.py": {
@@ -24,7 +24,7 @@
     "long_functions": 1
   },
   "src/matteloop/jobs/render.py": {
-    "lines": 2886,
+    "lines": 2889,
     "long_functions": 11
   },
   "src/matteloop/jobs/segmentation_host.py": {
@@ -88,7 +88,7 @@
     "long_functions": 1
   },
   "src/matteloop/ui/inspector.py": {
-    "lines": 897,
+    "lines": 904,
     "long_functions": 0
   },
   "src/matteloop/ui/timeline.py": {

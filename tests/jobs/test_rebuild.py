@@ -12,6 +12,7 @@ from PIL import Image
 
 import matteloop.paths as paths_module
 from matteloop.core.errors import AppError, ErrorCode, ValidationError
+from matteloop.core.fingerprints import cut_cache_key
 from matteloop.core.specs import (
     CropSpec,
     FramingSpec,
@@ -19,6 +20,7 @@ from matteloop.core.specs import (
     OutputSpec,
     ResizeSpec,
     SamplingSpec,
+    SegmentationSpec,
     TransformSpec,
 )
 from matteloop.core.state import JobKind
@@ -34,6 +36,7 @@ from matteloop.jobs.render import (
     RenderService,
 )
 from matteloop.jobs.transform_store import load_transform, transform_sidecar_path
+from matteloop.ui.workspace_presentation import request_for_workspace
 from tests.jobs.render_support import (
     ExplodingSource,
     FakeClock,
@@ -414,6 +417,43 @@ def _rebuild_service(workspace: FilesystemWorkspacePort, encoder) -> RenderServi
     )
 
 
+def test_rebuild_of_a_model_exclusion_set_reproduces_its_key_from_the_manifest(
+    tmp_path,
+) -> None:
+    workspace = FilesystemWorkspacePort()
+    seed_request = replace(
+        request(tmp_path),
+        segmentation=SegmentationSpec(
+            exclusions=(CropSpec(32, 24, 32, 80),)
+        ),
+    )
+    original = render_service(workspace=workspace).render(
+        seed_request, job(tmp_path, "seed-model-rebuild", JobKind.RENDER)
+    )
+    rebuilt_request = request_for_workspace(
+        original.manifest,
+        replace(seed_request, segmentation=SegmentationSpec()),
+    )
+
+    assert (
+        rebuilt_request.segmentation.exclusions
+        == seed_request.segmentation.exclusions
+    )
+    assert cut_cache_key(
+        rebuilt_request,
+        source_sha256=original.manifest.source_sha256,
+        model_weight_sha256="ab" * 32,
+    ) == original.manifest.cache_key
+
+    rebuilt = _rebuild_service(workspace, FakeEncoder()).rebuild(
+        rebuilt_request,
+        original.cut_workspace,
+        job(tmp_path, "rebuild-model-set", JobKind.REBUILD),
+    )
+
+    assert rebuilt.manifest.cache_key == original.manifest.cache_key
+
+
 def test_identity_transform_rebuild_is_byte_identical(tmp_path) -> None:
     """AC 1: an explicit identity ``TransformSpec`` and the ``RenderRequest``
     default must reach the encoder with the same paths and delays and produce
@@ -457,6 +497,79 @@ def test_identity_transform_rebuild_is_byte_identical(tmp_path) -> None:
         path.name for path in default_paths
     ]
     assert explicit_delays == default_delays
+
+
+def test_rebuild_with_a_region_misses_the_cached_union_and_recomputes_it(
+    tmp_path,
+) -> None:
+    workspace = FilesystemWorkspacePort()
+    seed_request = replace(
+        request(tmp_path),
+        framing=FramingSpec(True, Decimal("2"), 48, Decimal("1")),
+    )
+    original = render_service(workspace=workspace).render(
+        seed_request, job(tmp_path, "seed-union-region", JobKind.RENDER)
+    )
+    rebuild_request = replace(
+        seed_request,
+        rebuild=True,
+        framing=FramingSpec(
+            True,
+            Decimal("2"),
+            48,
+            Decimal("1"),
+            exclusions=(CropSpec(32, 24, 32, 80),),
+        ),
+        output=replace(seed_request.output, filename="region.webp"),
+    )
+
+    artifact = _rebuild_service(workspace, FakeEncoder()).rebuild(
+        rebuild_request,
+        original.cut_workspace,
+        job(tmp_path, "rebuild-union-region", JobKind.REBUILD),
+    )
+
+    assert (artifact.width, artifact.height) == (128, 176)
+    metadata = workspace.validate(original.cut_workspace).union_metadata
+    assert metadata is not None
+    assert metadata.bounds == (64, 24, 96, 104)
+
+
+def test_rebuild_reuses_union_metadata_when_region_inputs_match(tmp_path) -> None:
+    workspace = FilesystemWorkspacePort()
+    seed_request = replace(
+        request(tmp_path),
+        framing=FramingSpec(
+            True,
+            Decimal("2"),
+            48,
+            Decimal("1"),
+            exclusions=(CropSpec(32, 24, 32, 80),),
+        ),
+    )
+    original = render_service(workspace=workspace).render(
+        seed_request, job(tmp_path, "seed-reusable-region-union", JobKind.RENDER)
+    )
+
+    class CountingWorkspace(FilesystemWorkspacePort):
+        def __init__(self) -> None:
+            super().__init__()
+            self.reads = 0
+
+        def read_cut(self, workspace, index, ownership):
+            self.reads += 1
+            return super().read_cut(workspace, index, ownership)
+
+    counting = CountingWorkspace()
+    _rebuild_service(counting, FakeEncoder()).rebuild(
+        replace(seed_request, rebuild=True, output=replace(
+            seed_request.output, filename="reused-region-union.webp"
+        )),
+        original.cut_workspace,
+        job(tmp_path, "reuse-region-union", JobKind.REBUILD),
+    )
+
+    assert counting.reads == original.manifest.frame_count
 
 
 def test_trim_keeps_exactly_the_selected_frames_and_their_delays(tmp_path) -> None:

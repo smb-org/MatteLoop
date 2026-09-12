@@ -11,7 +11,7 @@ from matteloop.core.parameters import (
     output_directory_for_source,
     output_filename_for_source,
 )
-from matteloop.core.specs import EdgeMode, TransformSpec
+from matteloop.core.specs import CropSpec, EdgeMode, TransformSpec
 from matteloop.core.state import AppState, ArtifactResult
 
 
@@ -25,6 +25,8 @@ class ParameterPresentation:
     alpha_threshold: Decimal
     padding: int
     stretch_x: Decimal
+    exclusions: tuple[CropSpec, ...]
+    exclusions_before_model: bool
     output_directory: Path | None
     output_filename: str
     max_mib: Decimal
@@ -62,6 +64,8 @@ def present_parameters(state: AppState) -> ParameterPresentation:
         alpha_threshold=parameters.alpha_threshold,
         padding=parameters.padding,
         stretch_x=parameters.stretch_x,
+        exclusions=parameters.exclusions,
+        exclusions_before_model=parameters.exclusions_before_model,
         output_directory=directory,
         output_filename=filename,
         max_mib=parameters.max_mib,
