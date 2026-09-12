@@ -157,9 +157,11 @@ def remove_exclusion(canvas: ExclusionCanvas, target: CropSpec) -> None:
     if canvas._presentation is None or not canvas._editable:
         return
     exclusions = canvas._presentation.exclusions
-    try:
-        index = exclusions.index(target)
-    except ValueError:
+    index = next(
+        (index for index, exclusion in enumerate(exclusions) if exclusion is target),
+        None,
+    )
+    if index is None:
         return
     updated = exclusions[:index] + exclusions[index + 1 :]
     if canvas._selected_exclusion == index:

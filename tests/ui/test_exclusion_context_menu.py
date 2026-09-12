@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtCore import QPoint, Qt
+from PySide6.QtCore import QPoint, Qt, QTimer
 from PySide6.QtGui import QContextMenuEvent, QImage
 from PySide6.QtWidgets import QMenu
 
@@ -255,24 +255,48 @@ def test_context_menu_removal_revalidates_the_region_identity(qtbot) -> None:
     assert events == []
 
 
-def test_context_menu_is_deleted_after_each_opening(qtbot) -> None:
-    canvas = _ContextMenuProbe()
-    qtbot.addWidget(canvas)
-    canvas.resize(200, 100)
-    canvas.set_frame(QImage(100, 50, QImage.Format.Format_RGBA8888))
-    canvas.apply_presentation(_presentation(), active=True, editable=True)
-    canvas.show()
+def test_context_menu_removal_rejects_a_gone_duplicate_region(qtbot) -> None:
+    first = CropSpec(20, 10, 30, 20)
+    second = CropSpec(20, 10, 30, 20)
+    canvas = _canvas(qtbot, exclusions=(first, second))
+    events: list[object] = []
+    canvas.command_requested.connect(events.append)
 
-    for _ in range(4):
+    menu = canvas._build_context_menu(  # noqa: SLF001
+        _source_pos(canvas, 25, 15)
+    )
+    canvas.apply_presentation(
+        _presentation(exclusions=(first,)), active=True, editable=True
+    )
+    _action(menu, "Remove this region").trigger()
+
+    assert events == []
+
+
+def test_context_menu_is_deleted_after_each_opening(qtbot) -> None:
+    canvas = _canvas(qtbot)
+    opened_counts: list[int] = []
+
+    def dismiss_open_menu() -> None:
+        menus = canvas.findChildren(QMenu)
+        visible_menus = [menu for menu in menus if menu.isVisible()]
+        opened_counts.append(len(visible_menus))
+        for menu in visible_menus:
+            menu.close()
+
+    for index in range(4):
         event = QContextMenuEvent(
             QContextMenuEvent.Reason.Mouse,
             _source_pos(canvas, 5, 5),
             _source_pos(canvas, 5, 5),
         )
+        QTimer.singleShot(0, dismiss_open_menu)
         canvas.contextMenuEvent(event)
+        qtbot.waitUntil(lambda: len(opened_counts) == index + 1, timeout=1000)
         qtbot.wait(1)
+        assert canvas.findChildren(QMenu) == []
 
-    assert canvas.findChildren(QMenu) == []
+    assert opened_counts == [1, 1, 1, 1]
 
 
 def test_context_menu_offers_no_actions_when_editing_is_unavailable(qtbot) -> None:
