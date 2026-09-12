@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from fractions import Fraction
 
+import pytest
+
 from matteloop.core.crop import (
+    _orientation_transform,
     centered_crop_for_aspect,
     clamp_crop,
     crop_from_drag,
@@ -13,12 +16,14 @@ from matteloop.core.crop import (
 )
 from matteloop.core.geometry import (
     CropGeometryState,
+    MediaTransform,
     PointF,
     RectF,
     SizeF,
     build_crop_geometry,
 )
 from matteloop.core.specs import CropSpec
+from matteloop.jobs.source import _display_dimensions
 
 
 def test_dragging_crop_moves_and_clamps_in_oriented_source_pixels() -> None:
@@ -62,10 +67,13 @@ def test_crop_keyboard_nudge_uses_ten_source_pixels_with_shift_step() -> None:
 
 def test_oriented_crop_geometry_maps_rotation_and_pixel_aspect_once() -> None:
     crop = CropSpec(0, 0, 8, 8)
+    display_width, display_height = _display_dimensions(16, 8, Fraction(2), 270)
     raw_crop = oriented_rect_to_source_rect(
         crop,
         source_width=16,
         source_height=8,
+        display_width=display_width,
+        display_height=display_height,
         rotation=270,
         pixel_aspect=2,
     )
@@ -76,12 +84,129 @@ def test_oriented_crop_geometry_maps_rotation_and_pixel_aspect_once() -> None:
             rotation=270,
             pixel_aspect=2,
         ),
-        viewport=SizeF(8, 32),
+        viewport=SizeF(display_width, display_height),
         dpr=1,
     )
 
     assert geometry.visual["crop"] == RectF(0, 0, 8, 8)
-    assert oriented_point_from_widget(geometry, PointF(0, 0)) == PointF(0, 0)
+    assert oriented_point_from_widget(
+        geometry,
+        PointF(0, 0),
+        display_width=display_width,
+        display_height=display_height,
+    ) == PointF(0, 0)
+
+
+@pytest.mark.parametrize("rotation", [0, 90, 180, 270])
+@pytest.mark.parametrize(
+    ("source_width", "source_height", "pixel_aspect"),
+    [
+        pytest.param(720, 480, Fraction(32, 27), id="below-half"),
+        pytest.param(640, 480, Fraction(11, 12), id="above-half"),
+        pytest.param(1926, 1080, Fraction(11, 12), id="exact-half"),
+    ],
+)
+def test_oriented_crop_mapping_uses_rounded_decoder_extent(
+    rotation: int, source_width: int, source_height: int, pixel_aspect: Fraction
+) -> None:
+    """The canvas uses the decoder's rounded extent on both sides of .5.
+
+    Asserting against ``_display_dimensions`` rather than written-out widths
+    is the point: the canvas and decoder each round the same product, and this
+    is the assertion that fails if either one drifts from the other.
+    """
+    decoded = _display_dimensions(
+        source_width, source_height, pixel_aspect, rotation
+    )
+
+    transform = _orientation_transform(
+        source_width,
+        source_height,
+        decoded[0],
+        decoded[1],
+        rotation,
+        float(pixel_aspect),
+    )
+
+    assert transform.viewport == SizeF(*decoded)
+
+
+@pytest.mark.parametrize("rotation", [0, 90, 180, 270])
+@pytest.mark.parametrize(
+    "pixel_aspect",
+    [Fraction(1), Fraction(2), Fraction(3, 2), Fraction(3, 4)],
+)
+def test_oriented_crop_mapping_round_trips_inside_source_frame(
+    rotation: int, pixel_aspect: Fraction
+) -> None:
+    source_size = SizeF(16, 8)
+    crop = CropSpec(4, 0, 4, 8)
+    display_width, display_height = _display_dimensions(
+        16, 8, pixel_aspect, rotation
+    )
+    display_size = SizeF(display_width, display_height)
+
+    mapped = oriented_rect_to_source_rect(
+        crop,
+        source_width=16,
+        source_height=8,
+        display_width=display_width,
+        display_height=display_height,
+        rotation=rotation,
+        pixel_aspect=float(pixel_aspect),
+    )
+
+    assert mapped.x >= 0
+    assert mapped.y >= 0
+    assert mapped.right <= source_size.width
+    assert mapped.bottom <= source_size.height
+
+    restored = MediaTransform(
+        source_size=source_size,
+        viewport=display_size,
+        rotation=rotation,
+        pixel_aspect=float(pixel_aspect),
+    ).source_rect_to_widget(mapped)
+
+    assert restored.x == pytest.approx(crop.x)
+    assert restored.y == pytest.approx(crop.y)
+    assert restored.width == pytest.approx(crop.width)
+    assert restored.height == pytest.approx(crop.height)
+
+
+@pytest.mark.parametrize("rotation", [0, 90, 180, 270])
+@pytest.mark.parametrize(
+    "pixel_aspect",
+    [Fraction(1), Fraction(2), Fraction(3, 2), Fraction(3, 4)],
+)
+def test_oriented_point_mapping_round_trips_through_display_geometry(
+    rotation: int, pixel_aspect: Fraction
+) -> None:
+    source_size = SizeF(16, 8)
+    display_width, display_height = _display_dimensions(
+        16, 8, pixel_aspect, rotation
+    )
+    display_size = SizeF(display_width, display_height)
+    geometry = build_crop_geometry(
+        state=CropGeometryState(
+            source_size=source_size,
+            crop=RectF(0, 0, 8, 8),
+            rotation=rotation,
+            pixel_aspect=float(pixel_aspect),
+        ),
+        viewport=display_size,
+        dpr=1,
+    )
+
+    restored = oriented_point_from_widget(
+        geometry,
+        PointF(2, 3),
+        display_width=display_width,
+        display_height=display_height,
+    )
+
+    assert restored.x == pytest.approx(2)
+    assert restored.y == pytest.approx(3)
 
 
 def test_fit_crop_aspect_on_a_corner_keeps_the_opposite_corner_fixed() -> None:
@@ -209,3 +334,19 @@ def test_clamp_crop_leaves_a_crop_that_already_fits_unchanged() -> None:
     crop = CropSpec(5, 5, 50, 50)
 
     assert clamp_crop(crop, 100, 100) == crop
+
+
+def test_canvas_extent_uses_the_decoder_for_an_arbitrary_declared_ratio() -> None:
+    pixel_aspect = Fraction(18333, 20000)
+    decoded = _display_dimensions(1926, 1080, pixel_aspect, 0)
+
+    transform = _orientation_transform(
+        1926,
+        1080,
+        decoded[0],
+        decoded[1],
+        0,
+        float(pixel_aspect),
+    )
+
+    assert transform.viewport == SizeF(*decoded)

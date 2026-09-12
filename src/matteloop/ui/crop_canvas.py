@@ -169,8 +169,14 @@ class CropCanvas(PreviewCanvas):
             return
         self._focused_target = target
         self._dragged = target
-        self._drag_crop = self._presentation
-        self._drag_start = oriented_point_from_widget(geometry, position)
+        presentation = self._presentation
+        self._drag_crop = presentation
+        self._drag_start = oriented_point_from_widget(
+            geometry,
+            position,
+            display_width=presentation.width,
+            display_height=presentation.height,
+        )
         self.setFocus(Qt.FocusReason.MouseFocusReason)
         self._rebuild_geometry(focused=target, dragged=target)
         event.accept()
@@ -244,7 +250,10 @@ class CropCanvas(PreviewCanvas):
         if geometry is None or presentation is None or self._dragged is None:
             return
         current = oriented_point_from_widget(
-            geometry, PointF(position.x(), position.y())
+            geometry,
+            PointF(position.x(), position.y()),
+            display_width=presentation.width,
+            display_height=presentation.height,
         )
         crop = crop_from_drag(
             presentation.crop,
@@ -289,6 +298,8 @@ class CropCanvas(PreviewCanvas):
                 presentation.crop,
                 source_width=presentation.coded_width,
                 source_height=presentation.coded_height,
+                display_width=presentation.width,
+                display_height=presentation.height,
                 rotation=presentation.rotation,
                 pixel_aspect=presentation.pixel_aspect,
             )

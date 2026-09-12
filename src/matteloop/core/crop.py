@@ -96,12 +96,19 @@ def oriented_rect_to_source_rect(
     *,
     source_width: int,
     source_height: int,
+    display_width: int,
+    display_height: int,
     rotation: int,
     pixel_aspect: float,
 ) -> RectF:
     """Map oriented crop pixels into the raw coordinates used by geometry."""
     transform = _orientation_transform(
-        source_width, source_height, rotation, pixel_aspect
+        source_width,
+        source_height,
+        display_width,
+        display_height,
+        rotation,
+        pixel_aspect,
     )
     return transform.widget_rect_to_source(
         RectF(crop.x, crop.y, crop.width, crop.height)
@@ -109,14 +116,20 @@ def oriented_rect_to_source_rect(
 
 
 def oriented_point_from_widget(
-    geometry: InteractionGeometry, point: PointF
+    geometry: InteractionGeometry,
+    point: PointF,
+    *,
+    display_width: int,
+    display_height: int,
 ) -> PointF:
     """Map a widget point through one crop geometry snapshot to oriented space."""
     transform = geometry.transform
     if not isinstance(transform, MediaTransform):
         raise ValueError("crop geometry must use a media transform")
     raw = geometry.widget_to_source(point)
-    return _orientation_transform_from_media(transform).source_to_widget(raw)
+    return _orientation_transform_from_media(
+        transform, display_width=display_width, display_height=display_height
+    ).source_to_widget(raw)
 
 
 def fit_crop_aspect(
@@ -252,24 +265,31 @@ def _resize_crop(
 
 
 def _orientation_transform(
-    source_width: int, source_height: int, rotation: int, pixel_aspect: float
+    source_width: int,
+    source_height: int,
+    display_width: int,
+    display_height: int,
+    rotation: int,
+    pixel_aspect: float,
 ) -> MediaTransform:
     _validate_dimensions(source_width, source_height)
+    _validate_dimensions(display_width, display_height)
     return MediaTransform(
         source_size=SizeF(source_width, source_height),
-        viewport=SizeF(
-            source_height if rotation in {90, 270} else source_width,
-            source_width * pixel_aspect if rotation in {90, 270} else source_height,
-        ),
+        viewport=SizeF(display_width, display_height),
         rotation=rotation,
         pixel_aspect=pixel_aspect,
     )
 
 
-def _orientation_transform_from_media(transform: MediaTransform) -> MediaTransform:
+def _orientation_transform_from_media(
+    transform: MediaTransform, *, display_width: int, display_height: int
+) -> MediaTransform:
     return _orientation_transform(
         int(transform.source_size.width),
         int(transform.source_size.height),
+        display_width,
+        display_height,
         transform.rotation,
         transform.pixel_aspect,
     )
