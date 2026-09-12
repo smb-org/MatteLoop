@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from dataclasses import replace
 from fractions import Fraction
 
 from matteloop.core.geometry import (
@@ -255,14 +256,22 @@ def _orientation_transform(
     source_width: int, source_height: int, rotation: int, pixel_aspect: float
 ) -> MediaTransform:
     _validate_dimensions(source_width, source_height)
-    return MediaTransform(
+    transform = MediaTransform(
         source_size=SizeF(source_width, source_height),
-        viewport=SizeF(
-            source_height if rotation in {90, 270} else source_width,
-            source_width * pixel_aspect if rotation in {90, 270} else source_height,
-        ),
+        viewport=SizeF(source_width, source_height),
         rotation=rotation,
         pixel_aspect=pixel_aspect,
+    )
+    display_width = max(
+        1,
+        _round_fraction(Fraction(source_width) * Fraction(str(pixel_aspect))),
+    )
+    return replace(
+        transform,
+        viewport=SizeF(
+            source_height if rotation in {90, 270} else display_width,
+            display_width if rotation in {90, 270} else source_height,
+        ),
     )
 
 
@@ -277,6 +286,11 @@ def _orientation_transform_from_media(transform: MediaTransform) -> MediaTransfo
 
 def _rounded_delta(value: float) -> int:
     return math.floor(value + 0.5) if value >= 0 else math.ceil(value - 0.5)
+
+
+def _round_fraction(value: Fraction) -> int:
+    quotient, remainder = divmod(value.numerator, value.denominator)
+    return quotient + int(remainder * 2 >= value.denominator)
 
 
 def _validate_dimensions(source_width: int, source_height: int) -> None:
