@@ -595,6 +595,28 @@ def test_edit_regions_switches_the_original_canvas_to_region_mode(
     assert isinstance(services.commands[-1], ExclusionsChanged)
 
 
+def test_source_context_menu_edit_action_keeps_inspector_mode_in_sync(
+    window,
+) -> None:
+    value, _ = window
+    value.render_state(_ready_with_crop())
+    canvas = value.original_canvas
+    assert canvas._geometry is not None  # noqa: SLF001
+
+    menu = canvas._build_context_menu(  # noqa: SLF001
+        canvas._geometry.transform.source_to_widget(PointF(20, 20))
+    )
+    edit_action = next(
+        action
+        for action in menu.actions()
+        if action.text() == "Edit exclusion regions"
+    )
+    edit_action.trigger()
+
+    assert canvas._exclusion_edit is True  # noqa: SLF001
+    assert value.inspector.exclusion_controls.edit_button.isChecked()
+
+
 def test_invalid_saved_geometry_falls_back_to_default(window) -> None:
     value, _ = window
     settings = value._settings

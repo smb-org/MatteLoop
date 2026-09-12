@@ -2,11 +2,21 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from functools import partial
 from pathlib import Path
 
-from PySide6.QtCore import QCoreApplication, QPointF, QRectF, Qt
-from PySide6.QtGui import QColor, QKeyEvent, QMouseEvent, QPainter, QPen
-from PySide6.QtWidgets import QWidget
+from PySide6.QtCore import QCoreApplication, QPoint, QPointF, QRectF, Qt, Signal
+from PySide6.QtGui import (
+    QAction,
+    QColor,
+    QContextMenuEvent,
+    QKeyEvent,
+    QMouseEvent,
+    QPainter,
+    QPen,
+)
+from PySide6.QtWidgets import QMenu, QWidget
 
 from matteloop.core.crop import (
     crop_from_drag,
@@ -28,6 +38,8 @@ from matteloop.ui.theme import ACCENT_COLOR, CANVAS_COLOR
 
 class ExclusionCanvas(CropCanvas):
     """Add source-region editing while retaining CropCanvas's crop hooks."""
+
+    exclusion_edit_toggled = Signal(bool)
 
     def __init__(
         self,
@@ -63,6 +75,146 @@ class ExclusionCanvas(CropCanvas):
         self._rebuild_geometry()
         self._announce_crop()
         self.update()
+        self.exclusion_edit_toggled.emit(enabled)
+
+    def contextMenuEvent(self, event: QContextMenuEvent) -> None:
+        if self._presentation is None or not self._editable:
+            event.ignore()
+            return
+        position = self._context_menu_position(event)
+        menu = self._build_context_menu(position)
+        if not menu.actions():
+            event.ignore()
+            return
+        self._show_context_menu(menu, position)
+        event.accept()
+
+    def _build_context_menu(self, position: QPoint) -> QMenu:
+        menu = QMenu(self)
+        presentation = self._presentation
+        if presentation is None or not self._editable:
+            return menu
+        index = self._exclusion_at(position)
+        if index is None:
+            self._add_context_action(
+                menu,
+                QCoreApplication.translate("ExclusionCanvas", "Exclude this area"),
+                "exclude_area",
+                lambda: self._create_exclusion(position),
+            )
+        else:
+            self._add_context_action(
+                menu,
+                QCoreApplication.translate("ExclusionCanvas", "Remove this region"),
+                "remove_exclusion",
+                partial(self._remove_exclusion, index),
+            )
+        # A region under the cursor implies there is at least one, so this one
+        # condition covers both branches -- and keeps every entry in the same
+        # place in both menus, which is what makes the menu learnable.
+        if presentation.exclusions:
+            self._add_context_action(
+                menu,
+                QCoreApplication.translate("ExclusionCanvas", "Remove all regions"),
+                "remove_all_exclusions",
+                self._remove_all_exclusions,
+            )
+        self._add_edit_context_action(menu)
+        return menu
+
+    def _add_edit_context_action(self, menu: QMenu) -> None:
+        action = self._add_context_action(
+            menu,
+            QCoreApplication.translate(
+                "ExclusionCanvas", "Edit exclusion regions"
+            ),
+            "edit_exclusion_regions",
+            None,
+        )
+        action.setCheckable(True)
+        action.setChecked(self._exclusion_edit)
+        action.triggered.connect(self.set_exclusion_edit)
+
+    @staticmethod
+    def _add_context_action(
+        menu: QMenu,
+        text: str,
+        object_name: str,
+        callback: Callable[[], None] | None,
+    ) -> QAction:
+        action = QAction(text, menu)
+        action.setObjectName(object_name)
+        action.setToolTip(text)
+        action.setStatusTip(text)
+        if callback is not None:
+            def trigger(_checked: bool = False) -> None:
+                callback()
+
+            action.triggered.connect(trigger)
+        menu.addAction(action)
+        return action
+
+    def _context_menu_position(self, event: QContextMenuEvent) -> QPoint:
+        if event.reason() is QContextMenuEvent.Reason.Keyboard:
+            index = self._selected_exclusion
+            if (
+                index is not None
+                and self._presentation is not None
+                and self._geometry is not None
+                and index < len(self._presentation.exclusions)
+            ):
+                rect = self._widget_rect(
+                    self._geometry, self._presentation.exclusions[index]
+                )
+                return QPoint(round(rect.center().x()), round(rect.center().y()))
+            if self._geometry is not None and isinstance(
+                self._geometry.transform, MediaTransform
+            ):
+                content = self._geometry.transform.content_rect
+                return QPoint(
+                    round(content.x + content.width / 2),
+                    round(content.y + content.height / 2),
+                )
+            return self.rect().center()
+        position = event.pos()
+        return position if self.rect().contains(position) else self.rect().center()
+
+    def _show_context_menu(self, menu: QMenu, position: QPoint) -> None:
+        menu.exec(self.mapToGlobal(position))
+
+    def _exclusion_at(self, position: QPoint) -> int | None:
+        if self._presentation is None:
+            return None
+        oriented = self._oriented_position(position)
+        for index in range(len(self._presentation.exclusions) - 1, -1, -1):
+            if _contains(self._presentation.exclusions[index], oriented):
+                return index
+        return None
+
+    def _remove_exclusion(self, index: int) -> None:
+        if self._presentation is None or index >= len(self._presentation.exclusions):
+            return
+        exclusions = self._presentation.exclusions
+        updated = exclusions[:index] + exclusions[index + 1 :]
+        if self._selected_exclusion == index:
+            self._clear_exclusion_selection()
+        elif self._selected_exclusion is not None and self._selected_exclusion > index:
+            self._selected_exclusion -= 1
+        self._clear_gesture()
+        self._rebuild_geometry()
+        self._announce_crop()
+        self.update()
+        self.command_requested.emit(ExclusionsChanged(updated))
+
+    def _remove_all_exclusions(self) -> None:
+        if self._presentation is None or not self._presentation.exclusions:
+            return
+        self._clear_exclusion_selection()
+        self._clear_gesture()
+        self._rebuild_geometry()
+        self._announce_crop()
+        self.update()
+        self.command_requested.emit(ExclusionsChanged(()))
 
     def apply_presentation(
         self,
@@ -384,7 +536,7 @@ class ExclusionCanvas(CropCanvas):
             exclusions[self._selected_exclusion] = region
         return ExclusionsChanged(tuple(exclusions))
 
-    def _oriented_position(self, position: QPointF | PointF) -> PointF:
+    def _oriented_position(self, position: QPoint | QPointF | PointF) -> PointF:
         if self._geometry is None:
             return PointF(0, 0)
         point = (
@@ -456,20 +608,40 @@ class ExclusionCanvas(CropCanvas):
         self.update()
         return True
 
-    def _create_exclusion(self) -> None:
+    def _create_exclusion(self, position: QPoint | None = None) -> None:
         if self._presentation is None:
             return
-        width = min(8, self._presentation.width)
-        height = min(8, self._presentation.height)
+        if not self._exclusion_edit:
+            self.set_exclusion_edit(True)
+        width = max(1, round(self._presentation.width * 0.2))
+        height = max(1, round(self._presentation.height * 0.2))
+        width = min(width, self._presentation.width)
+        height = min(height, self._presentation.height)
+        if position is None:
+            center = PointF(
+                self._presentation.width / 2, self._presentation.height / 2
+            )
+        else:
+            center = self._clamp_oriented(self._oriented_position(position))
+        left = min(
+            max(round(center.x - width / 2), 0), self._presentation.width - width
+        )
+        top = min(
+            max(round(center.y - height / 2), 0), self._presentation.height - height
+        )
         region = CropSpec(
-            (self._presentation.width - width) // 2,
-            (self._presentation.height - height) // 2,
+            left,
+            top,
             width,
             height,
         )
         self._set_exclusion_selection(
             len(self._presentation.exclusions), value=region
         )
+        self.setFocus(Qt.FocusReason.OtherFocusReason)
+        self._rebuild_geometry()
+        self._announce_crop()
+        self.update()
         self.command_requested.emit(self._exclusion_event(region))
 
     def _reconcile_exclusion_state(

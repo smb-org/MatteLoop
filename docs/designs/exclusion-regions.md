@@ -642,6 +642,28 @@ five lines that construct, place, apply and tab-order it:
 - Wiring: `main_window.py:224-225` already connects `command_requested`;
   one more line connects `edit_toggled` to `original_canvas.set_exclusion_edit`.
 
+**Source-canvas context menu.** `ExclusionCanvas.contextMenuEvent` is the
+first context-menu pattern in the application and remains deliberately small.
+It builds its actions from the oriented source point under the pointer:
+
+- Empty canvas: `Exclude this area`, checkable `Edit exclusion regions`, and
+  `Remove all regions` when at least one region exists.
+- Existing region: `Remove this region`, `Remove all regions`, and checkable
+  `Edit exclusion regions`.
+
+The menu is unavailable while `capabilities(state).can_edit` is false, and
+each mutating action emits exactly one `ExclusionsChanged` command for the
+reducer. `Exclude this area` creates a default-sized rectangle derived from
+the source dimensions (20% of each dimension), centred on the click and
+clamped inside the frame. It does not start a rubber band: beginning a drag
+from a menu is unreliable, while the existing handles let the user resize the
+newly selected region immediately. The menu handles keyboard-origin context
+events at the selected region, or the frame centre when no region is selected.
+
+The Inspector row remains the discovery surface and the keyboard path. Its
+toggle and the menu's checkable toggle stay synchronized in both directions;
+the menu is an accelerator, not a replacement for the Inspector controls.
+
 **`CropCanvas` in region mode** (`set_exclusion_edit(enabled: bool)`):
 - `CropPresentation` gains `exclusions: tuple[CropSpec, ...] = ()`
   (`ui/crop_presentation.py:12-21`), filled by `present_crop` from
@@ -728,7 +750,8 @@ press-move×N-release and asserts exactly one.
 `"Exclusions"` (form label, via `inspector_label` in `ui/copy.py:632-654`),
 `"Edit regions"`, `"Edit exclusion regions"` (accessible name), `"Clear"`
 (exists), `"Clear exclusion regions"` (accessible name), `"%n region(s)"`,
-the canvas description above.
+the canvas description above, `"Exclude this area"`, `"Remove this region"`,
+and `"Remove all regions"` (context-menu actions).
 
 **README and screenshots.** `scripts/screenshots.py:_state` (`:120`) gets one
 region in its `ParameterState` so `main-window.png` shows a rectangle on the

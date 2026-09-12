@@ -30,12 +30,12 @@
         <translation>Original video frame</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="561"/>
+        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="740"/>
         <source>Exclusion region mode: %1 region(s); no region selected</source>
         <translation>Exclusion region mode: %1 region(s); no region selected</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="572"/>
+        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="751"/>
         <source>Exclusion region %1 of %2: x %3, y %4, width %5, height %6 source pixels</source>
         <translation>Exclusion region %1 of %2: x %3, y %4, width %5, height %6 source pixels</translation>
     </message>
@@ -43,6 +43,30 @@
         <location filename="../src/matteloop/ui/crop_canvas.py" line="384"/>
         <source>Crop bounds: x %s, y %s, width %s, height %s source pixels; source %s × %s</source>
         <translation>Crop bounds: x %s, y %s, width %s, height %s source pixels; source %s × %s</translation>
+    </message>
+</context>
+<context>
+    <name>ExclusionCanvas</name>
+    <message>
+        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="101"/>
+        <source>Exclude this area</source>
+        <translation>Exclude this area</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="108"/>
+        <source>Remove this region</source>
+        <translation>Remove this region</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="117"/>
+        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="125"/>
+        <source>Remove all regions</source>
+        <translation>Remove all regions</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="134"/>
+        <source>Edit exclusion regions</source>
+        <translation>Edit exclusion regions</translation>
     </message>
 </context>
 <context>

@@ -226,6 +226,9 @@ class MainWindow(QMainWindow):
         self.inspector.exclusion_controls.edit_toggled.connect(
             self.original_canvas.set_exclusion_edit
         )
+        self.original_canvas.exclusion_edit_toggled.connect(
+            self.inspector.exclusion_controls.edit_button.setChecked
+        )
         self.render_button.clicked.connect(
             lambda: self._services.dispatch(RenderVideoRequested())
         )

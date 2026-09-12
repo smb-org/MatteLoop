@@ -30,12 +30,12 @@
         <translation>Original-Videobild</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="561"/>
+        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="740"/>
         <source>Exclusion region mode: %1 region(s); no region selected</source>
         <translation>Ausschlussregion-Modus: %1 Region(en); keine Region ausgewählt</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="572"/>
+        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="751"/>
         <source>Exclusion region %1 of %2: x %3, y %4, width %5, height %6 source pixels</source>
         <translation>Ausschlussregion %1 von %2: x %3, y %4, Breite %5, Höhe %6 Quellpixel</translation>
     </message>
@@ -43,6 +43,30 @@
         <location filename="../src/matteloop/ui/crop_canvas.py" line="384"/>
         <source>Crop bounds: x %s, y %s, width %s, height %s source pixels; source %s × %s</source>
         <translation>Zuschnittgrenzen: x %s, y %s, Breite %s, Höhe %s Quellpixel; Quelle %s × %s</translation>
+    </message>
+</context>
+<context>
+    <name>ExclusionCanvas</name>
+    <message>
+        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="101"/>
+        <source>Exclude this area</source>
+        <translation>Diesen Bereich ausschließen</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="108"/>
+        <source>Remove this region</source>
+        <translation>Diese Region entfernen</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="117"/>
+        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="125"/>
+        <source>Remove all regions</source>
+        <translation>Alle Regionen entfernen</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/exclusion_canvas.py" line="134"/>
+        <source>Edit exclusion regions</source>
+        <translation>Ausschlussregionen bearbeiten</translation>
     </message>
 </context>
 <context>
