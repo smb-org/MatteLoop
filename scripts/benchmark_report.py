@@ -22,6 +22,12 @@ _SORT_OPTIONS = (
     ("name", "Model name"),
     ("size", "File size"),
 )
+_COLUMNS_OPTIONS = (
+    ("auto", "Auto"),
+    ("1", "1"),
+    ("2", "2"),
+    ("3", "3"),
+)
 
 _CSS = """
 :root { color-scheme: light dark; }
@@ -53,14 +59,19 @@ h1 { font-size: 16px; margin: 0; }
   gap: 16px;
   padding: 16px;
 }
+.grid.cols-1 { grid-template-columns: 1fr; }
+.grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+.grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
 .tile {
   background: #1e2128;
   border: 1px solid #2a2e37;
   border-radius: 8px;
   padding: 12px;
+  cursor: pointer;
 }
-.tile-error { border-color: #a33; }
+.tile-error { border-color: #a33; cursor: default; }
 .image-wrap {
+  position: relative;
   aspect-ratio: 4 / 3;
   border-radius: 4px;
   overflow: hidden;
@@ -68,6 +79,23 @@ h1 { font-size: 16px; margin: 0; }
   align-items: center;
   justify-content: center;
   background-color: #808080;
+}
+.playback-badge {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  pointer-events: none;
+}
+.tile[data-playback="playing"] .playback-badge::after {
+  content: "Playing \\2014 click to pause";
+}
+.tile[data-playback="paused"] .playback-badge::after {
+  content: "Still \\2014 click to play";
 }
 .grid.bg-checkerboard .image-wrap {
   background-image:
@@ -118,10 +146,110 @@ _SCRIPT = """
   var grid = document.getElementById("grid");
   var bgSelect = document.getElementById("bg-select");
   var sortSelect = document.getElementById("sort-select");
+  var columnsSelect = document.getElementById("columns-select");
   var restartButton = document.getElementById("restart-all");
+  var COLUMNS_STORAGE_KEY = "matteloop-benchmark-columns";
 
   function applyBackground() {
-    grid.className = "grid bg-" + bgSelect.value;
+    Array.prototype.forEach.call(bgSelect.options, function (option) {
+      grid.classList.remove("bg-" + option.value);
+    });
+    grid.classList.add("bg-" + bgSelect.value);
+  }
+
+  function loadColumnsPreference() {
+    try {
+      return window.localStorage.getItem(COLUMNS_STORAGE_KEY) || "auto";
+    } catch (error) {
+      // Private browsing / blocked storage -- fall back to "auto".
+      return "auto";
+    }
+  }
+
+  function saveColumnsPreference(value) {
+    try {
+      window.localStorage.setItem(COLUMNS_STORAGE_KEY, value);
+    } catch (error) {
+      // Ignore: a remembered column count is a convenience, not a
+      // requirement, so a blocked store must not break the page.
+    }
+  }
+
+  function applyColumns() {
+    Array.prototype.forEach.call(columnsSelect.options, function (option) {
+      grid.classList.remove("cols-" + option.value);
+    });
+    if (columnsSelect.value !== "auto") {
+      grid.classList.add("cols-" + columnsSelect.value);
+    }
+    saveColumnsPreference(columnsSelect.value);
+  }
+
+  function setImageSrc(img, url) {
+    if (url && img.getAttribute("src") !== url) {
+      img.src = url;
+    }
+  }
+
+  function applyAutoPlayback(tile) {
+    // The click handler (toggleManualPlayback) takes a tile out of this
+    // automatic, visibility-driven mode until the page reloads.
+    if (tile.getAttribute("data-manual") === "true") {
+      return;
+    }
+    var img = tile.querySelector("img.result-image");
+    var still = img && img.getAttribute("data-still");
+    if (!img || !still) {
+      return;
+    }
+    var visible = tile.getAttribute("data-visible") !== "false";
+    if (visible) {
+      setImageSrc(img, img.getAttribute("data-src"));
+      tile.setAttribute("data-playback", "playing");
+    } else {
+      setImageSrc(img, still);
+      tile.setAttribute("data-playback", "paused");
+    }
+  }
+
+  function toggleManualPlayback(tile) {
+    var img = tile.querySelector("img.result-image");
+    var still = img && img.getAttribute("data-still");
+    if (!img || !still) {
+      // No still was extracted for this model -- degrade to always
+      // animated, nothing to toggle to (see engineering-guardrails.md G4).
+      return;
+    }
+    tile.setAttribute("data-manual", "true");
+    if (tile.getAttribute("data-playback") === "paused") {
+      setImageSrc(img, img.getAttribute("data-src"));
+      tile.setAttribute("data-playback", "playing");
+    } else {
+      setImageSrc(img, still);
+      tile.setAttribute("data-playback", "paused");
+    }
+  }
+
+  function initPlaybackObserver() {
+    var tiles = Array.prototype.slice.call(grid.querySelectorAll(".tile"));
+    if (typeof IntersectionObserver === "undefined") {
+      // No observer support -- every tile keeps the animated src already
+      // in the markup rather than losing the fallback entirely.
+      return;
+    }
+    var observer = new IntersectionObserver(
+      function (entries) {
+        entries.forEach(function (entry) {
+          var tile = entry.target;
+          tile.setAttribute("data-visible", entry.isIntersecting ? "true" : "false");
+          applyAutoPlayback(tile);
+        });
+      },
+      { rootMargin: "200px 0px" }
+    );
+    tiles.forEach(function (tile) {
+      observer.observe(tile);
+    });
   }
 
   function sortValue(tile, key) {
@@ -158,13 +286,18 @@ _SCRIPT = """
   }
 
   function restartAll() {
-    // Preload every image off-DOM first, then swap all visible <img> tags
-    // to the reloaded sources together, so the animations start back in
-    // step (best effort -- network timing can still drift once playing).
+    // Preload every currently-playing image off-DOM first, then swap those
+    // <img> tags to the reloaded sources together, so the animations start
+    // back in step (best effort -- network timing can still drift once
+    // playing). A tile currently showing its still is left alone: nothing
+    // is animating there to restart.
     var stamp = Date.now();
-    var images = Array.prototype.slice.call(
-      grid.querySelectorAll("img.result-image")
-    );
+    var images = Array.prototype.slice
+      .call(grid.querySelectorAll("img.result-image"))
+      .filter(function (img) {
+        var tile = img.closest(".tile");
+        return !tile || tile.getAttribute("data-playback") !== "paused";
+      });
     if (images.length === 0) {
       return;
     }
@@ -189,8 +322,18 @@ _SCRIPT = """
 
   bgSelect.addEventListener("change", applyBackground);
   sortSelect.addEventListener("change", applySort);
+  columnsSelect.addEventListener("change", applyColumns);
   restartButton.addEventListener("click", restartAll);
+  grid.addEventListener("click", function (event) {
+    var tile = event.target.closest(".tile");
+    if (tile) {
+      toggleManualPlayback(tile);
+    }
+  });
   applyBackground();
+  columnsSelect.value = loadColumnsPreference();
+  applyColumns();
+  initPlaybackObserver();
 })();
 """
 
@@ -223,6 +366,9 @@ def render_report_html(run: BenchmarkRun) -> str:
         "</label>"
         "<label>Background "
         f'<select id="bg-select">{_background_options_html()}</select>'
+        "</label>"
+        "<label>Columns "
+        f'<select id="columns-select">{_columns_options_html()}</select>'
         "</label>"
         '<button id="restart-all" type="button">Restart all</button>'
         f'<span class="meta">Provider: {escape(run.provider)}'
@@ -265,6 +411,17 @@ def _sort_options_html() -> str:
     return "".join(options)
 
 
+def _columns_options_html() -> str:
+    """Options for the columns `<select>`; "Auto" is always the default --
+    `_SCRIPT`'s `loadColumnsPreference` overrides it client-side once a
+    remembered choice is available, so the pre-JS and no-JS states agree."""
+    options = []
+    for index, (value, label) in enumerate(_COLUMNS_OPTIONS):
+        selected = ' selected="selected"' if index == 0 else ""
+        options.append(f'<option value="{value}"{selected}>{escape(label)}</option>')
+    return "".join(options)
+
+
 def _sort_attributes_html(result: ModelResult) -> str:
     """`data-render-seconds`/`data-file-size` for the report's sort control.
 
@@ -279,6 +436,22 @@ def _sort_attributes_html(result: ModelResult) -> str:
     if result.file_size_bytes is not None:
         attributes += f' data-file-size="{escape(str(result.file_size_bytes))}"'
     return attributes
+
+
+def _still_attribute_and_badge(result: ModelResult) -> tuple[str, str]:
+    """The `data-still` attribute and playback badge for one tile's image.
+
+    Both are left out when no still was extracted (`still_relative_path` is
+    `None`): the tile then has nothing to fall back to or toggle, so it
+    keeps only the animated src and the click handler is a no-op for it --
+    the degrade path required by docs/engineering-guardrails.md G4.
+    """
+    if result.still_relative_path is None:
+        return "", ""
+    still = escape(result.still_relative_path)
+    attribute = f' data-still="{still}"'
+    badge = '<span class="playback-badge" aria-hidden="true"></span>'
+    return attribute, badge
 
 
 def _tile_html(result: ModelResult) -> str:
@@ -298,10 +471,13 @@ def _tile_html(result: ModelResult) -> str:
     src = escape(result.output_relative_path or "")
     provider_row = _provider_row(result.active_provider, result.fallback_notice)
     cache_class = ' class="cache-hit"' if result.cache_hit else ""
+    still_attribute, badge = _still_attribute_and_badge(result)
     return (
-        f'<article class="tile" data-model="{model_id}"{sort_attributes}>'
+        f'<article class="tile" data-model="{model_id}" data-playback="playing"'
+        f"{sort_attributes}>"
         f'<div class="image-wrap"><img class="result-image" '
-        f'src="{src}" data-src="{src}" alt="{title} result" /></div>'
+        f'src="{src}" data-src="{src}"{still_attribute} alt="{title} result" />'
+        f"{badge}</div>"
         f"<h2>{title}</h2>"
         f'<p class="model-id">{model_id}</p>'
         f'<dl class="stats">'

@@ -190,6 +190,9 @@ uv run python scripts/benchmark_models.py --out benchmark-run
 - Renders share the app's cut cache. A model whose cuts already exist for these
   settings is reused rather than segmented again, and flagged in the report —
   its tile may show hand-edited cuts, and its time is not a real measurement.
+- To rebuild `index.html` and each model's still-image fallback from an
+  existing run's `results.json` and WebPs — after a report change, without
+  rendering again — pass `--report-only <dir>` instead of `--out`.
 
 ## License
 

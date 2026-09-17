@@ -180,6 +180,56 @@ def test_report_omits_sort_attributes_for_a_failed_model() -> None:
     assert "data-file-size" not in tile_html
 
 
+def test_report_references_the_still_image_filename() -> None:
+    run = _run(_ok_result("silueta", still_relative_path="silueta-still.png"))
+
+    html = render_report_html(run)
+
+    assert 'data-still="silueta-still.png"' in html
+    assert 'class="playback-badge"' in html
+
+
+def test_report_tile_keeps_only_the_animated_src_when_the_still_is_missing() -> None:
+    run = _run(_ok_result("silueta", still_relative_path=None))
+
+    html = render_report_html(run)
+
+    tile_start = html.index('data-model="silueta"')
+    tile_end = html.index("</article>", tile_start)
+    tile_html = html[tile_start:tile_end]
+    assert "data-still" not in tile_html
+    assert "playback-badge" not in tile_html
+    assert 'src="silueta.webp" data-src="silueta.webp"' in tile_html
+
+
+def test_report_has_a_columns_select_with_the_expected_options() -> None:
+    html = render_report_html(_run(_ok_result("silueta")))
+
+    assert 'id="columns-select"' in html
+    for value in ("auto", "1", "2", "3"):
+        assert f'value="{value}"' in html
+
+
+def test_report_columns_choice_is_remembered_in_local_storage() -> None:
+    html = render_report_html(_run(_ok_result("silueta")))
+
+    assert "localStorage" in html
+    assert "try" in html and "catch" in html
+
+
+def test_report_uses_an_intersection_observer_for_lazy_playback() -> None:
+    html = render_report_html(_run(_ok_result("silueta")))
+
+    assert "IntersectionObserver" in html
+
+
+def test_report_tiles_are_clickable_to_toggle_playback() -> None:
+    html = render_report_html(_run(_ok_result("silueta")))
+
+    assert "toggleManualPlayback" in html
+    assert 'data-playback="playing"' in html
+
+
 def test_report_emits_tiles_in_render_time_order_with_failed_last() -> None:
     failed = ModelResult(
         model_id="broken", display_name="Broken", status="error", error="boom"

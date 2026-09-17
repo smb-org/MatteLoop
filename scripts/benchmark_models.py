@@ -70,11 +70,16 @@ try:
         render_report_html,
         sort_by_render_time,
     )
+    from scripts.benchmark_stills import rebuild_stills, write_still_frame
 except ImportError:
     from benchmark_report import (  # type: ignore[no-redef]
         _format_file_size,
         render_report_html,
         sort_by_render_time,
+    )
+    from benchmark_stills import (  # type: ignore[no-redef]
+        rebuild_stills,
+        write_still_frame,
     )
 
 _LICENSED_MODEL_ID = "bria-rmbg"
@@ -116,6 +121,7 @@ class ModelResult:
     frame_count: int | None = None
     duration_ms: int | None = None
     output_relative_path: str | None = None
+    still_relative_path: str | None = None
 
 
 @dataclass(frozen=True)
@@ -352,6 +358,7 @@ def _run_one_model(
         f"  {model_id}: ok -- prepare {timing.prepare_seconds:.1f}s, "
         f"render {timing.render_seconds:.1f}s"
     )
+    still_relative_path = write_still_frame(out_dir, model_id, log)
     return ModelResult(
         model_id=model_id,
         display_name=spec.display_name,
@@ -366,6 +373,7 @@ def _run_one_model(
         frame_count=artifact.frame_count,
         duration_ms=artifact.duration_ms,
         output_relative_path=f"{model_id}.webp",
+        still_relative_path=still_relative_path,
     )
 
 
@@ -533,6 +541,57 @@ def write_report(out_dir: Path, run: BenchmarkRun) -> Path:
     return path
 
 
+def load_run_from_results_json(path: Path) -> BenchmarkRun:
+    """Load a `BenchmarkRun` back from a `results.json` written by
+    `write_results`, for `--report-only`.
+
+    Raises `BenchmarkError` -- never a bare exception -- when the file is
+    missing, unreadable, not JSON, or missing an expected field, so
+    `run_report_only` can report it clearly instead of a traceback.
+    """
+    if not path.exists():
+        raise BenchmarkError(
+            f"{path} does not exist; run a benchmark into this directory first"
+        )
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except OSError as error:
+        raise BenchmarkError(f"could not read {path}: {error}") from error
+    except json.JSONDecodeError as error:
+        raise BenchmarkError(f"{path} is not valid JSON: {error}") from error
+    try:
+        results = tuple(ModelResult(**model) for model in payload["models"])
+        return BenchmarkRun(
+            generated_at=payload["generated_at"],
+            provider=payload["provider"],
+            request_settings=payload["request"],
+            results=results,
+            warnings=tuple(payload.get("warnings", ())),
+        )
+    except (KeyError, TypeError) as error:
+        raise BenchmarkError(
+            f"{path} is missing an expected field: {error}"
+        ) from error
+
+
+def run_report_only(out_dir: Path, log: Callable[[str], None] = print) -> int:
+    """Rebuild `index.html` and every model's still image from an existing
+    `results.json` and the WebPs already in `out_dir`.
+
+    No render, no model download, no runtime, and no Qt application --
+    see `--report-only` in `build_arg_parser`.
+    """
+    try:
+        run = load_run_from_results_json(out_dir / "results.json")
+    except BenchmarkError as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 1
+    run = rebuild_stills(out_dir, run, log=log)
+    write_report(out_dir, run)
+    log(f"rebuilt {out_dir / 'index.html'}")
+    return 0
+
+
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
@@ -574,6 +633,18 @@ def build_arg_parser() -> argparse.ArgumentParser:
         type=Path,
         default=None,
         help="output directory; default: ./benchmark-<timestamp>",
+    )
+    parser.add_argument(
+        "--report-only",
+        type=Path,
+        default=None,
+        metavar="DIR",
+        help=(
+            "rebuild index.html and each model's still image from an "
+            "existing DIR/results.json and the WebPs already there -- no "
+            "render, no model download, no --request; every other option "
+            "is ignored"
+        ),
     )
     return parser
 
@@ -644,6 +715,8 @@ def _ensure_qt_application(*, needs_clipboard: bool) -> object:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_arg_parser().parse_args(argv)
+    if args.report_only is not None:
+        return run_report_only(args.report_only)
     _ensure_qt_application(needs_clipboard=args.request is None)
     try:
         request_text = load_request_text(args.request, _TextClipboard())

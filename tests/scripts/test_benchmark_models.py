@@ -8,6 +8,7 @@ from fractions import Fraction
 from pathlib import Path
 
 import pytest
+from PIL import Image
 
 from matteloop.core.errors import ValidationError
 from matteloop.core.execution_providers import CPU_EXECUTION_PROVIDER
@@ -27,14 +28,19 @@ from matteloop.jobs.render import RenderArtifact
 from scripts.benchmark_models import (
     BenchmarkError,
     BenchmarkInterrupted,
+    BenchmarkRun,
     ModelResult,
     _print_license_note_if_selected,
     build_base_request,
     format_summary_table,
     load_request_text,
+    load_run_from_results_json,
+    main,
     resolve_provider,
     run_benchmark,
+    run_report_only,
     select_models,
+    write_results,
 )
 
 
@@ -627,3 +633,99 @@ def test_run_benchmark_raises_benchmark_interrupted_with_completed_results(
     assert partial.results[0].status == "ok"
     # The results completed before the interrupt were still written to disk.
     assert (out_dir / "results.json").exists()
+
+
+def _write_animated_webp(path: Path) -> None:
+    frame0 = Image.new("RGBA", (4, 4), (255, 0, 0, 255))
+    frame1 = Image.new("RGBA", (4, 4), (0, 255, 0, 255))
+    frame0.save(
+        path,
+        format="WEBP",
+        save_all=True,
+        append_images=[frame1],
+        duration=100,
+        loop=0,
+    )
+
+
+def _finished_run(out_dir: Path) -> BenchmarkRun:
+    _write_animated_webp(out_dir / "silueta.webp")
+    return BenchmarkRun(
+        generated_at="2026-09-17T12:00:00+00:00",
+        provider=CPU_EXECUTION_PROVIDER,
+        request_settings={"source": "clip.mp4"},
+        results=(
+            ModelResult(
+                model_id="silueta",
+                display_name="Silueta",
+                status="ok",
+                file_size_bytes=1234,
+                frame_count=2,
+                duration_ms=200,
+                output_relative_path="silueta.webp",
+            ),
+        ),
+    )
+
+
+def test_run_report_only_rebuilds_the_report_and_stills_without_rendering(
+    tmp_path: Path,
+) -> None:
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+    write_results(out_dir, _finished_run(out_dir))
+    webp_bytes_before = (out_dir / "silueta.webp").read_bytes()
+
+    exit_code = run_report_only(out_dir, log=lambda _message: None)
+
+    assert exit_code == 0
+    assert (out_dir / "silueta-still.png").exists()
+    html = (out_dir / "index.html").read_text(encoding="utf-8")
+    assert 'data-still="silueta-still.png"' in html
+    # A report-only rebuild only reads the WebP to make the still, never
+    # overwrites or deletes it.
+    assert (out_dir / "silueta.webp").read_bytes() == webp_bytes_before
+
+
+def test_run_report_only_fails_clearly_on_a_missing_results_json(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+
+    exit_code = run_report_only(out_dir)
+
+    assert exit_code == 1
+    captured = capsys.readouterr()
+    assert str(out_dir / "results.json") in captured.err
+
+
+def test_run_report_only_fails_clearly_on_unreadable_json(tmp_path: Path) -> None:
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+    (out_dir / "results.json").write_text("{not json", encoding="utf-8")
+
+    with pytest.raises(BenchmarkError) as excinfo:
+        load_run_from_results_json(out_dir / "results.json")
+
+    assert "results.json" in str(excinfo.value)
+
+
+def test_main_report_only_never_builds_a_qt_application(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+    write_results(out_dir, _finished_run(out_dir))
+
+    def _fail_if_called(*, needs_clipboard: bool) -> object:
+        raise AssertionError("--report-only must not build a Qt application")
+
+    monkeypatch.setattr(
+        "scripts.benchmark_models._ensure_qt_application", _fail_if_called
+    )
+
+    exit_code = main(["--report-only", str(out_dir)])
+
+    assert exit_code == 0
+    assert (out_dir / "index.html").exists()
