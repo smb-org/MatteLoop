@@ -170,6 +170,30 @@ launch warnings, and current platform qualification status.
 Notes for people writing decoder tests live in
 [docs/testing-fixtures.md](docs/testing-fixtures.md).
 
+### Comparing models
+
+To see how every model handles the same clip, set up the range, crop and
+settings in the app, then choose **Copy render settings** from the Render
+button's context menu (Ctrl/⌘+Shift+C). The benchmark renders those exact
+settings once per model and writes one WebP each, a `results.json` with
+timings, and an `index.html` that shows all of them side by side:
+
+```sh
+uv run python scripts/benchmark_models.py --out benchmark-run
+```
+
+- It reads the settings from the clipboard. On Linux or a headless machine,
+  save them to a file and pass `--request <file>`.
+- By default it renders the 13 models the app offers, about 6.8 GB of weights
+  on a first run. `bria-rmbg` (own licence terms) and `u2net_cloth_seg` (needs
+  a clothing-category input) run only when named with `--models`.
+- Renders share the app's cut cache. A model whose cuts already exist for these
+  settings is reused rather than segmented again, and flagged in the report —
+  its tile may show hand-edited cuts, and its time is not a real measurement.
+- To rebuild `index.html` and each model's still-image fallback from an
+  existing run's `results.json` and WebPs — after a report change, without
+  rendering again — pass `--report-only <dir>` instead of `--out`.
+
 ## License
 
 MatteLoop's original source code, documentation, and visual assets are licensed

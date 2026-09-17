@@ -65,6 +65,7 @@ class PresentationModel:
     model_available: bool
     preview_label: str
     render_enabled: bool
+    render_settings_export_enabled: bool
     rebuild_enabled: bool
     open_output_enabled: bool
     open_folder_enabled: bool

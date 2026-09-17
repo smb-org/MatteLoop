@@ -2,11 +2,29 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import QCoreApplication, QRectF, QSettings, QSize, Qt
-from PySide6.QtGui import QColor, QIcon, QKeySequence, QPainter, QPen, QPixmap
+from PySide6.QtCore import (
+    QCoreApplication,
+    QEvent,
+    QObject,
+    QRectF,
+    QSettings,
+    QSize,
+    Qt,
+)
+from PySide6.QtGui import (
+    QAction,
+    QColor,
+    QContextMenuEvent,
+    QIcon,
+    QKeySequence,
+    QPainter,
+    QPen,
+    QPixmap,
+)
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
+    QMenu,
     QPushButton,
     QVBoxLayout,
     QWidget,
@@ -125,6 +143,8 @@ class ActionShelf(QFrame):
         self.render_button.setAccessibleName(
             QCoreApplication.translate("ActionShelf", "Render Video")
         )
+        self._render_menu: QMenu | None = None
+        self.copy_render_settings_action = self._build_copy_render_settings_action()
         self.preferences_button = _preferences_button()
         self.update_button = _update_button()
         for button in (self.preview_button, self.render_button):
@@ -144,6 +164,56 @@ class ActionShelf(QFrame):
             store, services, settings, provider_options
         )
         self.preferences_button.clicked.connect(self.open_preferences)
+
+    def _build_copy_render_settings_action(self) -> QAction:
+        """Build the export action, reachable while Render is disabled.
+
+        Qt drops both a disabled widget's own shortcuts and the `ContextMenu`
+        events it would otherwise turn into `customContextMenuRequested`
+        (verified offscreen, with the Render button enabled and disabled) --
+        so a `QAction` or a context-menu route that lives *on* the Render
+        button goes unreachable exactly when this command is most useful:
+        while a model download or a job is running and the button is
+        disabled.
+
+        The fix has two parts. The shortcut is a `WindowShortcut`-context
+        action that `MainWindow` registers on the window itself, not the
+        button, so its availability never depends on the button's enabled
+        state. The right-click route is delivered through an event filter
+        installed on the button (`eventFilter` below): Qt still calls an
+        installed filter for a disabled widget's events, even though it
+        never calls the widget's own `contextMenuEvent()` or emits its
+        `customContextMenuRequested` -- also verified offscreen.
+        """
+        action = QAction(
+            QCoreApplication.translate("ActionShelf", "Copy render settings"), self
+        )
+        action.setObjectName("copy_render_settings_action")
+        action.setShortcut(QKeySequence("Ctrl+Shift+C"))
+        action.setShortcutContext(Qt.ShortcutContext.WindowShortcut)
+        self.render_button.installEventFilter(self)
+        return action
+
+    def _render_context_menu(self) -> QMenu:
+        """Return the Render button's popup menu, built once and reused.
+
+        Kept as one instance rather than a fresh `QMenu`
+        per right-click. Still a method, not inlined, so tests can inspect
+        the menu without triggering a real popup -- `QMenu.exec` blocks
+        until the menu closes, which a headless test has no way to do.
+        """
+        if self._render_menu is None:
+            menu = QMenu(self.render_button)
+            menu.setToolTipsVisible(True)
+            menu.addAction(self.copy_render_settings_action)
+            self._render_menu = menu
+        return self._render_menu
+
+    def eventFilter(self, watched: QObject, event: QEvent) -> bool:
+        if watched is self.render_button and isinstance(event, QContextMenuEvent):
+            self._render_context_menu().exec(event.globalPos())
+            return True
+        return super().eventFilter(watched, event)
 
     def _build_preferences_dialog(
         self,

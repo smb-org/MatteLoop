@@ -27,3 +27,6 @@ qemu_*.core
 # A stray SQLite session file some tool writes when a database name of
 # ":memory:" reaches a path. Its colon makes every Windows checkout fail.
 :memory:*
+# Model-benchmark output: one directory per run, holding a lossless WebP per
+# model. The script's own default is benchmark-<timestamp>.
+/benchmark-*/

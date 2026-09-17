@@ -81,6 +81,16 @@ def _render_actions(window: MainWindow, model: PresentationModel) -> None:
     window.preview_button.setEnabled(model.preview_enabled)
     window.preview_button.setText(presented_copy(model.preview_label))
     window.render_button.setEnabled(model.render_enabled)
+    window.copy_render_settings_action.setEnabled(
+        model.render_settings_export_enabled
+    )
+    window.copy_render_settings_action.setToolTip(
+        ""
+        if model.render_settings_export_enabled
+        else main_window_copy(
+            "Open a video with a valid range to copy its render settings."
+        )
+    )
     window.rebuild_button.setEnabled(model.rebuild_enabled)
     window.rebuild_button.setVisible(model.show_rebuild)
     window.edited_cut_recovery.setVisible(model.recovery_visible)

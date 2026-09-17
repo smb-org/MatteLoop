@@ -55,6 +55,7 @@ from matteloop.ui.crop_canvas import CropCanvas
 from matteloop.ui.model_manager import ModelManagerController, ModelRemovalService
 from matteloop.ui.ports import (
     ChooseVideoRequested,
+    CopyRenderSettingsRequested,
     ManageModelsRequested,
     ManageWorkspacesRequested,
     OpenOutputFolderRequested,
@@ -70,6 +71,7 @@ from matteloop.ui.ports import (
 from matteloop.ui.preferences import persist_parameters
 from matteloop.ui.preview_controller import PreviewController, PreviewRuntime
 from matteloop.ui.render_controller import RenderController
+from matteloop.ui.render_settings_export import RenderSettingsExportController
 from matteloop.ui.timeline import SourceFrameWorker
 from matteloop.ui.transform_group import TransformGroup
 from matteloop.ui.transform_stage import TransformStageController
@@ -188,6 +190,9 @@ class SourceController(QObject):
             dialog_parent=dialog_parent,
             parent=self,
         )
+        self._render_settings_export = self._build_render_settings_export(
+            store, dialog_parent
+        )
         self._model_manager = self._build_model_manager()
         self._transform_stage = TransformStageController(store, parent=self)
         self._render_controller.artifact_ready.connect(
@@ -210,18 +215,33 @@ class SourceController(QObject):
         self._decode_request_ids = count(1)
         self._threads: dict[str, tuple[QThread, _SourceLoadWorker]] = {}
         self._frame_threads: list[tuple[QThread, SourceFrameWorker]] = []
-        self._frame_timer = QTimer(self)
-        self._frame_timer.setSingleShot(True)
-        self._frame_timer.setInterval(125)
-        self._frame_timer.timeout.connect(self._decode_current_playhead)
+        self._frame_timer = self._build_frame_timer()
         self._closed = False
         self._shutdown_complete = True
+
+    def _build_render_settings_export(
+        self, store: StateStore, dialog_parent: QWidget | None
+    ) -> RenderSettingsExportController:
+        return RenderSettingsExportController(
+            store, dialog_parent=dialog_parent, parent=self
+        )
+
+    def _build_frame_timer(self) -> QTimer:
+        timer = QTimer(self)
+        timer.setSingleShot(True)
+        timer.setInterval(125)
+        timer.timeout.connect(self._decode_current_playhead)
+        return timer
 
     def set_dialog_parent(self, parent: QWidget) -> None:
         """Set the window used as the parent for native source dialogs."""
         self._dialog_parent = parent
         self._preview_controller.set_dialog_parent(parent)
         self._render_controller.set_dialog_parent(parent)
+        self._render_settings_export.set_dialog_parent(parent)
+        self._render_settings_export.set_anchor_widget(
+            getattr(parent, "render_button", None)
+        )
         self._model_manager.set_dialog_parent(parent)
 
     @property
@@ -300,6 +320,8 @@ class SourceController(QObject):
             self._preview_controller.dispatch(command)
         elif isinstance(command, RenderVideoRequested):
             self._render_controller.dispatch(command)
+        elif isinstance(command, CopyRenderSettingsRequested):
+            self._render_settings_export.dispatch(command)
         elif isinstance(command, CropEvent):
             self._store.dispatch(command)
         elif isinstance(command, ParameterEvent):

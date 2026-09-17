@@ -49,6 +49,11 @@ class RenderVideoRequested:
 
 
 @dataclass(frozen=True)
+class CopyRenderSettingsRequested:
+    pass
+
+
+@dataclass(frozen=True)
 class RebuildEditedCutsRequested:
     pass
 
@@ -83,6 +88,7 @@ type WindowCommand = (
     | VideoDropped
     | PreviewFrameRequested
     | RenderVideoRequested
+    | CopyRenderSettingsRequested
     | RebuildEditedCutsRequested
     | OpenOutputRequested
     | OpenOutputFolderRequested
