@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from fractions import Fraction
 from pathlib import Path
 
+from matteloop.core.errors import AppError
 from matteloop.core.parameters import (
     ParameterState,
     output_directory_for_source,
@@ -110,3 +111,54 @@ def _render_request(
         ),
         transform=parameters.transform,
     )
+
+
+_EXPORT_PLACEHOLDER_DIRECTORY = Path(".")
+_EXPORT_PLACEHOLDER_FILENAME = "export.webp"
+
+
+def _try_export_request(
+    metadata: object,
+    timeline: TimelineState | None,
+    crop: CropSpec | None,
+    parameters: ParameterState,
+) -> RenderRequest | None:
+    """Build the request "Copy render settings" would export, or ``None``.
+
+    Shared by the presenter's export-enabled check and the export command
+    itself (issue #170), so "can we build a request to export" has exactly
+    one implementation. Unlike ``_render_request``, this never resolves or
+    validates the *real* output directory/filename -- only
+    ``render_settings_to_json``'s ``output.max_bytes`` needs an ``OutputSpec``
+    at all, so a placeholder stands in for the location. That keeps the
+    export action's availability (checked on every ``present()``) independent
+    of whether the user's chosen output directory happens to be valid right
+    now, and avoids rebuilding the full, real ``OutputSpec`` for a value that
+    is discarded either way.
+    """
+    try:
+        inputs = _preview_inputs(metadata, timeline, crop, parameters)
+        return RenderRequest(
+            source=inputs.source,
+            sampling=SamplingSpec(inputs.start, inputs.end, fps=parameters.fps),
+            crop=inputs.crop,
+            segmentation=SegmentationSpec(
+                model_id=parameters.model_id,
+                edge_mode=parameters.edge_mode,
+                execution_provider=parameters.execution_provider,
+            ),
+            framing=FramingSpec(
+                trim=parameters.trim,
+                alpha_threshold=parameters.alpha_threshold,
+                padding=parameters.padding,
+                stretch_x=parameters.stretch_x,
+            ),
+            output=OutputSpec.from_mib(
+                _EXPORT_PLACEHOLDER_DIRECTORY,
+                _EXPORT_PLACEHOLDER_FILENAME,
+                parameters.max_mib,
+            ),
+            transform=parameters.transform,
+        )
+    except (AppError, ValueError):
+        return None

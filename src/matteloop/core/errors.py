@@ -16,6 +16,7 @@ class ErrorCode(StrEnum):
     INVALID_TRANSFORM = "invalid_transform"
     INVALID_OUTPUT = "invalid_output"
     INVALID_RENDER_REQUEST = "invalid_render_request"
+    RENDER_SETTINGS_INVALID = "render_settings_invalid"
     INVALID_FINAL_DIMENSIONS = "invalid_final_dimensions"
     INVALID_ERROR = "invalid_error"
     IMPOSSIBLE_SIZE = "impossible_size"

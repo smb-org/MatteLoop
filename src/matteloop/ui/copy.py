@@ -452,6 +452,12 @@ def main_window_copy(value: str) -> str:
         "Render complete": QCoreApplication.translate("MainWindow", "Render complete"),
         "Open output": QCoreApplication.translate("MainWindow", "Open output"),
         "Open folder": QCoreApplication.translate("MainWindow", "Open folder"),
+        "Open a video with a valid range to copy its render settings.": (
+            QCoreApplication.translate(
+                "MainWindow",
+                "Open a video with a valid range to copy its render settings.",
+            )
+        ),
     }
     return exact.get(value, value)
 

@@ -20,6 +20,7 @@ from matteloop.ui.presentation_model import (
     source_surface_copy,
     success_copy,
 )
+from matteloop.ui.request_builder import _try_export_request
 from matteloop.ui.source_error_copy import source_error_copy
 from matteloop.ui.source_presentation import present_source_metadata as s
 from matteloop.ui.timeline_presentation import present_timeline
@@ -33,6 +34,25 @@ def _failure_message(error: object | None, retry: str) -> str:
     if isinstance(detail, str) and detail:
         return f"Preview failed: {detail}"
     return f"Preview failed — {retry}"
+
+
+def _can_export_render_settings(state: AppState) -> bool:
+    """Ask the shared export-request builder (issue #170).
+
+    Shares its predicate with ``RenderSettingsExportController.dispatch`` so
+    "can we build a request to export" has one implementation. It does not
+    reuse the Render button's own builder, because that one also validates
+    the real output directory/filename -- settings this action never
+    exports and that should not be able to disable it.
+    """
+    if state.source is not Source.READY or state.source_value is None:
+        return False
+    return (
+        _try_export_request(
+            state.source_value, state.timeline, state.crop, state.parameters
+        )
+        is not None
+    )
 
 
 def present(state: AppState) -> PresentationModel:
@@ -138,6 +158,7 @@ def present(state: AppState) -> PresentationModel:
             "Download & Preview" if not state.model_available else "Preview Frame"
         ),
         render_enabled=allowed.can_render,
+        render_settings_export_enabled=_can_export_render_settings(state),
         rebuild_enabled=allowed.can_rebuild,
         open_output_enabled=allowed.can_open_output,
         open_folder_enabled=allowed.can_open_folder,

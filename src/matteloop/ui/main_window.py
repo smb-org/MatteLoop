@@ -26,6 +26,7 @@ from matteloop.ui.inspector import Inspector
 from matteloop.ui.main_window_render import render_source_error, render_window
 from matteloop.ui.ports import (
     ChooseVideoRequested,
+    CopyRenderSettingsRequested,
     ManageModelsRequested,
     ManageWorkspacesRequested,
     OpenOutputFolderRequested,
@@ -146,6 +147,12 @@ class MainWindow(QMainWindow):
         self.update_dialog = UpdateDialog(self)
         self.preview_button = self.action_shelf.preview_button
         self.render_button = self.action_shelf.render_button
+        self.copy_render_settings_action = self.action_shelf.copy_render_settings_action
+        # Registered on the window, not the Render button: a WindowShortcut
+        # action added to a disabled widget is itself unreachable, and the
+        # export command must stay reachable while Render is disabled (issue
+        # #170 review) -- verified offscreen, see action_shelf.py.
+        self.addAction(self.copy_render_settings_action)
         self.rebuild_button = self.inspector.rebuild_button
         runtime_message = runtime_banner_copy()
         self.runtime_container = QFrame()
@@ -225,6 +232,9 @@ class MainWindow(QMainWindow):
             widget.command_requested.connect(self._services.dispatch)
         self.render_button.clicked.connect(
             lambda: self._services.dispatch(RenderVideoRequested())
+        )
+        self.copy_render_settings_action.triggered.connect(
+            lambda: self._services.dispatch(CopyRenderSettingsRequested())
         )
         self.rebuild_button.clicked.connect(
             lambda: self._services.dispatch(RebuildEditedCutsRequested())
