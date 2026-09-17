@@ -146,3 +146,53 @@ def test_report_is_self_contained_with_no_external_resources() -> None:
     assert "http://" not in html
     assert "https://" not in html
     assert "<link " not in html
+
+
+def test_report_has_a_sort_control_with_the_expected_options() -> None:
+    html = render_report_html(_run(_ok_result("silueta")))
+
+    assert 'id="sort-select"' in html
+    assert 'value="render"' in html
+    assert 'value="name"' in html
+    assert 'value="size"' in html
+
+
+def test_report_tiles_carry_sortable_data_attributes() -> None:
+    run = _run(_ok_result("silueta", render_seconds=5.5, file_size_bytes=2048))
+
+    html = render_report_html(run)
+
+    assert 'data-render-seconds="5.5"' in html
+    assert 'data-file-size="2048"' in html
+
+
+def test_report_omits_sort_attributes_for_a_failed_model() -> None:
+    failed = ModelResult(
+        model_id="u2net", display_name="U2Net", status="error", error="boom"
+    )
+
+    html = render_report_html(_run(failed))
+
+    tile_start = html.index('data-model="u2net"')
+    tile_end = html.index("</article>", tile_start)
+    tile_html = html[tile_start:tile_end]
+    assert "data-render-seconds" not in tile_html
+    assert "data-file-size" not in tile_html
+
+
+def test_report_emits_tiles_in_render_time_order_with_failed_last() -> None:
+    failed = ModelResult(
+        model_id="broken", display_name="Broken", status="error", error="boom"
+    )
+    run = _run(
+        _ok_result("slow", render_seconds=20.0),
+        failed,
+        _ok_result("fast", render_seconds=1.0),
+    )
+
+    html = render_report_html(run)
+
+    fast_index = html.index('data-model="fast"')
+    slow_index = html.index('data-model="slow"')
+    broken_index = html.index('data-model="broken"')
+    assert fast_index < slow_index < broken_index

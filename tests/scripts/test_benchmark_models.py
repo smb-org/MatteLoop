@@ -26,8 +26,11 @@ from matteloop.jobs.models.catalog import ModelCatalog
 from matteloop.jobs.render import RenderArtifact
 from scripts.benchmark_models import (
     BenchmarkError,
+    BenchmarkInterrupted,
+    ModelResult,
     _print_license_note_if_selected,
     build_base_request,
+    format_summary_table,
     load_request_text,
     resolve_provider,
     run_benchmark,
@@ -159,7 +162,7 @@ def test_empty_models_argument_is_rejected() -> None:
 
 
 def test_ensure_qt_application_creates_a_core_application_for_a_file_request() -> None:
-    """Issue #170 review, item 1 and PR #171 Codex P2: main()'s first act
+    """main()'s first act
     must guarantee a Qt application exists before the runtime (and its
     download transport) is built -- but a `--request <file>` run never
     touches the clipboard, so it must not require a display/GUI backend, only
@@ -346,7 +349,7 @@ def test_run_benchmark_records_a_failing_model_and_keeps_going(
 def test_run_benchmark_writes_results_after_every_model_not_only_at_the_end(
     tmp_path: Path,
 ) -> None:
-    """Issue #170 review, item 8: a Ctrl+C partway through must not lose
+    """A Ctrl+C partway through must not lose
     tiles already rendered, so results.json/index.html are written
     incrementally rather than only once at the end of the loop."""
     out_dir = tmp_path / "out"
@@ -518,3 +521,109 @@ def test_results_json_has_the_documented_shape(tmp_path: Path) -> None:
     assert model_payload["status"] == "ok"
     assert model_payload["file_size_bytes"] == 1024
     assert model_payload["active_provider"] == CPU_EXECUTION_PROVIDER
+
+
+def _summary_result(model_id: str, **overrides: object) -> ModelResult:
+    defaults: dict[str, object] = dict(
+        model_id=model_id,
+        display_name=model_id,
+        status="ok",
+        prepare_seconds=1.0,
+        render_seconds=2.0,
+        frame_count=30,
+        file_size_bytes=1024,
+        active_provider=CPU_EXECUTION_PROVIDER,
+    )
+    defaults.update(overrides)
+    return ModelResult(**defaults)  # type: ignore[arg-type]
+
+
+def test_format_summary_table_sorts_by_render_time_with_failed_last() -> None:
+    results = (
+        _summary_result("slow", render_seconds=20.0),
+        ModelResult(
+            model_id="broken", display_name="Broken", status="error", error="boom"
+        ),
+        _summary_result("fast", render_seconds=1.0),
+    )
+
+    table = format_summary_table(results)
+
+    lines = table.splitlines()
+    data_rows = lines[2:]
+    assert [line.split()[0] for line in data_rows] == ["fast", "slow", "broken"]
+    assert "failed" in data_rows[2]
+
+
+def test_format_summary_table_marks_a_fallback_provider() -> None:
+    result = _summary_result("silueta", fallback_notice="CUDA unavailable; using CPU")
+
+    table = format_summary_table((result,))
+
+    assert "CPU (fallback)" in table
+
+
+def test_format_summary_table_marks_a_cache_hit_as_reused_cuts() -> None:
+    result = _summary_result("silueta", cache_hit=True)
+
+    table = format_summary_table((result,))
+
+    assert "reused cuts" in table
+
+
+def test_format_summary_table_uses_the_reports_file_size_formatting() -> None:
+    result = _summary_result("silueta", file_size_bytes=1024)
+
+    table = format_summary_table((result,))
+
+    assert "1.0 KB" in table
+
+
+def test_format_summary_table_has_column_headers() -> None:
+    table = format_summary_table((_summary_result("silueta"),))
+
+    header = table.splitlines()[0]
+    columns = (
+        "model",
+        "prepare (s)",
+        "render (s)",
+        "frames",
+        "size",
+        "provider",
+        "status",
+    )
+    for column in columns:
+        assert column in header
+
+
+def test_run_benchmark_raises_benchmark_interrupted_with_completed_results(
+    tmp_path: Path,
+) -> None:
+    out_dir = tmp_path / "out"
+    base_request, request_settings = _base_request(tmp_path, out_dir)
+
+    class _InterruptingRuntime(_FakeRuntime):
+        def render(self, request, context):  # noqa: ANN001, ANN201
+            if request.segmentation.model_id == "u2netp":
+                raise KeyboardInterrupt
+            return super().render(request, context)
+
+    runtime = _InterruptingRuntime(out_dir)
+
+    with pytest.raises(BenchmarkInterrupted) as excinfo:
+        run_benchmark(
+            base_request=base_request,
+            request_settings=request_settings,
+            model_ids=("u2net", "u2netp"),
+            provider=CPU_EXECUTION_PROVIDER,
+            out_dir=out_dir,
+            catalog=ModelCatalog.load_resource(),
+            runtime=runtime,
+            log=lambda _message: None,
+        )
+
+    partial = excinfo.value.run
+    assert [result.model_id for result in partial.results] == ["u2net"]
+    assert partial.results[0].status == "ok"
+    # The results completed before the interrupt were still written to disk.
+    assert (out_dir / "results.json").exists()

@@ -126,7 +126,7 @@ def _try_export_request(
     """Build the request "Copy render settings" would export, or ``None``.
 
     Shared by the presenter's export-enabled check and the export command
-    itself (issue #170), so "can we build a request to export" has exactly
+    itself, so "can we build a request to export" has exactly
     one implementation. Unlike ``_render_request``, this never resolves or
     validates the *real* output directory/filename -- only
     ``render_settings_to_json``'s ``output.max_bytes`` needs an ``OutputSpec``

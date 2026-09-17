@@ -150,8 +150,7 @@ class MainWindow(QMainWindow):
         self.copy_render_settings_action = self.action_shelf.copy_render_settings_action
         # Registered on the window, not the Render button: a WindowShortcut
         # action added to a disabled widget is itself unreachable, and the
-        # export command must stay reachable while Render is disabled (issue
-        # #170 review) -- verified offscreen, see action_shelf.py.
+        # export command must stay reachable while Render is disabled.
         self.addAction(self.copy_render_settings_action)
         self.rebuild_button = self.inspector.rebuild_button
         runtime_message = runtime_banner_copy()

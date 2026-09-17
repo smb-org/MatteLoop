@@ -37,7 +37,7 @@ def _failure_message(error: object | None, retry: str) -> str:
 
 
 def _can_export_render_settings(state: AppState) -> bool:
-    """Ask the shared export-request builder (issue #170).
+    """Ask the shared export-request builder.
 
     Shares its predicate with ``RenderSettingsExportController.dispatch`` so
     "can we build a request to export" has one implementation. It does not

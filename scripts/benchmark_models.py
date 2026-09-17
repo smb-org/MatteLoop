@@ -14,22 +14,11 @@ started from the GUI. In particular, model weights still download through
 `ui/download_transport.py`'s Qt transport -- see CLAUDE.md, "One network
 path" -- this script never opens a socket of its own.
 
-Cut-workspace caveat (issue #170 review, item 7): every render -- benchmark
-or otherwise -- promotes its segmented cuts into the single durable
-workspace cache all of MatteLoop shares (`paths.cut_workspace_root()`,
-fixed, not overridable). There is no supported way to give this script its
-own isolated workspace root without changing `jobs/render.py` (frozen) and
-the workspace-root validation in `jobs/workspace/_platform.py` and
-`_models.py`, which treats the shared root as a canonical, checked
-invariant, not a parameter. Short of that change, this script instead
-minimises the damage: it never forces re-segmentation over an existing cut
-set (there is no `--regenerate`; a previous CLI version's flag detected the
-destructive case reviewers actually hit -- overwriting a hand-edited cut
-workspace with fresh, unedited segmentation output -- and removing it
-removes that risk), and it detects and loudly flags a cache hit instead of
-reporting it as if it were the raw model's output. See the module docstring
-note in `_predict_cache_hit` below and the "STOP" discussion in the review
-for the options that would need a maintainer decision to isolate this fully.
+Renders share the application's durable cut-workspace cache
+(`paths.cut_workspace_root()`), which cannot be redirected without changing
+the frozen render and workspace code. The script therefore never forces
+re-segmentation over an existing cut set, and it flags a reused one: that
+tile may show hand-edited cuts, and its time is not a real measurement.
 
 This is a developer tool under `scripts/`, not a V1 product feature (see
 docs/v1-scope.md). It does not download models or render anything by itself
@@ -53,6 +42,7 @@ from matteloop.core.errors import AppError
 from matteloop.core.execution_providers import (
     ALLOWED_EXECUTION_PROVIDERS,
     is_allowed_provider,
+    provider_base_label,
     provider_options_from_runtime,
     select_provider,
 )
@@ -75,9 +65,17 @@ from matteloop.jobs.render import (
 # sys.path, the same dual-mode split already used by scripts/build.py and
 # scripts/qt_source.py. Both spellings have to resolve.
 try:
-    from scripts.benchmark_report import render_report_html
+    from scripts.benchmark_report import (
+        _format_file_size,
+        render_report_html,
+        sort_by_render_time,
+    )
 except ImportError:
-    from benchmark_report import render_report_html  # type: ignore[no-redef]
+    from benchmark_report import (  # type: ignore[no-redef]
+        _format_file_size,
+        render_report_html,
+        sort_by_render_time,
+    )
 
 _LICENSED_MODEL_ID = "bria-rmbg"
 
@@ -129,6 +127,18 @@ class BenchmarkRun:
     request_settings: Mapping[str, object]
     results: tuple[ModelResult, ...]
     warnings: tuple[str, ...] = ()
+
+
+class BenchmarkInterrupted(Exception):
+    """Ctrl+C reached `run_benchmark` mid-loop.
+
+    Carries the run as of the last finished model, so `main()` can still
+    print the summary table for it.
+    """
+
+    def __init__(self, run: BenchmarkRun) -> None:
+        super().__init__("interrupted")
+        self.run = run
 
 
 def select_models(catalog: ModelCatalog, requested: str | None) -> tuple[str, ...]:
@@ -215,7 +225,7 @@ def run_benchmark(
 
     Writes `results.json` and `index.html` after every model, not just at
     the end, so a Ctrl+C partway through keeps every tile already rendered
-    (issue #170 review, item 8) instead of losing the whole run.
+    instead of losing the whole run.
     """
     if not model_ids:
         raise BenchmarkError("model_ids must not be empty")
@@ -224,8 +234,8 @@ def run_benchmark(
     results: list[ModelResult] = []
     run = BenchmarkRun(generated_at, provider, request_settings, ())
     for index, model_id in enumerate(model_ids, start=1):
-        results.append(
-            _run_one_model(
+        try:
+            result = _run_one_model(
                 base_request=base_request,
                 model_id=model_id,
                 index=index,
@@ -237,7 +247,12 @@ def run_benchmark(
                 clock=clock,
                 log=log,
             )
-        )
+        except KeyboardInterrupt as error:
+            # `run` still holds every model that finished before this one;
+            # `_run_one_model` only catches `Exception`, not `BaseException`,
+            # so Ctrl+C during prepare/render reaches here uncaught.
+            raise BenchmarkInterrupted(run) from error
+        results.append(result)
         run = BenchmarkRun(
             generated_at=generated_at,
             provider=provider,
@@ -375,7 +390,7 @@ def _predict_cache_hit(
     before deciding to segment or reuse; calling the same public function
     first lets the script report the outcome instead of guessing at it. A
     hit means this tile may show a previously hand-edited cut set rather
-    than the model's raw output (issue #170 review, item 7) -- surfaced as a
+    than the model's raw output -- surfaced as a
     run-level warning by `_consistency_warnings`, since there is no isolated
     workspace to render into instead. Returns ``None`` when the runtime does
     not expose a `ModelCatalog` to look the model's weight hash up in --
@@ -425,6 +440,76 @@ def _consistency_warnings(results: Sequence[ModelResult]) -> tuple[str, ...]:
             "not the model's raw output"
         )
     return tuple(warnings)
+
+
+_SUMMARY_COLUMNS = (
+    "model",
+    "prepare (s)",
+    "render (s)",
+    "frames",
+    "size",
+    "provider",
+    "status",
+)
+
+
+def format_summary_table(results: Sequence[ModelResult]) -> str:
+    """Render a plain-text table of `results`, fastest render first.
+
+    Reuses `sort_by_render_time` -- the same ordering the HTML report's
+    tiles use server-side -- so the console table and the report agree on
+    what "fastest first, failed last" means instead of each having its own
+    notion of it. A cache hit is labelled "reused cuts" rather than folded
+    into "ok", since that render time is not a fresh measurement of the
+    model (see `_predict_cache_hit`).
+    """
+    rows = [_summary_row(result) for result in sort_by_render_time(results)]
+    widths = [
+        max(len(header), *(len(row[column]) for row in rows))
+        if rows
+        else len(header)
+        for column, header in enumerate(_SUMMARY_COLUMNS)
+    ]
+    lines = [
+        _summary_line(_SUMMARY_COLUMNS, widths),
+        _summary_line(tuple("-" * width for width in widths), widths),
+    ]
+    lines.extend(_summary_line(row, widths) for row in rows)
+    return "\n".join(lines)
+
+
+def _summary_line(cells: Sequence[str], widths: Sequence[int]) -> str:
+    padded = (cell.ljust(width) for cell, width in zip(cells, widths, strict=True))
+    return "  ".join(padded)
+
+
+def _summary_row(result: ModelResult) -> tuple[str, ...]:
+    return (
+        result.model_id,
+        _dash_or(result.prepare_seconds, "{:.1f}"),
+        _dash_or(result.render_seconds, "{:.1f}"),
+        _dash_or(result.frame_count, "{}"),
+        _format_file_size(result.file_size_bytes),
+        _summary_provider(result),
+        _summary_status(result),
+    )
+
+
+def _dash_or(value: float | int | None, template: str) -> str:
+    return "–" if value is None else template.format(value)
+
+
+def _summary_provider(result: ModelResult) -> str:
+    if result.active_provider is None:
+        return "–"
+    label = provider_base_label(result.active_provider)
+    return f"{label} (fallback)" if result.fallback_notice else label
+
+
+def _summary_status(result: ModelResult) -> str:
+    if result.status != "ok":
+        return "failed"
+    return "reused cuts" if result.cache_hit else "ok"
 
 
 def write_results(out_dir: Path, run: BenchmarkRun) -> Path:
@@ -498,12 +583,19 @@ def _default_out_dir() -> Path:
     return Path.cwd() / f"benchmark-{stamp}"
 
 
+def _interrupted_message(out_dir: Path) -> str:
+    return (
+        "interrupted; results for models completed so far were already "
+        f"written to {out_dir}"
+    )
+
+
 def _print_license_note_if_selected(
     catalog: ModelCatalog,
     model_ids: Sequence[str],
     log: Callable[[str], None] = print,
 ) -> None:
-    """Print `bria-rmbg`'s licence note before rendering it (issue #170, item 3).
+    """Print `bria-rmbg`'s licence note before rendering it.
 
     Split out from `main()` so the decision -- and the note it prints -- is
     testable without building a real runtime.
@@ -580,18 +672,23 @@ def main(argv: Sequence[str] | None = None) -> int:
             catalog=catalog,
             runtime=runtime,
         )
+    except BenchmarkInterrupted as error:
+        print(_interrupted_message(out_dir), file=sys.stderr)
+        if error.run.results:
+            print(format_summary_table(error.run.results))
+        return 130
     except KeyboardInterrupt:
-        print(
-            "interrupted; results for models completed so far were already "
-            f"written to {out_dir}",
-            file=sys.stderr,
-        )
+        # Defensive fallback: an interrupt landing outside the per-model
+        # try/except in run_benchmark (e.g. during results.json/index.html
+        # I/O between models) has no partial `run` to summarise.
+        print(_interrupted_message(out_dir), file=sys.stderr)
         return 130
     finally:
         runtime.close()
 
     for warning in run.warnings:
         print(f"warning: {warning}", file=sys.stderr)
+    print(format_summary_table(run.results))
     succeeded = sum(1 for result in run.results if result.status == "ok")
     print(f"{succeeded}/{len(run.results)} models succeeded; wrote {out_dir}")
     return 0 if succeeded == len(run.results) else 1

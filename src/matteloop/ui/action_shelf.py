@@ -166,7 +166,7 @@ class ActionShelf(QFrame):
         self.preferences_button.clicked.connect(self.open_preferences)
 
     def _build_copy_render_settings_action(self) -> QAction:
-        """Build the export action, reachable while Render is disabled (issue #170).
+        """Build the export action, reachable while Render is disabled.
 
         Qt drops both a disabled widget's own shortcuts and the `ContextMenu`
         events it would otherwise turn into `customContextMenuRequested`
@@ -197,7 +197,7 @@ class ActionShelf(QFrame):
     def _render_context_menu(self) -> QMenu:
         """Return the Render button's popup menu, built once and reused.
 
-        Kept as one instance (issue #170 review) rather than a fresh `QMenu`
+        Kept as one instance rather than a fresh `QMenu`
         per right-click. Still a method, not inlined, so tests can inspect
         the menu without triggering a real popup -- `QMenu.exec` blocks
         until the menu closes, which a headless test has no way to do.

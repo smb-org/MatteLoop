@@ -9,6 +9,7 @@ the output directory is copied or zipped elsewhere.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from html import escape
 from typing import TYPE_CHECKING
 
@@ -16,6 +17,11 @@ if TYPE_CHECKING:
     from scripts.benchmark_models import BenchmarkRun, ModelResult
 
 _BACKGROUNDS = ("checkerboard", "black", "white", "green")
+_SORT_OPTIONS = (
+    ("render", "Render time (fastest first)"),
+    ("name", "Model name"),
+    ("size", "File size"),
+)
 
 _CSS = """
 :root { color-scheme: light dark; }
@@ -111,10 +117,44 @@ _SCRIPT = """
 (function () {
   var grid = document.getElementById("grid");
   var bgSelect = document.getElementById("bg-select");
+  var sortSelect = document.getElementById("sort-select");
   var restartButton = document.getElementById("restart-all");
 
   function applyBackground() {
     grid.className = "grid bg-" + bgSelect.value;
+  }
+
+  function sortValue(tile, key) {
+    if (key === "name") {
+      return (tile.getAttribute("data-model") || "").toLowerCase();
+    }
+    var attribute = key === "size" ? "data-file-size" : "data-render-seconds";
+    if (!tile.hasAttribute(attribute)) {
+      // No measurement (a failed model) always sorts last, regardless of
+      // which numeric column is selected.
+      return Infinity;
+    }
+    return parseFloat(tile.getAttribute(attribute));
+  }
+
+  function applySort() {
+    var key = sortSelect.value;
+    var tiles = Array.prototype.slice.call(grid.querySelectorAll(".tile"));
+    tiles.sort(function (a, b) {
+      var va = sortValue(a, key);
+      var vb = sortValue(b, key);
+      if (va < vb) {
+        return -1;
+      }
+      if (va > vb) {
+        return 1;
+      }
+      return 0;
+    });
+    // Reorders the existing tile nodes in place -- no re-rendering.
+    tiles.forEach(function (tile) {
+      grid.appendChild(tile);
+    });
   }
 
   function restartAll() {
@@ -148,18 +188,39 @@ _SCRIPT = """
   }
 
   bgSelect.addEventListener("change", applyBackground);
+  sortSelect.addEventListener("change", applySort);
   restartButton.addEventListener("click", restartAll);
   applyBackground();
 })();
 """
 
 
+def sort_by_render_time(results: Sequence[ModelResult]) -> list[ModelResult]:
+    """Sort `results` by render time ascending, failed models last.
+
+    Shared by this module's server-side tile order -- so the no-JS view
+    already matches the report's default sort -- and by the console summary
+    table in `benchmark_models.py`, which reuses this instead of sorting a
+    second way.
+    """
+
+    def key(result: ModelResult) -> tuple[int, float]:
+        if result.status != "ok" or result.render_seconds is None:
+            return (1, 0.0)
+        return (0, result.render_seconds)
+
+    return sorted(results, key=key)
+
+
 def render_report_html(run: BenchmarkRun) -> str:
     """Render the full self-contained results page for one benchmark run."""
-    tiles = "\n".join(_tile_html(result) for result in run.results)
+    tiles = "\n".join(_tile_html(result) for result in sort_by_render_time(run.results))
     header = (
         "<h1>MatteLoop model benchmark</h1>"
         '<div class="controls">'
+        "<label>Sort "
+        f'<select id="sort-select">{_sort_options_html()}</select>'
+        "</label>"
         "<label>Background "
         f'<select id="bg-select">{_background_options_html()}</select>'
         "</label>"
@@ -196,13 +257,39 @@ def _background_options_html() -> str:
     return "".join(options)
 
 
+def _sort_options_html() -> str:
+    options = []
+    for index, (value, label) in enumerate(_SORT_OPTIONS):
+        selected = ' selected="selected"' if index == 0 else ""
+        options.append(f'<option value="{value}"{selected}>{escape(label)}</option>')
+    return "".join(options)
+
+
+def _sort_attributes_html(result: ModelResult) -> str:
+    """`data-render-seconds`/`data-file-size` for the report's sort control.
+
+    Left out when the underlying value is unknown -- a failed model has no
+    render time or file size -- so the script can treat a missing attribute
+    as "sort last" (see `sortValue` in `_SCRIPT`) instead of inventing a
+    numeric sentinel here that the script would have to know about too.
+    """
+    attributes = ""
+    if result.render_seconds is not None:
+        attributes += f' data-render-seconds="{escape(str(result.render_seconds))}"'
+    if result.file_size_bytes is not None:
+        attributes += f' data-file-size="{escape(str(result.file_size_bytes))}"'
+    return attributes
+
+
 def _tile_html(result: ModelResult) -> str:
     title = escape(result.display_name or result.model_id)
     model_id = escape(result.model_id)
+    sort_attributes = _sort_attributes_html(result)
     if result.status != "ok":
         error = escape(result.error or "unknown error")
         return (
-            f'<article class="tile tile-error" data-model="{model_id}">'
+            f'<article class="tile tile-error" data-model="{model_id}"'
+            f"{sort_attributes}>"
             f"<h2>{title}</h2>"
             f'<p class="model-id">{model_id}</p>'
             f'<p class="error">Failed: {error}</p>'
@@ -212,7 +299,7 @@ def _tile_html(result: ModelResult) -> str:
     provider_row = _provider_row(result.active_provider, result.fallback_notice)
     cache_class = ' class="cache-hit"' if result.cache_hit else ""
     return (
-        f'<article class="tile" data-model="{model_id}">'
+        f'<article class="tile" data-model="{model_id}"{sort_attributes}>'
         f'<div class="image-wrap"><img class="result-image" '
         f'src="{src}" data-src="{src}" alt="{title} result" /></div>'
         f"<h2>{title}</h2>"
