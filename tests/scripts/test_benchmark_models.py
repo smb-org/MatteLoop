@@ -158,11 +158,15 @@ def test_empty_models_argument_is_rejected() -> None:
         select_models(catalog, "   ")
 
 
-def test_ensure_qt_application_guarantees_an_instance_without_network() -> None:
-    """Issue #170 review, item 1: main()'s first act must guarantee a Qt
-    application exists before the runtime (and its download transport) is
-    built, regardless of whether the request came from --request or the
-    clipboard.
+def test_ensure_qt_application_creates_a_core_application_for_a_file_request() -> None:
+    """Issue #170 review, item 1 and PR #171 Codex P2: main()'s first act
+    must guarantee a Qt application exists before the runtime (and its
+    download transport) is built -- but a `--request <file>` run never
+    touches the clipboard, so it must not require a display/GUI backend, only
+    the event loop `QtNetworkDownloadTransport` pumps while waiting for a
+    downloaded chunk. A plain `QCoreApplication` provides that; forcing a
+    `QGuiApplication` here is what made a headless `--request` run on Linux
+    contradict the README's documented headless workflow.
 
     Run in a subprocess, not in-process: this repository's own test session
     shares one Qt application across every test file, and creating a bare
@@ -174,9 +178,40 @@ def test_ensure_qt_application_guarantees_an_instance_without_network() -> None:
     """
     script = (
         "from PySide6.QtCore import QCoreApplication\n"
+        "from PySide6.QtGui import QGuiApplication\n"
         "from scripts.benchmark_models import _ensure_qt_application\n"
-        "app = _ensure_qt_application()\n"
+        "app = _ensure_qt_application(needs_clipboard=False)\n"
         "assert QCoreApplication.instance() is app\n"
+        "assert not isinstance(app, QGuiApplication)\n"
+        "print('ok')\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        cwd=Path(__file__).resolve().parents[2],
+        capture_output=True,
+        check=False,
+        env=os.environ | {"QT_QPA_PLATFORM": "offscreen"},
+        text=True,
+        timeout=30,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "ok"
+
+
+def test_ensure_qt_application_creates_a_gui_application_for_the_clipboard() -> None:
+    """The clipboard path (`_TextClipboard.text()`) calls `QGuiApplication
+    .instance().clipboard()`, which plain `QCoreApplication` does not have,
+    so reading from the clipboard still needs the GUI application -- only the
+    `--request <file>` path may downgrade to `QCoreApplication`.
+    """
+    script = (
+        "from PySide6.QtCore import QCoreApplication\n"
+        "from PySide6.QtGui import QGuiApplication\n"
+        "from scripts.benchmark_models import _ensure_qt_application\n"
+        "app = _ensure_qt_application(needs_clipboard=True)\n"
+        "assert QCoreApplication.instance() is app\n"
+        "assert isinstance(app, QGuiApplication)\n"
         "print('ok')\n"
     )
     result = subprocess.run(

@@ -528,27 +528,31 @@ class _TextClipboard:
         return clipboard.text()
 
 
-def _ensure_qt_application() -> object:
+def _ensure_qt_application(*, needs_clipboard: bool) -> object:
     """Guarantee a Qt application instance exists before any network I/O.
 
-    `QtNetworkDownloadTransport` (ui/download_transport.py) pumps a
-    `QEventLoop` while waiting for each downloaded chunk; without a
-    constructed `QCoreApplication`, that loop never dispatches, so the
-    first uncached model hangs forever instead of downloading (issue #170
-    review, item 1). This has to run before the runtime is built,
-    regardless of whether the request comes from `--request` or the
-    clipboard -- previously only the clipboard path created one, lazily,
-    inside `_TextClipboard.text()`.
+    `QtNetworkDownloadTransport` pumps a `QEventLoop` while it waits for a
+    download; without an application that loop never dispatches and the
+    first uncached model hangs. Only reading the clipboard needs a
+    `QGuiApplication`, which requires a display backend, so a `--request`
+    run gets a plain `QCoreApplication` and stays usable on a headless
+    machine. An existing instance is reused.
     """
     from PySide6.QtCore import QCoreApplication
-    from PySide6.QtGui import QGuiApplication
 
-    return QCoreApplication.instance() or QGuiApplication(sys.argv[:1])
+    existing = QCoreApplication.instance()
+    if existing is not None:
+        return existing
+    if needs_clipboard:
+        from PySide6.QtGui import QGuiApplication
+
+        return QGuiApplication(sys.argv[:1])
+    return QCoreApplication(sys.argv[:1])
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_arg_parser().parse_args(argv)
-    _ensure_qt_application()
+    _ensure_qt_application(needs_clipboard=args.request is None)
     try:
         request_text = load_request_text(args.request, _TextClipboard())
         catalog = ModelCatalog.load_resource()
