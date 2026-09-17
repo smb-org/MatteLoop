@@ -88,6 +88,15 @@ def _control_stylesheet() -> str:
             selection-background-color: {ACCENT_COLOR};
             selection-color: {PRIMARY_ACTION_TEXT_COLOR}; }}
         QComboBox::drop-down {{ border: 0; width: 28px; }}
+        /* The explicit QMenu::item padding is required, not cosmetic: Qt's
+           windows11 style (the Windows 11 default since Qt 6.7) under-sizes
+           CT_MenuItem for this font, so the shortcut column overlaps the
+           label unless a stylesheet rule takes over the item's box model. */
+        QMenu {{ background: {CONTROL_COLOR}; border: 1px solid {DIVIDER_COLOR}; }}
+        QMenu::item {{ padding: 6px 16px; }}
+        QMenu::item:selected {{ background: {ACCENT_COLOR};
+            color: {PRIMARY_ACTION_TEXT_COLOR}; }}
+        QMenu::item:disabled {{ color: {DISABLED_COLOR}; }}
         QAbstractSpinBox::up-button, QAbstractSpinBox::down-button {{
             width: 24px; border: 0; background: transparent;
             subcontrol-origin: border; subcontrol-position: top right;
