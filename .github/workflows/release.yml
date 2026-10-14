@@ -223,7 +223,7 @@
         {
           "name": "Upload retained media-stack staging on failure",
           "if": "failure()",
-          "uses": "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+          "uses": "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9",
           "with": {
             "name": "media-stack-staging-${{ matrix.target }}",
             "path": "build-failure-diagnostics",
@@ -234,7 +234,7 @@
           "name": "Upload unsigned bundle",
           "id": "upload",
           "if": "runner.os == 'Windows'",
-          "uses": "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+          "uses": "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9",
           "with": {
             "name": "MatteLoop-unsigned-${{ matrix.target }}",
             "path": "dist/MatteLoop.dist\ndist/MatteLoop-*-sources-*",
@@ -245,7 +245,7 @@
         {
           "name": "Upload macOS application archive",
           "if": "runner.os == 'macOS'",
-          "uses": "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+          "uses": "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9",
           "with": {
             "name": "MatteLoop-unsigned-${{ matrix.target }}",
             "path": "dist/MatteLoop-${{ matrix.target }}.zip\ndist/MatteLoop-*-sources-*",
@@ -254,7 +254,7 @@
         },
         {
           "name": "Upload Velopack output",
-          "uses": "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+          "uses": "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9",
           "with": {
             "name": "MatteLoop-velopack-${{ matrix.target }}",
             "path": "dist/velopack",
