@@ -22,7 +22,7 @@ dependencies = [
   "av>=16,<17",
   "Pillow>=12.1,<13",
   "numpy>=2.3,<3",
-  "rembg==2.0.75",
+  "rembg==2.0.82",
   "velopack==1.2.0",
   "onnxruntime-directml>=1.24,<2; sys_platform == 'win32'",
   "onnxruntime>=1.23.2,<2; sys_platform != 'win32'",
