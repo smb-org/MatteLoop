@@ -353,6 +353,9 @@ class MainWindow(QMainWindow):
             handler = getattr(self._services, "toggle_playback", None)
             if callable(handler):
                 handler()
+            # A focused button would swallow Left/Right and Space, and a focused
+            # model picker would take `I` for itself; the timeline owns the keys.
+            self.timeline_widget.setFocus(Qt.FocusReason.OtherFocusReason)
 
         self.playback_controls.play_toggled.connect(toggle)
 
@@ -363,9 +366,10 @@ class MainWindow(QMainWindow):
         if key in (Qt.Key.Key_I, Qt.Key.Key_O) and not (
             modifiers & Qt.KeyboardModifier.ControlModifier
         ):
-            self._services.dispatch(
-                SetStartToPlayhead() if key == Qt.Key.Key_I else SetEndToPlayhead()
-            )
+            if not event.isAutoRepeat():
+                self._services.dispatch(
+                    SetStartToPlayhead() if key == Qt.Key.Key_I else SetEndToPlayhead()
+                )
             event.accept()
             return
         if (

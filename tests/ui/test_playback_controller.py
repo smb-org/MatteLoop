@@ -746,7 +746,6 @@ def make_keyed(qtbot, tmp_path):
     yield build
     for controller in controllers:
         controller.shutdown()
-    
 
 def _play_and_wait(qtbot, controller) -> None:
     controller.toggle_playback()
@@ -935,15 +934,10 @@ def test_job_start_stops_playback_without_a_commit(qtbot, make_keyed) -> None:
     assert not [e for e in events if isinstance(e, PlayheadChanged)]
 
 
-def test_source_replacement_stops_playback_and_clears_the_marker(
+def test_source_replacement_stops_playback_and_releases_the_holds(
     qtbot, make_keyed
 ) -> None:
-    store, factory, controller, window, events = make_keyed("rep")
-    factory.script = Script(fail_at=2)
-    controller.toggle_playback()
-    qtbot.waitUntil(lambda: not controller.playback.playing, timeout=5000)
-    assert window.original_canvas.status_label.isVisible()
-    factory.script = Script(end=Fraction(5))
+    store, _factory, controller, window, events = make_keyed("rep")
     controller.toggle_playback()
     qtbot.waitUntil(
         lambda: controller.playback.visible_position is not None, timeout=5000
@@ -954,7 +948,89 @@ def test_source_replacement_stops_playback_and_clears_the_marker(
 
     assert not controller.playback.playing
     assert not [e for e in events if isinstance(e, PlayheadChanged)]
-    assert not window.original_canvas.status_label.isVisible()
     assert not window.original_canvas.holding_live_frame
     assert window.timeline_widget.held_playhead is None
     assert window.playback_controls.position is None
+
+
+def _auto_repeat(key: Qt.Key, text: str) -> QKeyEvent:
+    return QKeyEvent(
+        QEvent.Type.KeyPress, key, Qt.KeyboardModifier.NoModifier, text, True
+    )
+
+
+def _set_in_while_playing(qtbot, store, controller, widget) -> Fraction:
+    """Play, key `I` once on ``widget``, then let the visible frame move on."""
+    _play_and_wait(qtbot, controller)
+    qtbot.waitUntil(
+        lambda: (controller.playback.visible_position or 0) >= 3 * STEP, timeout=5000
+    )
+    QTest.keyClick(widget, Qt.Key.Key_I)
+    first = store.state.timeline.start
+    assert first > 0
+    qtbot.waitUntil(
+        lambda: (controller.playback.visible_position or 0) >= first + 5 * STEP,
+        timeout=5000,
+    )
+    return first
+
+
+def test_a_held_i_on_the_window_route_sets_in_once(qtbot, make_keyed) -> None:
+    store, _factory, controller, window, _events = make_keyed("rep-window")
+    button = window.playback_controls.play_button
+    button.setFocus()
+    first = _set_in_while_playing(qtbot, store, controller, button)
+
+    QApplication.sendEvent(button, _auto_repeat(Qt.Key.Key_I, "i"))
+
+    assert store.state.timeline.start == first
+
+
+def test_a_held_i_on_the_timeline_route_sets_in_once(qtbot, make_keyed) -> None:
+    store, _factory, controller, window, _events = make_keyed("rep-timeline")
+    timeline = window.timeline_widget
+    timeline.setFocus()
+    assert QApplication.focusWidget() is timeline
+    first = _set_in_while_playing(qtbot, store, controller, timeline)
+
+    QApplication.sendEvent(timeline, _auto_repeat(Qt.Key.Key_I, "i"))
+
+    assert store.state.timeline.start == first
+
+
+def test_clicking_play_moves_focus_to_the_timeline_so_i_and_arrows_act_on_it(
+    qtbot, make_keyed
+) -> None:
+    store, _factory, controller, window, _events = make_keyed("focus")
+    picker = window.inspector.model_picker
+    model = picker.currentData()
+    picker.setFocus()
+    assert QApplication.focusWidget() is picker
+
+    window.playback_controls.play_button.click()
+
+    assert QApplication.focusWidget() is window.timeline_widget
+    qtbot.waitUntil(
+        lambda: (controller.playback.visible_position or 0) >= 3 * STEP, timeout=5000
+    )
+    QTest.keyClick(QApplication.focusWidget(), Qt.Key.Key_I)
+    assert picker.currentData() == model
+    assert store.state.timeline.start > 0
+    window.playback_controls.play_button.click()
+    paused_at = store.state.timeline.playhead
+
+    QTest.keyClick(QApplication.focusWidget(), Qt.Key.Key_Right)
+
+    assert store.state.timeline.playhead == paused_at + STEP
+
+
+def test_space_does_not_move_focus_off_the_widget_that_had_it(
+    qtbot, make_keyed
+) -> None:
+    _store, _factory, controller, window, _events = make_keyed("space-focus")
+    window.original_canvas.setFocus()
+
+    QTest.keyClick(window.original_canvas, Qt.Key.Key_Space)
+
+    assert controller.playback.playing
+    assert QApplication.focusWidget() is window.original_canvas

@@ -5,8 +5,8 @@ from __future__ import annotations
 from dataclasses import replace
 from fractions import Fraction
 
-from PySide6.QtCore import QCoreApplication, Signal
-from PySide6.QtGui import QFont
+from PySide6.QtCore import QCoreApplication, Qt, Signal
+from PySide6.QtGui import QFont, QKeyEvent
 from PySide6.QtWidgets import (
     QCheckBox,
     QFrame,
@@ -134,3 +134,9 @@ class PlaybackTimeline(TimelineWidget):
             )
         super().set_presentation(presentation)
 
+    def keyPressEvent(self, event: QKeyEvent) -> None:
+        """A held `I` or `O` sets the range once, like the window route."""
+        if event.isAutoRepeat() and event.key() in (Qt.Key.Key_I, Qt.Key.Key_O):
+            event.accept()
+            return
+        super().keyPressEvent(event)
