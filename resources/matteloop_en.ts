@@ -2097,17 +2097,17 @@ Freed %s.</translation>
 <context>
     <name>SourceController</name>
     <message>
-        <location filename="../src/matteloop/ui/controller.py" line="419"/>
+        <location filename="../src/matteloop/ui/controller.py" line="473"/>
         <source>Open video</source>
         <translation>Open video</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/controller.py" line="421"/>
+        <location filename="../src/matteloop/ui/controller.py" line="475"/>
         <source>Video files (*.mp4 *.mov *.webm *.mkv)</source>
         <translation>Video files (*.mp4 *.mov *.webm *.mkv)</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/controller.py" line="575"/>
+        <location filename="../src/matteloop/ui/controller.py" line="629"/>
         <source>Choose output directory</source>
         <translation>Choose output directory</translation>
     </message>
@@ -2196,6 +2196,19 @@ Freed %s.</translation>
         <location filename="../src/matteloop/ui/copy.py" line="600"/>
         <source>This video could not be read. Open another video.</source>
         <translation>This video could not be read. Open another video.</translation>
+    </message>
+</context>
+<context>
+    <name>SourcePlaybackController</name>
+    <message>
+        <location filename="../src/matteloop/ui/playback_controller.py" line="425"/>
+        <source>Playback stopped — the video file changed on disk</source>
+        <translation>Playback stopped — the video file changed on disk</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/playback_controller.py" line="430"/>
+        <source>Playback stopped — the video could not be decoded further</source>
+        <translation>Playback stopped — the video could not be decoded further</translation>
     </message>
 </context>
 <context>

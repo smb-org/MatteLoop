@@ -96,14 +96,22 @@ def _run_gui() -> int:
         provider_options=provider_options,
         runtime_unavailable=not runtime_usable,
     )
-    controller.set_dialog_parent(window)
-    controller.attach_transform_stage(
-        window.inspector.transform_group, window.result_canvas
-    )
+    _wire_window(controller, window)
     application.aboutToQuit.connect(controller.shutdown)
     window.show()
     _start_update_controller(window, settings, application, store, controller)
     return _finish_gui_shutdown(application.exec())
+
+
+def _wire_window(controller: Any, window: Any) -> None:
+    """Hand the controller the window and the widgets it drives."""
+    controller.set_dialog_parent(window)
+    controller.attach_transform_stage(
+        window.inspector.transform_group, window.result_canvas
+    )
+    controller.attach_playback(
+        window.playback_controls, window.original_canvas, window.timeline_widget
+    )
 
 
 def _finish_gui_shutdown(exit_code: int) -> int:

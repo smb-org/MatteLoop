@@ -76,6 +76,7 @@ class MainWindow(QMainWindow):
         self._last_focus: FocusTarget | None = None
         self._success_artifact_path = ""
         self._build()
+        self._connect_playback_controls()
         self._set_tab_order()
         self._restore_geometry()
         self.render_state(store.state)
@@ -344,6 +345,14 @@ class MainWindow(QMainWindow):
 
     def requested_focus_name(self) -> str:
         return (self._last_focus or FocusTarget.NONE).value
+
+    def _connect_playback_controls(self) -> None:
+        def toggle(_checked: bool) -> None:
+            handler = getattr(self._services, "toggle_playback", None)
+            if callable(handler):
+                handler()
+
+        self.playback_controls.play_toggled.connect(toggle)
 
     def closeEvent(self, event) -> None:  # type: ignore[no-untyped-def]
         confirm = getattr(self._services, "confirm_discard_unsaved_transform", None)
