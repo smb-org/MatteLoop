@@ -4,7 +4,8 @@
 `docs/superpowers/plans/2026-08-28-matteloop-implementation.md` disagree, **this
 file wins**. Read it together with `docs/engineering-guardrails.md`.
 
-Revision: 2026-09-01, following native dependency qualification.
+Revision: 2026-11-04, reopening scope for source playback. Earlier revision:
+2026-09-01, following native dependency qualification.
 
 Product rename, 2026-08-31: `rembgGUI` is now **MatteLoop**. New installs use
 the `matteloop` package, command, settings identity, cache, and workspace
@@ -49,7 +50,8 @@ Nothing else gates V1. When that sentence is true end to end, V1 is done.
 | Edge treatment | `Standard` and `Decontaminate colors`. |
 | Source media | Local 8-bit SDR MP4/MOV, H.264/H.265. |
 | Output | Lossless animated WebP, plus the still-image single-frame case. |
-| Timeline | Filmstrip, playhead, IN/OUT range handles, exact time/frame readout. |
+| Timeline | Filmstrip, playhead, IN/OUT range handles, exact time/frame readout. `I`/`O` set IN/OUT from anywhere in the window when the key event propagates to it (line edits, spin boxes, combo boxes and dialogs consume the letters first); ignored while the editor is locked. |
+| Playback | Sequential source playback in the Original pane with a Selection-only loop; no audio, no speed control. **Scope reopened 2026-11-04** by maintainer decision after use on real footage: choosing a cut from stills on a whole Twitch clip is impractical. |
 | Crop | Visual rectangle with handles, plus numeric fields. |
 | Preview | `Preview Frame` through the exact render pipeline, with the stale-result contract. |
 | Jobs | Exclusive modal job dialog with truthful stage/progress and working cancellation. |
