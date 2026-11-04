@@ -226,12 +226,16 @@ fixture. If either fails, stop and report; nothing has been built yet.
   size in both dimensions, use the oriented size — no upscaling). Un-swap to
   get the pre-transpose size `(w_r, h_r)`.
 - `convert(frame)`: for `proof.rgb_input`, `frame.reformat(width=w_r,
-  height=h_r, format="rgba")`; otherwise `_width_padded_yuv_frame(frame)`
-  first, then `VideoReformatter().reformat(padded, width=W, height=h_r,
-  format="rgba", src_colorspace=<ITU709 for matrix 1, ITU601 for 5 and 6>,
+  height=h_r, format="rgba")`; otherwise, when `(w_r, h_r)` equals the frame
+  size, `_width_padded_yuv_frame(frame)` first, `VideoReformatter().reformat(
+  padded, width=padded.width, height=h_r, ...)` and a crop to `w_r`, as the
+  still path does; when scaling, no padding: `reformat(frame, width=W,
+  height=h_r, ...)` with `W` = `w_r` rounded up to a multiple of
+  `_SWSCALE_WIDTH_ALIGNMENT`, then a whole-image Pillow `BILINEAR`
+  `resize((w_r, h_r))` only if `W != w_r`. The colour arguments are
+  `format="rgba", src_colorspace=<ITU709 for matrix 1, ITU601 for 5 and 6>,
   dst_colorspace=Colorspace.ITU709, src_color_range=<JPEG for range 2 else
-  MPEG>, dst_color_range=ColorRange.JPEG)` where `W` is `w_r` rounded up to
-  a multiple of `_SWSCALE_WIDTH_ALIGNMENT`, then crop the image to `w_r`.
+  MPEG>, dst_color_range=ColorRange.JPEG`.
   Then `_convert_bt709_transfer_to_srgb` when `proof.color_transfer in {1,
   6}`; then the transpose for `proof.rotation` as `_normalized_image` does
   (90 → `ROTATE_90`, 180 → `ROTATE_180`, 270 → `ROTATE_270`). Pack to

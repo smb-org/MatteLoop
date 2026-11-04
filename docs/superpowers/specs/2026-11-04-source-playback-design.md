@@ -257,10 +257,15 @@ The still path (`_normalized_image`) is: swscale `reformat` to RGBA with the
 proof's matrix and range, the BT.709→sRGB LUT when the transfer is 1 or 6, a
 LANCZOS resize for a non-square pixel aspect, a transpose for rotation.
 `PlaybackDecoder.convert` takes the same steps with the proof's values, scaled:
-target width = display width × pixel aspect folded in, rounded up to
-`_SWSCALE_WIDTH_ALIGNMENT` and cropped afterwards (the overrun from `a1cd2b8`
-is an observed libswscale failure, and the source frame is padded through
-`_width_padded_yuv_frame` for the same reason); `VideoReformatter().reformat(
+target size = display size fitted to the oriented aspect (pixel aspect folded in).
+At source size the still's route is kept: the frame is padded through
+`_width_padded_yuv_frame`, converted unscaled and cropped (the overrun from
+`a1cd2b8` is an observed libswscale failure on the RGBA destination). When
+scaling, the frame is never padded, since swscale's bilinear filter would blend
+the copied stride tail into the last columns; the destination width is rounded
+up to `_SWSCALE_WIDTH_ALIGNMENT` and a whole-image Pillow `BILINEAR` resize
+brings it to the exact width when they differ;
+`VideoReformatter().reformat(
 frame, width, height, format="rgba", src_colorspace, dst_colorspace=ITU709,
 src_color_range, dst_color_range=JPEG)`; the LUT via
 `_convert_bt709_transfer_to_srgb` on the small image; rotation by a transpose of

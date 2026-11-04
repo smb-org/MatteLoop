@@ -18,12 +18,12 @@ from tests.fixtures.media_factory import make_video
 # ``PlaybackDecoder.convert`` and the full-resolution still resized by Pillow
 # LANCZOS. LANCZOS stands in for the canvas's Qt smooth scaling, which a Qt-free
 # test cannot call. Measured (mean, worst quadrant mean):
-#   bt709 transfer 96x64 -> 48x32:      mean 3.109, quadrant 2.914
+#   bt709 transfer 96x64 -> 48x32:      mean 0.977, quadrant 1.359
 #   oriented 8x32 -> 4x16:               mean 2.833, quadrant 4.250
 #   sar2 32x16 -> 32x8:                  mean 1.417, quadrant 2.125
 #   unaligned yuv 40x24 -> 15x9:         mean 0.111, quadrant 0.200
-# TOLERANCE is the largest mean rounded up (4) plus 2.
-TOLERANCE = 6.0
+# TOLERANCE is the largest mean rounded up (3) plus 2.
+TOLERANCE = 5.0
 
 
 def _declare_srgb(stream, *, rgb: bool) -> None:
@@ -278,8 +278,7 @@ def test_downscaled_convert_approximates_the_resized_still(tmp_path):
         still = _still(path, info, Fraction(0)).image
         reference = still.resize(size, Image.Resampling.LANCZOS)
         mean = _mean_abs_difference(ours, reference)
-        worst = _worst_quadrant_difference(ours, reference)
-        print(f"MEASURED {name}: mean={mean:.3f} worst_quadrant={worst:.3f}")
+        _worst_quadrant_difference(ours, reference)
         assert mean <= TOLERANCE, name
 
 
@@ -351,3 +350,76 @@ def test_close_is_idempotent_and_frames_before_seek_is_an_error(tmp_path):
         decoder.frames()
     decoder.close()
     decoder.close()
+
+
+def _make_vp9_solid_video(path: Path, size: tuple[int, int]) -> Path:
+    """Solid-colour VP9 clip; its decoder leaves data in the stride tail."""
+    with av.open(str(path), "w") as container:
+        stream = container.add_stream("libvpx-vp9", rate=20)
+        stream.width, stream.height = size
+        stream.pix_fmt = "yuv420p"
+        stream.codec_context.time_base = Fraction(1, 20)
+        stream.codec_context.color_primaries = 1
+        stream.codec_context.color_trc = 13
+        stream.codec_context.colorspace = 1
+        stream.codec_context.color_range = 1
+        for index in range(3):
+            image = Image.new("RGB", size, (200, 100, 50))
+            frame = av.VideoFrame.from_image(image)
+            frame.pts = index
+            frame.time_base = Fraction(1, 20)
+            for packet in stream.encode(frame):
+                container.mux(packet)
+        for packet in stream.encode():
+            container.mux(packet)
+    return path
+
+
+def test_scaled_convert_keeps_the_last_column_free_of_stride_padding(tmp_path):
+    path = _make_vp9_solid_video(tmp_path / "solid.webm", (200, 116))
+    decoder, _ = _decoder(path, (150, 87))
+    decoder.open()
+    try:
+        _, frame = _frame_at(decoder, Fraction(0))
+        converted = decoder.convert(frame)
+    finally:
+        decoder.close()
+    assert (converted.width, converted.height) == (150, 87)
+    image = Image.frombytes("RGBA", (converted.width, converted.height), converted.rgba)
+    interior = image.getpixel((75, 43))[:3]
+    for y in range(image.height):
+        last = image.getpixel((image.width - 1, y))[:3]
+        assert max(abs(a - b) for a, b in zip(last, interior)) <= 8
+
+
+def _make_bar_video(path: Path, size: tuple[int, int]) -> Path:
+    """Black yuv420p clip with a white vertical bar at 60-70 % of the width."""
+    width, height = size
+    image = Image.new("RGB", size, "black")
+    for x in range(width * 6 // 10, width * 7 // 10):
+        for y in range(height):
+            image.putpixel((x, y), (255, 255, 255))
+    return make_video(path, [image] * 3, Fraction(20))
+
+
+def test_scaled_yuv_convert_keeps_picture_geometry_at_an_unaligned_target(tmp_path):
+    path = _make_bar_video(tmp_path / "bar.mp4", (100, 40))
+    decoder, info = _decoder(path, (33, 13))
+    decoder.open()
+    try:
+        _, frame = _frame_at(decoder, Fraction(0))
+        converted = decoder.convert(frame)
+    finally:
+        decoder.close()
+    size = decoder.target_size
+    ours = Image.frombytes("RGBA", size, converted.rgba)
+    reference = _still(path, info, Fraction(0)).image.resize(
+        size, Image.Resampling.LANCZOS
+    )
+    assert _mean_abs_difference(ours, reference) <= 6
+
+
+def test_a_collapsed_display_size_clamps_to_one_pixel(tmp_path):
+    path = _make_yuv_video(tmp_path / "aligned.mp4", (64, 32))
+    decoder, _ = _decoder(path, (0, 0))
+    assert decoder.target_size == (1, 1)

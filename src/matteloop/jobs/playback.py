@@ -11,6 +11,13 @@ during the swscale conversion and applies the transfer LUT and rotation to the
 small image, where the still path converts at full resolution first. Scaling
 uses PyAV's default interpolation, which ``av.video.reformatter`` documents as
 ``BILINEAR`` (``SWS_BILINEAR``); no interpolation argument is passed.
+
+A scaled YUV frame is never padded: the stride tail that padding copies would be
+blended into the last columns by the bilinear filter. libswscale still overruns
+an unaligned RGBA destination, so the destination is converted at the width
+rounded up to ``_SWSCALE_WIDTH_ALIGNMENT`` and then resampled to the exact
+target width with a second, whole-image Pillow ``BILINEAR`` pass. At source
+size the still path's pad, unscaled convert and crop is used instead.
 """
 
 from __future__ import annotations
@@ -86,8 +93,7 @@ def _geometry(
     proof: SourceValidationProof, display_size: tuple[int, int]
 ) -> tuple[tuple[int, int], tuple[int, int]]:
     """Return ``(target_size, pre_transpose_size)`` for a proof and a display."""
-    if display_size[0] < 1 or display_size[1] < 1:
-        raise ValueError("display_size must be at least 1x1")
+    display_size = (max(1, display_size[0]), max(1, display_size[1]))
     pixel_aspect = proof.pixel_aspect
     width = max(
         1,
@@ -233,11 +239,20 @@ class PlaybackDecoder:
                 return image.convert("RGBA")
             finally:
                 image.close()
-        padded, _ = _width_padded_yuv_frame(frame)
-        scaled_width, visible_width = self._yuv_widths(padded.width, frame.width)
+        if (width, height) == (frame.width, frame.height):
+            # Source size: pad, convert unscaled and crop, as the still path does.
+            source, _ = _width_padded_yuv_frame(frame)
+            target_width = source.width
+        else:
+            # Scaled: never pad. swscale's bilinear filter would blend the
+            # copied stride tail into the last columns.
+            source = frame
+            target_width = -(-width // _SWSCALE_WIDTH_ALIGNMENT) * (
+                _SWSCALE_WIDTH_ALIGNMENT
+            )
         converted_yuv: Any = VideoReformatter().reformat(
-            padded,
-            width=scaled_width,
+            source,
+            width=target_width,
             height=height,
             format="rgba",
             src_colorspace=_COLORSPACES[self._proof.color_matrix],
@@ -249,37 +264,16 @@ class PlaybackDecoder:
         )
         image = converted_yuv.to_image()
         try:
-            if visible_width != width:
-                # Resample only the visible columns to the exact target width.
-                resized = image.resize(
-                    (width, height),
-                    Image.Resampling.BILINEAR,
-                    box=(0, 0, visible_width, height),
-                )
+            if target_width != width:
+                if source is frame:
+                    resized = image.resize((width, height), Image.Resampling.BILINEAR)
+                else:
+                    resized = image.crop((0, 0, width, height))
                 image.close()
                 image = resized
-            elif scaled_width != width:
-                cropped = image.crop((0, 0, width, height))
-                image.close()
-                image = cropped
             return image.convert("RGBA")
         finally:
             image.close()
-
-    def _yuv_widths(self, padded_width: int, source_width: int) -> tuple[int, int]:
-        """Return the aligned destination width and the visible part of it.
-
-        libswscale writes past the end of an unaligned RGBA destination (see
-        ``_width_padded_yuv_frame``), so the destination width is rounded up to
-        ``_SWSCALE_WIDTH_ALIGNMENT``. The padded source scales as a whole, so
-        the picture occupies only the first ``visible`` columns of it.
-        """
-        width = self._pre_size[0]
-        wanted = -(-padded_width * width // source_width)
-        blocks = -(-wanted // _SWSCALE_WIDTH_ALIGNMENT)
-        scaled = max(width, blocks * _SWSCALE_WIDTH_ALIGNMENT)
-        visible = _round_half_up(source_width * scaled, padded_width)
-        return scaled, min(scaled, max(width, visible))
 
     def close(self) -> None:
         """Close the container; an ``AppError`` from its exit propagates."""
