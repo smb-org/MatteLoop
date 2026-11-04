@@ -67,6 +67,7 @@ class Script:
     open_error: Exception | None = None
     close_error: Exception | None = None
     convert_delay: float = 0.0
+    preroll: float = 0.0
 
 
 class FakeDecoder:
@@ -97,6 +98,8 @@ class FakeDecoder:
             script.block.wait(5)
         pts = self._position
         index = 0
+        if script.preroll:
+            time.sleep(script.preroll)
         while True:
             if script.pts_list is not None:
                 if index >= len(script.pts_list):
@@ -1422,19 +1425,105 @@ def test_in_out_changed_during_a_loop_reach_the_worker(qtbot, make_rig) -> None:
     rig.controller.pause()
 
 
+def _hold_single_frame(qtbot, rig: Rig) -> FakeDecoder:
+    """Loop a one-frame range until the worker holds it; return its decoder."""
+    rig.factory.script = Script(end=Fraction(5))
+    _set_range(rig, Fraction(1, 5), Fraction(1, 5) + STEP)
+    rig.controls.selection_only.setChecked(True)
+    rig.controller.play()
+    qtbot.waitUntil(lambda: bool(rig.factory.decoders), timeout=5000)
+    decoder = rig.factory.decoders[0]
+    qtbot.waitUntil(lambda: len(decoder.seeks) >= 2, timeout=5000)
+    qtbot.wait(150)
+    return decoder
+
+
 def test_a_single_frame_range_is_a_still_without_a_seek_storm(
     qtbot, make_rig
 ) -> None:
     rig = make_rig(fps=100)
-    rig.factory.script = Script(end=Fraction(5))
-    _set_range(rig, Fraction(1, 5), Fraction(1, 5) + STEP)
+    decoder = _hold_single_frame(qtbot, rig)
+    seeks = len(decoder.seeks)
+    converted = len(decoder.converted)
+
+    qtbot.wait(300)
+
+    assert len(decoder.seeks) == seeks <= 3
+    assert len(decoder.converted) == converted
+    assert set(decoder.converted) == {Fraction(1, 5)}
+    rig.controller.pause()
+
+
+def test_a_range_change_ends_the_hold_and_plays_on_from_the_frame_in_hand(
+    qtbot, make_rig
+) -> None:
+    rig = make_rig(fps=100)
+    decoder = _hold_single_frame(qtbot, rig)
+    seeks = len(decoder.seeks)
+
+    rig.store.dispatch(EndChanged(Fraction(1, 5) + 2 * STEP))
+
+    qtbot.waitUntil(lambda: Fraction(21, 100) in decoder.converted, timeout=5000)
+    assert len(decoder.seeks) in (seeks, seeks + 1)
+    assert max(decoder.converted) < Fraction(22, 100)
+    rig.controller.pause()
+
+
+def test_selection_only_turned_off_during_the_hold_plays_on_without_a_seek(
+    qtbot, make_rig
+) -> None:
+    rig = make_rig(fps=100)
+    decoder = _hold_single_frame(qtbot, rig)
+    seeks = len(decoder.seeks)
+
+    rig.controls.selection_only.setChecked(False)
+
+    qtbot.waitUntil(lambda: max(decoder.converted) >= Fraction(3, 10), timeout=5000)
+    assert len(decoder.seeks) == seeks
+    rig.controller.pause()
+
+
+def test_pause_ends_the_hold(qtbot, make_rig) -> None:
+    rig = make_rig(fps=100)
+    _hold_single_frame(qtbot, rig)
+
+    rig.controller.pause()
+
+    _wait_for_worker_end(qtbot, rig)
+
+
+def test_the_frame_owning_in_is_shown_on_every_iteration_despite_a_pre_roll(
+    qtbot, make_rig
+) -> None:
+    rig = make_rig()
+    rig.factory.script = Script(end=Fraction(5), preroll=0.05)
+    _set_range(rig, Fraction(1, 5), Fraction(3, 10))
     rig.controls.selection_only.setChecked(True)
 
-    decoder, elapsed = _loop_until_seeks(qtbot, rig, 5)
+    decoder, _elapsed = _loop_until_seeks(qtbot, rig, 4)
 
-    assert set(decoder.converted) == {Fraction(1, 5)}
-    # One seek per source frame interval at most, plus the one that started it.
-    assert len(decoder.seeks) <= elapsed / float(STEP) + 2
+    marks = [m for m in decoder.seek_marks if m < len(decoder.converted)]
+    assert len(marks) >= 3
+    assert all(decoder.converted[m] == Fraction(1, 5) for m in marks)
+
+
+def test_the_frame_owning_a_new_in_is_shown_despite_a_pre_roll(
+    qtbot, make_rig
+) -> None:
+    rig = make_rig()
+    rig.factory.script = Script(end=Fraction(5), preroll=0.05)
+    _set_range(rig, Fraction(1, 5), Fraction(1, 2))
+    rig.controls.selection_only.setChecked(True)
+    rig.play_until_frame(qtbot, 3)
+    decoder = rig.factory.decoders[0]
+
+    rig.store.dispatch(StartChanged(Fraction(1, 4)))
+
+    qtbot.waitUntil(lambda: Fraction(1, 4) in decoder.seeks, timeout=5000)
+    mark = decoder.seek_marks[decoder.seeks.index(Fraction(1, 4))]
+    qtbot.waitUntil(lambda: len(decoder.converted) > mark, timeout=5000)
+    assert decoder.converted[mark] == Fraction(1, 4)
+    rig.controller.pause()
 
 
 def test_an_in_between_two_frames_still_shows_the_frame_that_owns_it(
@@ -1451,3 +1540,61 @@ def test_an_in_between_two_frames_still_shows_the_frame_that_owns_it(
     assert max(decoder.converted) < Fraction(3, 10)
     assert len(decoder.converted) >= 3
     assert len(decoder.seeks) <= elapsed / float(STEP) + 2
+
+
+def test_releasing_a_drag_at_the_last_frame_resumes_there_not_from_zero(
+    qtbot, make_keyed
+) -> None:
+    store, factory, controller, window, _events = _playing_keyed(
+        qtbot, make_keyed, "last-frame"
+    )
+    timeline = window.timeline_widget
+    rect = timeline._geometry.visual["timeline"]
+    _press(timeline, _strip_point(timeline, 0.5))
+    beyond = QPoint(int(rect.x + rect.width) + 40, int(rect.y + rect.height / 2))
+    _drag_to(timeline, beyond)
+    last = store.state.timeline.duration - store.state.timeline.source_frame_interval
+    assert store.state.timeline.playhead == last
+
+    _release(timeline, beyond)
+
+    qtbot.waitUntil(lambda: len(factory.decoders) == 2, timeout=5000)
+    qtbot.waitUntil(lambda: bool(factory.decoders[1].seeks), timeout=5000)
+    assert factory.decoders[1].seeks[0] == last
+
+
+def _mouse(timeline, kind: QEvent.Type, point: QPoint, held: bool) -> None:
+    button = Qt.MouseButton.LeftButton
+    event = QMouseEvent(
+        kind,
+        QPointF(point),
+        QPointF(timeline.mapToGlobal(point)),
+        button if kind != QEvent.Type.MouseMove else Qt.MouseButton.NoButton,
+        button if held else Qt.MouseButton.NoButton,
+        Qt.KeyboardModifier.NoModifier,
+    )
+    QApplication.sendEvent(timeline, event)
+
+
+def test_a_double_click_still_suspends_for_the_drag_after_it(
+    qtbot, make_keyed
+) -> None:
+    _store, factory, controller, window, _events = _playing_keyed(
+        qtbot, make_keyed, "dblclick"
+    )
+    timeline = window.timeline_widget
+    point = _strip_point(timeline, 0.5)
+    # Qt's real sequence for a double click.
+    _mouse(timeline, QEvent.Type.MouseButtonPress, point, True)
+    _mouse(timeline, QEvent.Type.MouseButtonRelease, point, False)
+    qtbot.waitUntil(lambda: len(factory.decoders) == 2, timeout=5000)
+    _mouse(timeline, QEvent.Type.MouseButtonDblClick, point, True)
+    assert controller.playback.suspended
+
+    moved = _strip_point(timeline, 0.6)
+    _drag_to(timeline, moved)
+    _mouse(timeline, QEvent.Type.MouseButtonRelease, moved, False)
+
+    qtbot.waitUntil(lambda: len(factory.decoders) == 3, timeout=5000)
+    assert not controller.playback.suspended
+    assert controller.playback.playing

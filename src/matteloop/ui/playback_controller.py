@@ -214,17 +214,27 @@ class _PlaybackWorker(QObject):
 
         The range is read once per decoded frame. The frame right after a seek
         is the one owning the target, so it is never rejected for starting
-        before IN: a non-aligned IN would otherwise seek again forever.
+        before IN: a non-aligned IN would otherwise seek again forever. When a
+        loop seek produced at most one frame and the range is still the one it
+        sought, there is nothing to replay: hold until the range changes.
         """
         iterator = iter(self._decoder.frames())
         fresh = True
+        yielded = 0
+        sought: tuple[Fraction, Fraction] | None = None
         while True:
             item = next(iterator, None)
             if self._interrupted():
                 return
             window = self.range
+            at_boundary = item is None or self._outside(item[0], window, fresh)
+            if at_boundary and window is not None and yielded <= 1 and sought == window:
+                if not self._hold_while(window):
+                    return
+                window = self.range
             if item is not None and not self._outside(item[0], window, fresh):
                 fresh = False
+                yielded += 1
                 yield item
                 continue
             if window is None:
@@ -232,7 +242,18 @@ class _PlaybackWorker(QObject):
             if not self._loop_back(window[0]):
                 return
             iterator = iter(self._decoder.frames())
-            fresh = True
+            fresh, yielded, sought = True, 0, window
+
+    def _hold_while(self, window: tuple[Fraction, Fraction]) -> bool:
+        """Wait for the range to change; False when interrupted."""
+        while self.range == window:
+            if self._interrupted():
+                return False
+            time.sleep(_SLEEP_SLICE_SECONDS)
+        # The frame in hand plays on, paced from its own arrival.
+        self._anchor_pts = None
+        self._late_run = 0
+        return not self._interrupted()
 
     @staticmethod
     def _outside(
@@ -250,7 +271,9 @@ class _PlaybackWorker(QObject):
                 return False
         self._last_loop_seek = time.perf_counter()
         self._decoder.seek(start)
-        self._anchor_wall, self._anchor_pts = time.perf_counter(), start
+        # Anchor on the arrival of the first frame: the pre-roll decode must not
+        # make the frames that matter late.
+        self._anchor_pts = None
         self._late_run = 0
         return not self._interrupted()
 
@@ -343,13 +366,13 @@ class SourcePlaybackController(QObject):
         if self._playing:
             self.pause()
 
-    def play(self) -> None:
+    def play(self, *, resume: bool = False) -> None:
         request = self._play_request()
         if request is None or self._canvas is None or self._controls is None:
             return
         path, proof, revision, source_id, timeline = request
         interval = timeline.source_frame_interval
-        start, range_ = self._start_and_range(timeline)
+        start, range_ = self._start_and_range(timeline, resume)
         decoder = self._decoder_factory(
             path, proof, revision, self._canvas.display_size()
         )
@@ -379,12 +402,14 @@ class SourcePlaybackController(QObject):
         thread.start()
 
     def _start_and_range(
-        self, timeline: TimelineState
+        self, timeline: TimelineState, resume: bool
     ) -> tuple[Fraction, tuple[Fraction, Fraction] | None]:
         """Pick where to start and, with `Selection only`, the loop window."""
         playhead = timeline.playhead
         interval = timeline.source_frame_interval
-        start = Fraction(0) if playhead >= timeline.duration - interval else playhead
+        # Only a press on Play restarts at the end; a drag release resumes there.
+        at_end = playhead >= timeline.duration - interval
+        start = Fraction(0) if at_end and not resume else playhead
         if self._controls is None or not self._controls.selection_only_enabled:
             return start, None
         window = (timeline.start, timeline.end)
@@ -458,13 +483,16 @@ class SourcePlaybackController(QObject):
             isinstance(event, QMouseEvent)
             and event.button() == Qt.MouseButton.LeftButton
         )
-        if left and event.type() == QEvent.Type.MouseButtonPress:
+        if left and event.type() in (
+            QEvent.Type.MouseButtonPress,
+            QEvent.Type.MouseButtonDblClick,
+        ):
             self._press_pending = True
         elif left and event.type() == QEvent.Type.MouseButtonRelease:
             self._press_pending = False
             if self._resume_pending:
                 self._resume_pending = False
-                self.play()
+                self.play(resume=True)
         return False
 
     @Slot(bool)

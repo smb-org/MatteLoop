@@ -949,8 +949,10 @@ single-frame range.
 
 - Event filter: `MouseButtonPress` with the left button → `press_pending =
   True`; `MouseButtonRelease` with the left button → `press_pending =
-  False`, and if `resume_pending`, clear it and call `play()` (which starts
-  from `state.timeline.playhead`).
+  False`, and if `resume_pending`, clear it and call `play(resume=True)`
+  (which starts from `state.timeline.playhead` and does not apply the
+  restart-at-the-end rule of a press on Play). `MouseButtonDblClick` with the
+  left button counts as a press.
 - `playhead_changed_by_user()`: when `playing and press_pending and not
   suspended`: interrupt the worker, `active_session = None`, release the
   canvas hold (`release_live_frame`), `timeline.hold_playhead(None)`,
@@ -971,12 +973,19 @@ single-frame range.
   playing assigns the current range; `(False)` assigns `None`. Toggling while
   paused changes nothing else.
 - Worker range loop: before pacing each decoded frame, read `self.range`
-  once; if set and `pts >= OUT` or `pts < IN`: if less than `frame_interval`
+  once; if set and `pts >= OUT`, or `pts < IN` for a frame that is not the
+  first after a seek (that one owns the target and may start before IN), or
+  the stream ends: if less than `frame_interval`
   of wall time has passed since the last loop seek, sleep until it has (in
-  interruptible slices); then `decoder.seek(IN)`, re-anchor
-  (`anchor_pts = IN`, `anchor_wall = now`) and continue with the new
-  `frames()` iterator. The single-frame range therefore shows one frame per
-  interval with one seek per interval, never a storm.
+  interruptible slices); then `decoder.seek(IN)`, set
+  `anchor_pts = None` so the clock anchors on the arrival of the first frame
+  (the pre-roll decode must not make it late), reset the late counter, and
+  continue with the new `frames()` iterator. If the seek yielded at most one
+  frame and the window equals the one of the last loop seek, wait in 10 ms
+  slices until `self.range` changes or the worker is interrupted, without
+  seeking; then re-evaluate the frame in hand against the new range (`None`
+  plays on from it) and anchor on its arrival. A one-frame range is a still at
+  idle CPU.
 
 - [ ] **Step 1: Write the failing tests**:
   - `test_press_move_release_on_the_timeline_suspends_and_resumes_from_the_new_position`:

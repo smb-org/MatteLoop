@@ -32,7 +32,7 @@ IN/Set OUT and Reset Range stay where they are.
 | No source / loading / error | placeholder or still | — | hidden with the stage | — | source ready |
 | Ready, paused | still at the reducer playhead | reducer playhead | `Play`, enabled | source ready; any stop | `Play`, Space |
 | Playing | live frames, scaled on the worker | follow the displayed frame; `Outside export range` follows too | `Pause`, checked | `Play`, Space, drag release | `Pause`, Space, end of video, drag, job start, source change, decode error |
-| Suspended by drag | scrub still (existing debounce path) | drag position | still shows `Pause` | left press on the timeline that moves the playhead, while playing | left release: resumes from the new position (seek) |
+| Suspended by drag | scrub still (existing debounce path) | drag position | still shows `Pause` | left press on the timeline that moves the playhead, while playing | left release: resumes from the new position (seek); a release at the last frame resumes there and ends normally, it does not restart from 0 |
 | Locked (job running) | still | reducer playhead | disabled, same flag as the timeline (`editor_locked`) | job start | job end → Ready, paused |
 
 Playback runs from the current playhead to the end of the video and stops
@@ -52,11 +52,11 @@ Interaction decisions (each with its reason):
 | `I`/`O` without timeline focus, playing or paused | They work anywhere in the window when the key event propagates to it: a button or the canvas may have focus, and setting cuts while watching is the point of this feature. Line edits, spin boxes, combo boxes and dialogs consume the letters before that, so typing is unaffected. Ignored while the editor is locked. A held key does not repeat: auto-repeat of `I`/`O` is ignored on both routes. |
 | Space | Toggles play/pause when the key event propagates to the main window. Buttons, line edits, spin boxes and dialogs consume Space before that, so they keep it; with focus on the Result canvas Space is left alone, reserved for hold-to-compare (`matteloop-desktop-app.md:302`), which is not implemented yet. Auto-repeat from a held key is ignored, so holding Space toggles once. |
 | Left/Right (Shift+) while playing | Pause first (commit the visible frame), then step from it. Stepping means "show me exactly this frame". |
-| Click or drag on the timeline while playing | Suspend; the picture follows the scrub as today; on release playback resumes from the new position. A click is a press and release. |
+| Click or drag on the timeline while playing | Suspend; the picture follows the scrub as today; on release playback resumes from the new position. A click is a press and release; a double click counts as a press. The restart-from-0 rule belongs to pressing `Play`, not to this resume. |
 | Crop drag during playback | Allowed and playback continues; the live frame has the still's orientation and aspect, so the crop geometry is unchanged. |
 | Window resize during playback | Frames keep the size chosen at play start and the canvas rescales them; the next play or resume adopts the new size. |
 | Timecode and frame number | Both show the displayed frame's timestamp (row timecode, timeline telemetry, `Frame N` via `absolute_frame_number`). |
-| Very short range, single frame | The frame owning IN is shown; a loop iteration never restarts before one source frame interval has passed, so a one-frame range is a still with no seek storm. |
+| Very short range, single frame | The frame owning IN is shown; a loop iteration never restarts before one source frame interval has passed, so a one-frame range never storms. When a loop seek yields at most one frame and the range is unchanged, the worker holds that frame without seeking until the range changes, `Selection only` is turned off or playback stops: a one-frame range is a still at idle CPU. |
 | Pressing `Play` while a job runs | Impossible: the row is disabled with the editor. Space is ignored while the row is disabled. |
 | Preview or Render pressed while playing | Playback stops and commits the visible frame before the request is built, so the job uses the frame the user was looking at. |
 | Pause | The visible frame stays on screen and becomes the playhead, with no jump in time or position (see holds below). When the exact still replaces it, sharpness and colour may change minimally (see Picture fidelity). |
@@ -279,11 +279,17 @@ stills today, and sharper HiDPI stills are a separate matter.
 
 Pacing is by presentation timestamps, so variable frame rate needs nothing
 extra; the still path treats timestamps as authoritative and so does this one.
-A frame with `pts is None` is skipped. End of stream ends playback (above).
-With a range set, a frame whose `pts >= OUT` or `pts < IN` triggers
-`seek(IN)` and re-anchors the clock at IN, so the seek cost (27–174 ms measured)
-is a single hitch per loop and does not accumulate. The loop guard for short
-ranges is in the table above.
+A frame with `pts is None` is skipped. End of stream ends playback (above), except that with a range set
+it loops: the end of the stream is a loop boundary like OUT.
+With a range set, a frame whose `pts >= OUT`, or whose `pts < IN` when it is not
+the first frame after a seek, triggers `seek(IN)`. The first frame after a seek
+is the frame owning the target and may start before IN (IN is rarely frame
+aligned); rejecting it would seek forever without showing a frame. The clock is
+anchored on the arrival of that first frame, not at the seek: the pre-roll decode
+(27–174 ms measured) happens before it arrives, and anchoring earlier would make
+the frames that matter late and drop them. The seek cost is thus a single hitch
+per loop and does not accumulate. The loop guard and the one-frame hold for short
+ranges are in the table above.
 
 ## Errors and degradation (G4)
 
