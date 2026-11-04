@@ -24,6 +24,7 @@ from matteloop.ui.action_shelf import ActionShelf
 from matteloop.ui.copy import main_window_copy, runtime_banner_copy
 from matteloop.ui.inspector import Inspector
 from matteloop.ui.main_window_render import render_source_error, render_window
+from matteloop.ui.playback_controls import PlaybackTimeline
 from matteloop.ui.ports import (
     ChooseVideoRequested,
     CopyRenderSettingsRequested,
@@ -42,7 +43,6 @@ from matteloop.ui.presentation_model import PresentationModel
 from matteloop.ui.presenter import present
 from matteloop.ui.preview_canvas import PreviewStage, StatusLabel
 from matteloop.ui.source_strip import SourceDropSurface, SourceStrip
-from matteloop.ui.timeline import TimelineWidget
 from matteloop.ui.update_dialog import UpdateDialog
 
 
@@ -105,10 +105,11 @@ class MainWindow(QMainWindow):
         self.replace_video_button = self.source_strip.replace_button
         self.preview_stage = PreviewStage()
         self.original_canvas = self.preview_stage.original_canvas
+        self.playback_controls = self.preview_stage.playback_controls
         self.result_canvas = self.preview_stage.result_canvas
         self.source_drop_target.install_drop_target(self.source_strip)
         self.source_drop_target.install_drop_target(self.preview_stage)
-        self.timeline_widget = TimelineWidget()
+        self.timeline_widget = PlaybackTimeline()
         self.timeline_placeholder = self.timeline_widget
         self.source_error_heading = StatusLabel(
             main_window_copy("Couldn’t read this video")
@@ -260,6 +261,8 @@ class MainWindow(QMainWindow):
             self.choose_video_button,
             self.replace_video_button,
             self.original_canvas,
+            self.playback_controls.play_button,
+            self.playback_controls.selection_only,
             self.result_canvas,
             self.timeline_widget,
         ]

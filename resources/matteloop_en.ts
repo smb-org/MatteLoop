@@ -4,25 +4,25 @@
 <context>
     <name>ActionShelf</name>
     <message>
-        <location filename="../src/matteloop/ui/action_shelf.py" line="116"/>
-        <location filename="../src/matteloop/ui/action_shelf.py" line="120"/>
+        <location filename="../src/matteloop/ui/action_shelf.py" line="133"/>
+        <location filename="../src/matteloop/ui/action_shelf.py" line="137"/>
         <source>Preview Frame</source>
         <translation>Preview Frame</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/action_shelf.py" line="123"/>
-        <location filename="../src/matteloop/ui/action_shelf.py" line="127"/>
+        <location filename="../src/matteloop/ui/action_shelf.py" line="140"/>
+        <location filename="../src/matteloop/ui/action_shelf.py" line="144"/>
         <source>Render Video</source>
         <translation>Render Video</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/action_shelf.py" line="159"/>
+        <location filename="../src/matteloop/ui/action_shelf.py" line="189"/>
         <source>Copy render settings</source>
         <translation>Copy render settings</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/action_shelf.py" line="88"/>
-        <location filename="../src/matteloop/ui/action_shelf.py" line="90"/>
+        <location filename="../src/matteloop/ui/action_shelf.py" line="105"/>
+        <location filename="../src/matteloop/ui/action_shelf.py" line="107"/>
         <source>Preferences</source>
         <translation>Preferences</translation>
     </message>
@@ -1054,6 +1054,41 @@ Freed %s.</translation>
     </message>
 </context>
 <context>
+    <name>PlaybackControls</name>
+    <message>
+        <location filename="../src/matteloop/ui/playback_controls.py" line="38"/>
+        <location filename="../src/matteloop/ui/playback_controls.py" line="94"/>
+        <source>Play</source>
+        <translation>Play</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/playback_controls.py" line="42"/>
+        <location filename="../src/matteloop/ui/playback_controls.py" line="99"/>
+        <source>Play the video</source>
+        <translation>Play the video</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/playback_controls.py" line="50"/>
+        <source>Selection only</source>
+        <translation>Selection only</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/playback_controls.py" line="54"/>
+        <source>Loop playback inside the export range</source>
+        <translation>Loop playback inside the export range</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/playback_controls.py" line="92"/>
+        <source>Pause</source>
+        <translation>Pause</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/playback_controls.py" line="97"/>
+        <source>Pause the video</source>
+        <translation>Pause the video</translation>
+    </message>
+</context>
+<context>
     <name>Presenter</name>
     <message>
         <location filename="../src/matteloop/ui/copy.py" line="336"/>
@@ -1235,17 +1270,17 @@ Freed %s.</translation>
 <context>
     <name>PreviewCanvas</name>
     <message>
-        <location filename="../src/matteloop/ui/preview_canvas.py" line="133"/>
+        <location filename="../src/matteloop/ui/preview_canvas.py" line="139"/>
         <source>Original video frame</source>
         <translation>Original video frame</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/preview_canvas.py" line="135"/>
+        <location filename="../src/matteloop/ui/preview_canvas.py" line="141"/>
         <source>Background-removed result</source>
         <translation>Background-removed result</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/preview_canvas.py" line="285"/>
+        <location filename="../src/matteloop/ui/preview_canvas.py" line="322"/>
         <source>Original</source>
         <translation>Original</translation>
     </message>
@@ -1625,7 +1660,7 @@ Freed %s.</translation>
 <context>
     <name>PreviewStage</name>
     <message>
-        <location filename="../src/matteloop/ui/preview_canvas.py" line="291"/>
+        <location filename="../src/matteloop/ui/preview_canvas.py" line="328"/>
         <source>Original</source>
         <translation>Original</translation>
     </message>
@@ -1893,7 +1928,7 @@ Freed %s.</translation>
 <context>
     <name>RenderSettingsExportController</name>
     <message>
-        <location filename="../src/matteloop/ui/render_settings_export.py" line="57"/>
+        <location filename="../src/matteloop/ui/render_settings_export.py" line="66"/>
         <source>Copied render settings to clipboard</source>
         <translation>Copied render settings to clipboard</translation>
     </message>
@@ -2062,17 +2097,17 @@ Freed %s.</translation>
 <context>
     <name>SourceController</name>
     <message>
-        <location filename="../src/matteloop/ui/controller.py" line="416"/>
+        <location filename="../src/matteloop/ui/controller.py" line="419"/>
         <source>Open video</source>
         <translation>Open video</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/controller.py" line="418"/>
+        <location filename="../src/matteloop/ui/controller.py" line="421"/>
         <source>Video files (*.mp4 *.mov *.webm *.mkv)</source>
         <translation>Video files (*.mp4 *.mov *.webm *.mkv)</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/controller.py" line="572"/>
+        <location filename="../src/matteloop/ui/controller.py" line="575"/>
         <source>Choose output directory</source>
         <translation>Choose output directory</translation>
     </message>
@@ -2541,8 +2576,8 @@ Freed %s.</translation>
 <context>
     <name>UpdateBanner</name>
     <message>
-        <location filename="../src/matteloop/ui/action_shelf.py" line="70"/>
-        <location filename="../src/matteloop/ui/action_shelf.py" line="73"/>
+        <location filename="../src/matteloop/ui/action_shelf.py" line="87"/>
+        <location filename="../src/matteloop/ui/action_shelf.py" line="90"/>
         <location filename="../src/matteloop/ui/update_dialog.py" line="23"/>
         <location filename="../src/matteloop/ui/update_dialog.py" line="26"/>
         <location filename="../src/matteloop/ui/update_dialog.py" line="41"/>
