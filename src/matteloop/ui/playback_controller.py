@@ -19,8 +19,16 @@ from pathlib import Path
 from typing import Protocol
 
 import av
-from PySide6.QtCore import QCoreApplication, QObject, QThread, Signal, Slot
-from PySide6.QtGui import QImage
+from PySide6.QtCore import (
+    QCoreApplication,
+    QEvent,
+    QObject,
+    Qt,
+    QThread,
+    Signal,
+    Slot,
+)
+from PySide6.QtGui import QImage, QMouseEvent
 
 from matteloop.core.errors import AppError, ErrorCode
 from matteloop.core.state import AppState, JobState, SourceState
@@ -109,6 +117,10 @@ class _PlaybackWorker(QObject):
         self.range = range_
         self.shown_frames = 0
         self.dropped_frames = 0
+        self._anchor_wall = 0.0
+        self._anchor_pts: Fraction | None = None
+        self._late_run = 0
+        self._last_loop_seek: float | None = None
 
     @Slot()
     def run(self) -> None:
@@ -150,52 +162,97 @@ class _PlaybackWorker(QObject):
         return QThread.currentThread().isInterruptionRequested()
 
     def _decode_loop(self) -> tuple[str, object] | None:
-        anchor_wall = 0.0
-        anchor_pts: Fraction | None = None
-        late_run = 0
         last_pts: Fraction | None = None
         interval = float(self._frame_interval)
-        iterator = iter(self._decoder.frames())
+        frames = self._ranged_frames()
         while True:
             if self._interrupted():
                 return None
             try:
-                pts, frame = next(iterator)
+                pts, frame = next(frames)
             except StopIteration:
                 return ("ended", last_pts)
             if self._interrupted():
                 return None
             last_pts = pts
-            if anchor_pts is None:
-                anchor_wall, anchor_pts = time.perf_counter(), pts
-            due = anchor_wall + float(pts - anchor_pts)
+            if self._anchor_pts is None:
+                self._anchor_wall, self._anchor_pts = time.perf_counter(), pts
+            due = self._anchor_wall + float(pts - self._anchor_pts)
             if time.perf_counter() > due + interval:
-                late_run += 1
-                if late_run < _CONVERT_EVERY_LATE_FRAMES:
+                self._late_run += 1
+                if self._late_run < _CONVERT_EVERY_LATE_FRAMES:
                     self.dropped_frames += 1
                     continue
-                late_run = 0
+                self._late_run = 0
             else:
-                late_run = 0
+                self._late_run = 0
                 if not self._sleep_until(due):
                     return None
             if self._interrupted():
                 return None
-            converted = self._decoder.convert(frame)
-            image = QImage(
-                converted.rgba,
-                converted.width,
-                converted.height,
-                converted.width * 4,
-                QImage.Format.Format_RGBA8888,
-            ).copy()
+            self._publish(pts, frame)
+
+    def _publish(self, pts: Fraction, frame: object) -> None:
+        converted = self._decoder.convert(frame)
+        image = QImage(
+            converted.rgba,
+            converted.width,
+            converted.height,
+            converted.width * 4,
+            QImage.Format.Format_RGBA8888,
+        ).copy()
+        if self._interrupted():
+            return
+        if self._mailbox.put(self._session, image, pts):
+            self.shown_frames += 1
+            self.frame_available.emit(self._session)
+        else:
+            self.dropped_frames += 1
+
+    def _ranged_frames(self) -> Iterator[tuple[Fraction, object]]:
+        """Yield decoded frames, looping back to IN at a range boundary.
+
+        The range is read once per decoded frame. The frame right after a seek
+        is the one owning the target, so it is never rejected for starting
+        before IN: a non-aligned IN would otherwise seek again forever.
+        """
+        iterator = iter(self._decoder.frames())
+        fresh = True
+        while True:
+            item = next(iterator, None)
             if self._interrupted():
-                return None
-            if self._mailbox.put(self._session, image, pts):
-                self.shown_frames += 1
-                self.frame_available.emit(self._session)
-            else:
-                self.dropped_frames += 1
+                return
+            window = self.range
+            if item is not None and not self._outside(item[0], window, fresh):
+                fresh = False
+                yield item
+                continue
+            if window is None:
+                return
+            if not self._loop_back(window[0]):
+                return
+            iterator = iter(self._decoder.frames())
+            fresh = True
+
+    @staticmethod
+    def _outside(
+        pts: Fraction, window: tuple[Fraction, Fraction] | None, fresh: bool
+    ) -> bool:
+        if window is None:
+            return False
+        return pts >= window[1] or (pts < window[0] and not fresh)
+
+    def _loop_back(self, start: Fraction) -> bool:
+        """Seek to IN, at most once per frame interval; False when interrupted."""
+        if self._last_loop_seek is not None:
+            earliest = self._last_loop_seek + float(self._frame_interval)
+            if not self._sleep_until(earliest):
+                return False
+        self._last_loop_seek = time.perf_counter()
+        self._decoder.seek(start)
+        self._anchor_wall, self._anchor_pts = time.perf_counter(), start
+        self._late_run = 0
+        return not self._interrupted()
 
     def _sleep_until(self, due: float) -> bool:
         """Sleep in short slices; return False when interrupted."""
@@ -238,6 +295,9 @@ class SourcePlaybackController(QObject):
         self._play_source_id: str | None = None
         self._release_pending = False
         self._remembered_frame: object | None = None
+        self._press_pending = False
+        self._suspended = False
+        self._resume_pending = False
         self._unsubscribe: Callable[[], None] | None = store.subscribe(
             self._state_changed
         )
@@ -254,6 +314,10 @@ class SourcePlaybackController(QObject):
     def active_session(self) -> int | None:
         return self._active_session
 
+    @property
+    def suspended(self) -> bool:
+        return self._suspended
+
     def attach(
         self,
         controls: PlaybackControls,
@@ -263,6 +327,8 @@ class SourcePlaybackController(QObject):
         self._controls = controls
         self._canvas = canvas
         self._timeline = timeline
+        timeline.installEventFilter(self)
+        controls.selection_only_toggled.connect(self._selection_only_toggled)
 
     def toggle(self) -> None:
         if self._playing:
@@ -283,15 +349,14 @@ class SourcePlaybackController(QObject):
             return
         path, proof, revision, source_id, timeline = request
         interval = timeline.source_frame_interval
-        playhead = timeline.playhead
-        start = Fraction(0) if playhead >= timeline.duration - interval else playhead
+        start, range_ = self._start_and_range(timeline)
         decoder = self._decoder_factory(
             path, proof, revision, self._canvas.display_size()
         )
         self._session += 1
         session = self._session
         mailbox = _FrameMailbox()
-        worker = _PlaybackWorker(session, decoder, start, interval, None, mailbox)
+        worker = _PlaybackWorker(session, decoder, start, interval, range_, mailbox)
         thread = WorkerThread(worker, self)
         worker.frame_available.connect(self._frame_available)
         worker.ended.connect(self._ended)
@@ -305,11 +370,25 @@ class SourcePlaybackController(QObject):
         self._active_session = session
         self._play_source_id = source_id
         self._playing = True
+        self._suspended = False
+        self._resume_pending = False
         self._release_pending = False
         self._visible = None
         self._controls.set_playing(True)
         self._canvas.set_status_marker(None)
         thread.start()
+
+    def _start_and_range(
+        self, timeline: TimelineState
+    ) -> tuple[Fraction, tuple[Fraction, Fraction] | None]:
+        """Pick where to start and, with `Selection only`, the loop window."""
+        playhead = timeline.playhead
+        interval = timeline.source_frame_interval
+        start = Fraction(0) if playhead >= timeline.duration - interval else playhead
+        if self._controls is None or not self._controls.selection_only_enabled:
+            return start, None
+        window = (timeline.start, timeline.end)
+        return (start if window[0] <= start < window[1] else window[0]), window
 
     def _play_request(
         self,
@@ -321,7 +400,7 @@ class SourcePlaybackController(QObject):
         revision = getattr(metadata, "revision", None)
         proof = getattr(metadata, "validation_proof", None)
         if (
-            self._playing
+            (self._playing and not self._suspended)
             or state.source is not SourceState.READY
             or state.source_id is None
             or timeline is None
@@ -339,8 +418,15 @@ class SourcePlaybackController(QObject):
         self._finish_playback()
 
     def _stop_worker(self) -> None:
-        active, self._active = self._active, None
+        self._interrupt_worker()
         self._playing = False
+        self._suspended = False
+        self._resume_pending = False
+        if self._controls is not None:
+            self._controls.set_playing(False)
+
+    def _interrupt_worker(self) -> None:
+        active, self._active = self._active, None
         self._active_session = None
         self._mailbox = None
         if active is not None:
@@ -350,8 +436,60 @@ class SourcePlaybackController(QObject):
                 active[1].shown_frames,
                 active[1].dropped_frames,
             )
+
+    def playhead_changed_by_user(self) -> None:
+        """Suspend playback while the user drags the marker; resume on release."""
+        if not (self._playing and self._press_pending and not self._suspended):
+            return
+        self._interrupt_worker()
+        self._visible = None
+        self._suspended = True
+        self._resume_pending = True
+        if self._canvas is not None:
+            self._canvas.release_live_frame()
+        if self._timeline is not None:
+            self._timeline.hold_playhead(None)
         if self._controls is not None:
-            self._controls.set_playing(False)
+            self._controls.set_position(None)
+
+    def eventFilter(self, watched: QObject, event: QEvent) -> bool:  # noqa: N802
+        """Note the left button on the timeline; never consume an event."""
+        left = (
+            isinstance(event, QMouseEvent)
+            and event.button() == Qt.MouseButton.LeftButton
+        )
+        if left and event.type() == QEvent.Type.MouseButtonPress:
+            self._press_pending = True
+        elif left and event.type() == QEvent.Type.MouseButtonRelease:
+            self._press_pending = False
+            if self._resume_pending:
+                self._resume_pending = False
+                self.play()
+        return False
+
+    @Slot(bool)
+    def _selection_only_toggled(self, enabled: bool) -> None:
+        timeline = self._store.state.timeline
+        if self._active is None or self._suspended or timeline is None:
+            return
+        self._active[1].range = (
+            (timeline.start, timeline.end) if enabled else None
+        )
+
+    def _sync_range(self, state: AppState) -> None:
+        """Hand a changed IN/OUT to the running loop."""
+        timeline = state.timeline
+        if (
+            self._active is None
+            or self._suspended
+            or timeline is None
+            or self._controls is None
+            or not self._controls.selection_only_enabled
+        ):
+            return
+        window = (timeline.start, timeline.end)
+        if self._active[1].range != window:
+            self._active[1].range = window
 
     def _finish_playback(self) -> None:
         """Commit the visible frame and wait for its still, or release at once."""
@@ -453,6 +591,7 @@ class SourcePlaybackController(QObject):
             self._canvas.set_status_marker(None)
         if replaced:
             self._play_source_id = None
+        self._sync_range(state)
 
     def _stop_without_commit(self, *, clear_marker: bool) -> None:
         if self._playing:
@@ -467,6 +606,8 @@ class SourcePlaybackController(QObject):
             unsubscribe, self._unsubscribe = self._unsubscribe, None
             unsubscribe()
         self._playing = False
+        self._suspended = False
+        self._resume_pending = False
         self._active_session = None
         self._active = None
         self._mailbox = None

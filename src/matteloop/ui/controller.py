@@ -562,6 +562,8 @@ class SourceController(QObject):
         return event
 
     def _dispatch_timeline(self, event: object) -> None:
+        if isinstance(event, PlayheadChanged):
+            self._playback.playhead_changed_by_user()
         event = self._while_playing(event)
         before = self._store.state
         self._store.dispatch(event)  # type: ignore[arg-type]
