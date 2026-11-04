@@ -141,7 +141,7 @@ def test_probe_reports_exact_vfr_stream_metadata_and_ignores_fixture_sidecar(
     assert info.duration == Fraction(1, 5)
     assert info.time_base == Fraction(1, 10240)
     assert info.average_rate == Fraction(15)
-    assert info.sustained_rate == Fraction(30720, 2562)
+    assert info.sustained_rate == Fraction(250, 21)
     assert info.frame_count == 3
     assert info.pixel_aspect == Fraction(1)
 
@@ -391,6 +391,58 @@ def test_millisecond_quantized_60fps_source_opens_and_proof_verifies(tmp_path):
 
     assert info.sustained_rate == Fraction(1_800_000, 30_001)
     _validate_proof_identity(info.validation_proof, info.revision)
+
+
+def _ms_grid_90khz_info(tmp_path, rate, average_rate):
+    # Whole-millisecond PTS expressed in 90 kHz ticks, as an MP4 muxer writes them.
+    ticks = [round(i * 1000 / rate) * 90 for i in range(1800)]
+    frames = [_yuv_frame(81, 90, 240, matrix=1, color_range=1) for _ in ticks]
+    for frame, pts in zip(frames, ticks):
+        frame.pts = pts
+        frame.time_base = Fraction(1, 90_000)
+    stream = _color_stream(matrix=1)
+    stream.index = 0
+    stream.width = 1920
+    stream.height = 1080
+    stream.time_base = Fraction(1, 90_000)
+    stream.start_time = 0
+    stream.duration = 2_699_910
+    stream.average_rate = average_rate
+    stream.base_rate = Fraction(60)
+    stream.guessed_rate = Fraction(60)
+    stream.frames = len(frames)
+
+    class Container:
+        duration = None
+
+        def seek(self, *args, **kwargs):
+            return None
+
+        def decode(self, selected_stream):
+            assert selected_stream is stream
+            yield from frames
+
+    return _source_info(
+        tmp_path / "ms-grid-90khz.mp4",
+        SourceRevision(1, 2, 3, 4, 5),
+        Container(),
+        stream,
+        frames[0],
+    )
+
+
+def test_millisecond_grid_on_90khz_time_base_60fps_source_opens(tmp_path):
+    info = _ms_grid_90khz_info(tmp_path, 60, Fraction(5_400_000, 89_999))
+
+    assert info.sustained_rate == Fraction(1_800_000, 30_001)
+    _validate_proof_identity(info.validation_proof, info.revision)
+
+
+def test_millisecond_grid_on_90khz_time_base_61fps_source_is_rejected(tmp_path):
+    with pytest.raises(AppError) as error:
+        _ms_grid_90khz_info(tmp_path, 61, Fraction(61))
+
+    assert error.value.code is ErrorCode.SOURCE_FPS_UNSUPPORTED
 
 
 def test_short_millisecond_quantized_60fps_source_opens(tmp_path):

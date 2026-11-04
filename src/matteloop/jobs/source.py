@@ -34,6 +34,8 @@ MAX_SOURCE_HEIGHT = 2160
 # also affected.
 MIN_SOURCE_DIMENSION = 8
 MAX_SOURCE_FPS = Fraction(60)
+# PTS rounded to whole ms on a finer time base: allow 2 ms, not 2 ticks, of slack.
+_PTS_QUANTISATION = Fraction(1, 1000)
 MAX_SOURCE_DURATION = Fraction(10 * 60)
 MAX_TIMELINE_DECODED_FRAMES = 36_002
 SUPPORTED_CONTAINER_SUFFIXES = frozenset({".mp4", ".mov", ".webm", ".mkv"})
@@ -839,9 +841,9 @@ def _derive_timeline(
                 "convert-source",
             )
         return _DerivedTimeline(Fraction(1, nominal_rate), nominal_rate, 1)
-    deltas = tuple(b - a for a, b in zip(timestamps, timestamps[1:]))
-    duration = timestamps[-1] + deltas[-1]
-    sustained_rate = Fraction(len(timestamps), duration + 2 * time_base)
+    duration = 2 * timestamps[-1] - timestamps[-2]
+    slack = 2 * max(time_base, _PTS_QUANTISATION)
+    sustained_rate = Fraction(len(timestamps), duration + slack)
     if sustained_rate > MAX_SOURCE_FPS:
         raise _source_error(
             ErrorCode.SOURCE_FPS_UNSUPPORTED,
@@ -881,10 +883,8 @@ def _source_info(
     average_rate = _fraction_or_none(stream.average_rate)
     base_rate = _fraction_or_none(getattr(stream, "base_rate", None))
     guessed_rate = _fraction_or_none(getattr(stream, "guessed_rate", None))
-    validation_rates = tuple(
-        rate for rate in (average_rate, guessed_rate) if rate is not None and rate > 0
-    )
-    validation_rate = max(validation_rates) if validation_rates else None
+    rates = (r for r in (average_rate, guessed_rate) if r is not None and r > 0)
+    validation_rate = max(rates, default=None)
     duration = _duration(container, stream, time_base, presentation_origin)
     declared_duration = duration
     cfr_rate = _proven_cfr_rate(
@@ -905,7 +905,7 @@ def _source_info(
         )
         if duration <= 0:
             duration = derived.duration
-        validation_rate = max(validation_rate or Fraction(0), derived.sustained_rate)
+        validation_rate = max(guessed_rate or Fraction(0), derived.sustained_rate)
     else:
         validation_rate = max(validation_rate or Fraction(0), cfr_rate)
     if duration <= 0:
