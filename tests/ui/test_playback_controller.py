@@ -12,8 +12,9 @@ from typing import Any
 
 import pytest
 from PIL import Image
-from PySide6.QtCore import QObject, QSettings, Slot
-from PySide6.QtGui import QImage
+from PySide6.QtCore import QEvent, QObject, QSettings, Qt, Slot
+from PySide6.QtGui import QImage, QKeyEvent
+from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QFileDialog
 
 from matteloop.core.errors import AppError, ErrorCode
@@ -29,9 +30,13 @@ from matteloop.core.state import (
     reduce,
 )
 from matteloop.core.timeline import (
+    EndChanged,
     PlayheadChanged,
+    SetEndToPlayhead,
+    SetStartToPlayhead,
     SourceFrameDecoded,
     StartChanged,
+    StepFrame,
 )
 from matteloop.jobs.playback import PlaybackFrame
 from matteloop.jobs.source import probe_source
@@ -712,3 +717,244 @@ def test_source_controller_shutdown_includes_playback(
 
     release.set()
     qtbot.waitUntil(lambda: _finished(thread), timeout=5000)
+
+
+@pytest.fixture
+def make_keyed(qtbot, tmp_path):
+    """A real SourceController and window, with every dispatched event recorded."""
+    controllers: list[SourceController] = []
+
+    def build(name: str, **script: Any):
+        store, factory, controller, window = _source_controller_rig(
+            qtbot, tmp_path, name
+        )
+        controllers.append(controller)
+        window.raise_()
+        window.activateWindow()
+        qtbot.waitUntil(window.isActiveWindow, timeout=2000)
+        factory.script = Script(end=Fraction(5), **script)
+        events: list[object] = []
+        original = store.dispatch
+
+        def record(event: object) -> None:
+            events.append(event)
+            original(event)  # type: ignore[arg-type]
+
+        store.dispatch = record  # type: ignore[method-assign]
+        return store, factory, controller, window, events
+
+    yield build
+    for controller in controllers:
+        controller.shutdown()
+    
+
+def _play_and_wait(qtbot, controller) -> None:
+    controller.toggle_playback()
+    qtbot.waitUntil(
+        lambda: controller.playback.visible_position is not None, timeout=5000
+    )
+
+
+def test_i_and_o_with_focus_on_the_play_button_set_the_range_from_the_visible_frame_while_playing(  # noqa: E501
+    qtbot, make_keyed
+) -> None:
+    store, _factory, controller, window, events = make_keyed("io")
+    _play_and_wait(qtbot, controller)
+    qtbot.waitUntil(
+        lambda: (controller.playback.visible_position or 0) >= 3 * STEP, timeout=5000
+    )
+    button = window.playback_controls.play_button
+    button.setFocus()
+    assert QApplication.focusWidget() is button
+
+    visible = controller.playback.visible_position
+    QTest.keyClick(button, Qt.Key.Key_I)
+
+    assert store.state.timeline.start == visible
+    assert controller.playback.playing
+    # The reducer keeps at least one output frame (1/15 s) between IN and OUT.
+    far_enough = visible + Fraction(1, 15) + STEP
+    qtbot.waitUntil(
+        lambda: (controller.playback.visible_position or 0) >= far_enough,
+        timeout=5000,
+    )
+    visible = controller.playback.visible_position
+    assert store.state.timeline.playhead == 0
+    QTest.keyClick(button, Qt.Key.Key_O)
+
+    assert store.state.timeline.end == visible
+    assert controller.playback.playing
+    assert [e for e in events if isinstance(e, StartChanged)]
+    assert [e for e in events if isinstance(e, EndChanged)]
+    assert not [
+        e for e in events if isinstance(e, (SetStartToPlayhead, SetEndToPlayhead))
+    ]
+
+
+def test_i_while_paused_with_focus_on_the_play_button_uses_the_reducer_playhead(
+    qtbot, make_keyed
+) -> None:
+    store, _factory, controller, window, events = make_keyed("ip")
+    controller.dispatch(PlayheadChanged(Fraction(1, 2)))
+    window.playback_controls.play_button.setFocus()
+
+    QTest.keyClick(window.playback_controls.play_button, Qt.Key.Key_I)
+
+    assert store.state.timeline.start == Fraction(1, 2)
+    assert any(isinstance(e, SetStartToPlayhead) for e in events)
+
+
+def test_i_in_an_inspector_spin_box_does_not_touch_the_range(qtbot, make_keyed) -> None:
+    store, _factory, controller, window, _events = make_keyed("isp")
+    controller.dispatch(PlayheadChanged(Fraction(1, 2)))
+    start = store.state.timeline.start
+    window.inspector.fps_spinbox.setFocus()
+
+    QTest.keyClick(window.inspector.fps_spinbox, Qt.Key.Key_I)
+
+    assert store.state.timeline.start == start
+
+
+def test_i_is_ignored_while_the_editor_is_locked(qtbot, make_keyed) -> None:
+    store, _factory, controller, window, _events = make_keyed("il")
+    controller.dispatch(PlayheadChanged(Fraction(1, 2)))
+    start = store.state.timeline.start
+    store.dispatch(PreviewRequested("preview", "preview-request"))
+
+    QTest.keyClick(window, Qt.Key.Key_I)
+
+    assert store.state.timeline.start == start
+
+
+def test_space_on_the_window_toggles_playback_and_auto_repeat_is_ignored(
+    qtbot, make_keyed
+) -> None:
+    _store, _factory, controller, window, _events = make_keyed("sp")
+    window.original_canvas.setFocus()
+
+    QTest.keyClick(window.original_canvas, Qt.Key.Key_Space)
+    assert controller.playback.playing
+    qtbot.waitUntil(
+        lambda: controller.playback.visible_position is not None, timeout=5000
+    )
+    QTest.keyClick(window.original_canvas, Qt.Key.Key_Space)
+    assert not controller.playback.playing
+
+    repeat = QKeyEvent(
+        QEvent.Type.KeyPress,
+        Qt.Key.Key_Space,
+        Qt.KeyboardModifier.NoModifier,
+        " ",
+        True,
+    )
+    QApplication.sendEvent(window.original_canvas, repeat)
+    assert not controller.playback.playing
+
+
+def test_space_in_a_spin_box_or_on_the_result_canvas_does_not_toggle(
+    qtbot, make_keyed
+) -> None:
+    _store, _factory, controller, window, _events = make_keyed("sps")
+    window.inspector.fps_spinbox.setFocus()
+    QTest.keyClick(window.inspector.fps_spinbox, Qt.Key.Key_Space)
+    assert not controller.playback.playing
+
+    window.result_canvas.setFocus()
+    assert QApplication.focusWidget() is window.result_canvas
+    QTest.keyClick(window.result_canvas, Qt.Key.Key_Space)
+    assert not controller.playback.playing
+
+
+def test_space_is_ignored_while_the_row_is_disabled(qtbot, make_keyed) -> None:
+    store, _factory, controller, window, _events = make_keyed("sd")
+    store.dispatch(PreviewRequested("preview", "preview-request"))
+    assert not window.playback_controls.isEnabled()
+
+    QTest.keyClick(window, Qt.Key.Key_Space)
+
+    assert not controller.playback.playing
+    assert not controller.playback._threads
+
+
+def test_toggle_playback_does_nothing_after_the_controller_is_closed(
+    qtbot, make_keyed
+) -> None:
+    _store, _factory, controller, window, _events = make_keyed("sc")
+    controller.shutdown()
+
+    QTest.keyClick(window, Qt.Key.Key_Space)
+    controller.toggle_playback()
+
+    assert not controller.playback.playing
+    assert not controller.playback._threads
+
+
+def test_step_frame_while_playing_pauses_first_and_steps_from_the_visible_frame(
+    qtbot, make_keyed
+) -> None:
+    store, _factory, controller, _window, events = make_keyed("st")
+    _play_and_wait(qtbot, controller)
+    visible = controller.playback.visible_position
+    assert visible is not None
+    events.clear()
+
+    controller.dispatch(StepFrame(1))
+
+    assert not controller.playback.playing
+    timeline_events = [
+        e for e in events if isinstance(e, (PlayheadChanged, StepFrame))
+    ]
+    assert timeline_events == [PlayheadChanged(visible), StepFrame(1)]
+    assert store.state.timeline.playhead == visible + STEP
+
+
+def test_job_start_stops_playback_without_a_commit(qtbot, make_keyed) -> None:
+    gate = threading.Event()
+    store, _factory, controller, window, events = make_keyed(
+        "job", gate=gate, gate_at=5
+    )
+    _play_and_wait(qtbot, controller)
+    session = controller.playback.active_session
+    assert session is not None
+    events.clear()
+
+    store.dispatch(PreviewRequested("preview", "preview-request"))
+
+    assert not controller.playback.playing
+    assert not [e for e in events if isinstance(e, PlayheadChanged)]
+    assert not window.original_canvas.holding_live_frame
+    assert window.original_canvas._frame == store.state.source_frame
+    assert not window.playback_controls.isEnabled()
+
+    gate.set()
+    qtbot.waitUntil(lambda: not controller.playback._threads, timeout=5000)
+    QApplication.processEvents()
+    controller.playback._frame_available(session)
+    assert not window.original_canvas.holding_live_frame
+    assert window.original_canvas._frame == store.state.source_frame
+    assert not [e for e in events if isinstance(e, PlayheadChanged)]
+
+
+def test_source_replacement_stops_playback_and_clears_the_marker(
+    qtbot, make_keyed
+) -> None:
+    store, factory, controller, window, events = make_keyed("rep")
+    factory.script = Script(fail_at=2)
+    controller.toggle_playback()
+    qtbot.waitUntil(lambda: not controller.playback.playing, timeout=5000)
+    assert window.original_canvas.status_label.isVisible()
+    factory.script = Script(end=Fraction(5))
+    controller.toggle_playback()
+    qtbot.waitUntil(
+        lambda: controller.playback.visible_position is not None, timeout=5000
+    )
+    events.clear()
+
+    store.dispatch(SourceLoadRequested("new", "load"))
+
+    assert not controller.playback.playing
+    assert not [e for e in events if isinstance(e, PlayheadChanged)]
+    assert not window.original_canvas.status_label.isVisible()
+    assert not window.original_canvas.holding_live_frame
+    assert window.timeline_widget.held_playhead is None
+    assert window.playback_controls.position is None

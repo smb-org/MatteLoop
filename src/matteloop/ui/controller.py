@@ -327,7 +327,8 @@ class SourceController(QObject):
         return self._playback
 
     def toggle_playback(self) -> None:
-        self._playback.toggle()
+        if not self._closed:
+            self._playback.toggle()
 
     def _commit_playhead(self, position: Fraction) -> None:
         self._dispatch_timeline(PlayheadChanged(position))
@@ -546,7 +547,22 @@ class SourceController(QObject):
     def _load_thread_finished(self, request_id: str) -> None:
         self._threads.pop(request_id, None)
 
+    def _while_playing(self, event: object) -> object:
+        """Translate a timeline event for the frame the user is looking at."""
+        playback = self._playback
+        position = playback.visible_position
+        if not playback.playing:
+            return event
+        if isinstance(event, StepFrame):
+            playback.pause()
+        elif position is not None and isinstance(event, SetStartToPlayhead):
+            return StartChanged(position)
+        elif position is not None and isinstance(event, SetEndToPlayhead):
+            return EndChanged(position)
+        return event
+
     def _dispatch_timeline(self, event: object) -> None:
+        event = self._while_playing(event)
         before = self._store.state
         self._store.dispatch(event)  # type: ignore[arg-type]
         after = self._store.state

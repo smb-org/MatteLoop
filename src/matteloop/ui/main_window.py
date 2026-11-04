@@ -5,8 +5,9 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from PySide6.QtCore import QByteArray, QSettings, Qt, QTimer
-from PySide6.QtGui import QFontMetrics
+from PySide6.QtGui import QFontMetrics, QKeyEvent
 from PySide6.QtWidgets import (
+    QApplication,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -20,6 +21,7 @@ from PySide6.QtWidgets import (
 from matteloop import application_title
 from matteloop.core.execution_providers import ProviderOption
 from matteloop.core.state import AppState, FocusTarget
+from matteloop.core.timeline import SetEndToPlayhead, SetStartToPlayhead
 from matteloop.ui.action_shelf import ActionShelf
 from matteloop.ui.copy import main_window_copy, runtime_banner_copy
 from matteloop.ui.inspector import Inspector
@@ -353,6 +355,32 @@ class MainWindow(QMainWindow):
                 handler()
 
         self.playback_controls.play_toggled.connect(toggle)
+
+    def keyPressEvent(self, event: QKeyEvent) -> None:
+        """Window-wide I/O and Space, after the focused widget declined the key."""
+        key = event.key()
+        modifiers = event.modifiers()
+        if key in (Qt.Key.Key_I, Qt.Key.Key_O) and not (
+            modifiers & Qt.KeyboardModifier.ControlModifier
+        ):
+            self._services.dispatch(
+                SetStartToPlayhead() if key == Qt.Key.Key_I else SetEndToPlayhead()
+            )
+            event.accept()
+            return
+        if (
+            key == Qt.Key.Key_Space
+            and modifiers == Qt.KeyboardModifier.NoModifier
+            and not event.isAutoRepeat()
+            and QApplication.focusWidget() is not self.result_canvas
+        ):
+            # The row is disabled with the editor, so a job running blocks Space too.
+            handler = getattr(self._services, "toggle_playback", None)
+            if self.playback_controls.isEnabled() and callable(handler):
+                handler()
+            event.accept()
+            return
+        super().keyPressEvent(event)
 
     def closeEvent(self, event) -> None:  # type: ignore[no-untyped-def]
         confirm = getattr(self._services, "confirm_discard_unsaved_transform", None)
