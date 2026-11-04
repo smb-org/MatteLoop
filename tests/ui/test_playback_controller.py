@@ -1127,7 +1127,7 @@ def test_press_move_release_on_the_timeline_suspends_and_resumes_from_the_new_po
     qtbot.waitUntil(lambda: playback.visible_position is not None, timeout=5000)
 
 
-def test_a_frame_from_the_suspended_session_arriving_after_release_changes_nothing(
+def test_the_suspended_worker_converts_no_frame_after_the_resume(
     qtbot, make_keyed
 ) -> None:
     gate = threading.Event()
@@ -1464,7 +1464,9 @@ def test_a_range_change_ends_the_hold_and_plays_on_from_the_frame_in_hand(
     rig.store.dispatch(EndChanged(Fraction(1, 5) + 2 * STEP))
 
     qtbot.waitUntil(lambda: Fraction(21, 100) in decoder.converted, timeout=5000)
-    assert len(decoder.seeks) in (seeks, seeks + 1)
+    # The frame in hand was converted before any seek that followed the change.
+    shown_at = decoder.converted.index(Fraction(21, 100))
+    assert all(mark > shown_at for mark in decoder.seek_marks[seeks:])
     assert max(decoder.converted) < Fraction(22, 100)
     rig.controller.pause()
 
@@ -1561,6 +1563,9 @@ def test_releasing_a_drag_at_the_last_frame_resumes_there_not_from_zero(
     qtbot.waitUntil(lambda: len(factory.decoders) == 2, timeout=5000)
     qtbot.waitUntil(lambda: bool(factory.decoders[1].seeks), timeout=5000)
     assert factory.decoders[1].seeks[0] == last
+    qtbot.waitUntil(lambda: not controller.playback.playing, timeout=5000)
+    assert store.state.timeline.playhead == last
+    assert window.playback_controls.play_button.text() == "Play"
 
 
 def _mouse(timeline, kind: QEvent.Type, point: QPoint, held: bool) -> None:
@@ -1598,3 +1603,30 @@ def test_a_double_click_still_suspends_for_the_drag_after_it(
     qtbot.waitUntil(lambda: len(factory.decoders) == 3, timeout=5000)
     assert not controller.playback.suspended
     assert controller.playback.playing
+
+
+def test_a_drag_right_after_pause_releases_the_holds_and_the_marker_follows(
+    qtbot, make_keyed
+) -> None:
+    store, _factory, controller, window, _events = _playing_keyed(
+        qtbot, make_keyed, "drag-after-pause"
+    )
+    timeline = window.timeline_widget
+
+    controller.playback.pause()
+
+    # The pause commit is the controller's own dispatch; it must not release.
+    assert window.original_canvas.holding_live_frame
+    assert timeline.held_playhead is not None
+    point = _strip_point(timeline, 0.5)
+    _press(timeline, point)
+    moved = _strip_point(timeline, 0.6)
+    _drag_to(timeline, moved)
+
+    assert timeline.held_playhead is None
+    assert not window.original_canvas.holding_live_frame
+    assert window.playback_controls.position is None
+    shown = timeline._presentation.state.playhead
+    assert shown == store.state.timeline.playhead
+    assert Fraction(5, 10) < shown < Fraction(7, 10)
+    _release(timeline, moved)

@@ -321,6 +321,7 @@ class SourcePlaybackController(QObject):
         self._press_pending = False
         self._suspended = False
         self._resume_pending = False
+        self._committing = False
         self._unsubscribe: Callable[[], None] | None = store.subscribe(
             self._state_changed
         )
@@ -463,7 +464,15 @@ class SourcePlaybackController(QObject):
             )
 
     def playhead_changed_by_user(self) -> None:
-        """Suspend playback while the user drags the marker; resume on release."""
+        """Suspend playback while the user drags the marker; resume on release.
+
+        A drag right after Pause, while the commit still waits for its still,
+        releases the holds at once: each move restarts the still's debounce, so
+        the marker would otherwise stay frozen for the whole drag.
+        """
+        if self._release_pending and not self._committing:
+            self._release_holds()
+            return
         if not (self._playing and self._press_pending and not self._suspended):
             return
         self._interrupt_worker()
@@ -528,7 +537,11 @@ class SourcePlaybackController(QObject):
         before = self._store.state
         self._remembered_frame = before.source_frame
         self._release_pending = True
-        self._commit(position)
+        self._committing = True
+        try:
+            self._commit(position)
+        finally:
+            self._committing = False
         if self._store.state is before:
             self._release_pending = False
             self._release_holds()
