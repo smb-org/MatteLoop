@@ -436,15 +436,23 @@ class SourcePlaybackController(QObject):
     def _state_changed(self, state: AppState) -> None:
         if self._release_pending and state.source_frame is not self._remembered_frame:
             self._release_holds()
-        if not (self._playing or self._release_pending):
-            return
-        source_changed = state.source_id != self._play_source_id
-        if (
-            source_changed
+        # Replacing the video is the recovery from a failure marker, so a new
+        # source id clears it even after the stop has long settled.
+        replaced = (
+            self._play_source_id is not None
+            and state.source_id != self._play_source_id
+        )
+        active = self._playing or self._release_pending
+        if active and (
+            replaced
             or state.source is not SourceState.READY
             or state.job.phase is not JobState.IDLE
         ):
-            self._stop_without_commit(clear_marker=source_changed)
+            self._stop_without_commit(clear_marker=replaced)
+        elif replaced and self._canvas is not None:
+            self._canvas.set_status_marker(None)
+        if replaced:
+            self._play_source_id = None
 
     def _stop_without_commit(self, *, clear_marker: bool) -> None:
         if self._playing:

@@ -12,7 +12,7 @@ from typing import Any
 
 import pytest
 from PIL import Image
-from PySide6.QtCore import QSettings
+from PySide6.QtCore import QObject, QSettings, Slot
 from PySide6.QtGui import QImage
 from PySide6.QtWidgets import QApplication, QFileDialog
 
@@ -326,37 +326,94 @@ def test_the_still_after_the_commit_releases_the_holds(qtbot, make_rig) -> None:
     assert rig.controls.position is None
 
 
+class _TerminalSpy(QObject):
+    """Records terminal signals on the GUI thread, like the real queued slots."""
+
+    def __init__(self, rig: Rig) -> None:
+        super().__init__()
+        self.rig = rig
+        self.seen: list[str] = []
+
+    @Slot(int, str)
+    def failed(self, _session: int, token: str) -> None:
+        closed = "close" in self.rig.factory.log
+        self.seen.append(f"failed:{token}:closed={closed}")
+
+    @Slot(int, object)
+    def ended(self, _session: int, _last: object) -> None:
+        self.seen.append("ended")
+
+
 def test_close_failure_after_the_last_frame_reports_the_changed_source(
     qtbot, make_rig
 ) -> None:
     rig = make_rig()
+    gate = threading.Event()
     rig.factory.script = Script(
         end=STEP * 3,
+        gate=gate,
+        gate_at=0,
         close_error=AppError(
             ErrorCode.SOURCE_CHANGED, "s", "s.changed", "changed", "reload"
         ),
     )
-    controller = rig.controller
-    original_failed, original_ended = controller._failed, controller._ended
-    seen: list[str] = []
+    spy = _TerminalSpy(rig)
+    rig.controller.play()
+    worker = rig.controller._threads[0][1]
+    # The worker waits on the gate, so the spy is connected before any signal.
+    worker.failed.connect(spy.failed)
+    worker.ended.connect(spy.ended)
+    gate.set()
+    qtbot.waitUntil(lambda: not rig.controller.playing, timeout=5000)
+    qtbot.waitUntil(lambda: bool(spy.seen), timeout=5000)
 
-    def failed(session: int, token: str) -> None:
-        seen.append(f"failed:{token}:closed={'close' in rig.factory.log}")
-        original_failed(session, token)
-
-    def ended(session: int, last: object) -> None:
-        seen.append("ended")
-        original_ended(session, last)
-
-    # The worker's signals are connected at play(), so wrap the slots first.
-    controller._failed = failed  # type: ignore[method-assign]
-    controller._ended = ended  # type: ignore[method-assign]
-    controller.play()
-    qtbot.waitUntil(lambda: not controller.playing, timeout=5000)
-
-    assert seen == ["failed:source-changed:closed=True"]
+    assert spy.seen == ["failed:source-changed:closed=True"]
     assert rig.canvas.status_label.text() == CHANGED_MARKER
     assert rig.canvas.status_label.isVisible()
+
+
+def _replace_source(rig: Rig, name: str) -> None:
+    rig.store.dispatch(SourceLoadRequested(name, f"{name}-load"))
+
+
+def test_the_marker_clears_when_the_video_is_replaced_after_an_open_failure(
+    qtbot, make_rig
+) -> None:
+    rig = make_rig()
+    rig.factory.script = Script(
+        open_error=AppError(
+            ErrorCode.SOURCE_CHANGED, "s", "s.changed", "changed", "reload"
+        )
+    )
+    rig.controller.play()
+    qtbot.waitUntil(lambda: not rig.controller.playing, timeout=5000)
+    assert rig.canvas.status_label.isVisible()
+    rig.store.dispatch(StartChanged(Fraction(1, 10)))
+    assert rig.canvas.status_label.isVisible()
+
+    _replace_source(rig, "other")
+
+    assert not rig.canvas.status_label.isVisible()
+    assert rig.canvas.status_label.text() == ""
+
+
+def test_the_marker_clears_when_the_video_is_replaced_after_a_settled_failure(
+    qtbot, make_rig
+) -> None:
+    rig = make_rig()
+    rig.factory.script = Script(fail_at=2)
+    rig.controller.play()
+    qtbot.waitUntil(lambda: not rig.controller.playing, timeout=5000)
+    rig.store.dispatch(
+        SourceFrameDecoded("source", rig.store.state.timeline.generation, QImage())
+    )
+    assert not rig.canvas.holding_live_frame
+    assert rig.canvas.status_label.text() == DECODE_MARKER
+
+    _replace_source(rig, "other")
+
+    assert not rig.canvas.status_label.isVisible()
+    assert rig.canvas.status_label.text() == ""
 
 
 def test_a_pts_beyond_the_metadata_duration_shows_one_position_everywhere(
