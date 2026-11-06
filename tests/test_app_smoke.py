@@ -99,6 +99,9 @@ class SourceController(QObject):
     def attach_transform_stage(self, _group, _canvas):
         pass
 
+    def attach_playback(self, _controls, _canvas, _timeline):
+        pass
+
     def shutdown(self):
         if self._thread is None:
             return True
@@ -125,6 +128,8 @@ class MainWindow(QWidget):
         super().__init__()
         self.inspector = Inspector()
         self.result_canvas = None
+        self.original_canvas = None
+        self.playback_controls = None
         self.timeline_widget = Timeline()
 
 
@@ -151,7 +156,7 @@ import sys
 from pathlib import Path
 from threading import Event
 
-from PySide6.QtCore import QCoreApplication, QTimer
+from PySide6.QtCore import QCoreApplication, QObject, QTimer, Signal
 from PySide6.QtWidgets import QApplication, QWidget
 
 import matteloop.app as app_module
@@ -179,8 +184,12 @@ class BlockingSourceAdapter:
         raise RuntimeError("the blocking source adapter was released")
 
 
-class Timeline:
+class Timeline(QObject):
     shutdown_complete = True
+
+
+class PlaybackControls(QObject):
+    selection_only_toggled = Signal(bool)
 
 
 class Inspector:
@@ -193,6 +202,8 @@ class MainWindow(QWidget):
         super().__init__()
         self.inspector = Inspector()
         self.result_canvas = None
+        self.original_canvas = None
+        self.playback_controls = PlaybackControls()
         self.timeline_widget = Timeline()
         source_controller.dispatch(VideoDropped(source_path))
         self._quit_when_started()

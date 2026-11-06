@@ -4,25 +4,25 @@
 <context>
     <name>ActionShelf</name>
     <message>
-        <location filename="../src/matteloop/ui/action_shelf.py" line="116"/>
-        <location filename="../src/matteloop/ui/action_shelf.py" line="120"/>
+        <location filename="../src/matteloop/ui/action_shelf.py" line="133"/>
+        <location filename="../src/matteloop/ui/action_shelf.py" line="137"/>
         <source>Preview Frame</source>
         <translation>Vorschau anzeigen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/action_shelf.py" line="123"/>
-        <location filename="../src/matteloop/ui/action_shelf.py" line="127"/>
+        <location filename="../src/matteloop/ui/action_shelf.py" line="140"/>
+        <location filename="../src/matteloop/ui/action_shelf.py" line="144"/>
         <source>Render Video</source>
         <translation>Video rendern</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/action_shelf.py" line="159"/>
+        <location filename="../src/matteloop/ui/action_shelf.py" line="189"/>
         <source>Copy render settings</source>
         <translation>Render-Einstellungen kopieren</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/action_shelf.py" line="88"/>
-        <location filename="../src/matteloop/ui/action_shelf.py" line="90"/>
+        <location filename="../src/matteloop/ui/action_shelf.py" line="105"/>
+        <location filename="../src/matteloop/ui/action_shelf.py" line="107"/>
         <source>Preferences</source>
         <translation>Einstellungen</translation>
     </message>
@@ -1054,6 +1054,41 @@ Freed %s.</source>
     </message>
 </context>
 <context>
+    <name>PlaybackControls</name>
+    <message>
+        <location filename="../src/matteloop/ui/playback_controls.py" line="38"/>
+        <location filename="../src/matteloop/ui/playback_controls.py" line="94"/>
+        <source>Play</source>
+        <translation>Abspielen</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/playback_controls.py" line="42"/>
+        <location filename="../src/matteloop/ui/playback_controls.py" line="99"/>
+        <source>Play the video</source>
+        <translation>Video abspielen</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/playback_controls.py" line="50"/>
+        <source>Selection only</source>
+        <translation>Nur Auswahl</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/playback_controls.py" line="54"/>
+        <source>Loop playback inside the export range</source>
+        <translation>Wiedergabe im Exportbereich wiederholen</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/playback_controls.py" line="92"/>
+        <source>Pause</source>
+        <translation>Pause</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/playback_controls.py" line="97"/>
+        <source>Pause the video</source>
+        <translation>Video anhalten</translation>
+    </message>
+</context>
+<context>
     <name>Presenter</name>
     <message>
         <location filename="../src/matteloop/ui/copy.py" line="336"/>
@@ -1235,17 +1270,17 @@ Freed %s.</source>
 <context>
     <name>PreviewCanvas</name>
     <message>
-        <location filename="../src/matteloop/ui/preview_canvas.py" line="133"/>
+        <location filename="../src/matteloop/ui/preview_canvas.py" line="139"/>
         <source>Original video frame</source>
         <translation>Original-Videobild</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/preview_canvas.py" line="135"/>
+        <location filename="../src/matteloop/ui/preview_canvas.py" line="141"/>
         <source>Background-removed result</source>
         <translation>Freigestelltes Ergebnis</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/preview_canvas.py" line="285"/>
+        <location filename="../src/matteloop/ui/preview_canvas.py" line="322"/>
         <source>Original</source>
         <translation>Original</translation>
     </message>
@@ -1625,7 +1660,7 @@ Freed %s.</source>
 <context>
     <name>PreviewStage</name>
     <message>
-        <location filename="../src/matteloop/ui/preview_canvas.py" line="291"/>
+        <location filename="../src/matteloop/ui/preview_canvas.py" line="328"/>
         <source>Original</source>
         <translation>Original</translation>
     </message>
@@ -1893,7 +1928,7 @@ Freed %s.</source>
 <context>
     <name>RenderSettingsExportController</name>
     <message>
-        <location filename="../src/matteloop/ui/render_settings_export.py" line="57"/>
+        <location filename="../src/matteloop/ui/render_settings_export.py" line="66"/>
         <source>Copied render settings to clipboard</source>
         <translation>Render-Einstellungen in die Zwischenablage kopiert</translation>
     </message>
@@ -2062,17 +2097,17 @@ Freed %s.</source>
 <context>
     <name>SourceController</name>
     <message>
-        <location filename="../src/matteloop/ui/controller.py" line="416"/>
+        <location filename="../src/matteloop/ui/controller.py" line="473"/>
         <source>Open video</source>
         <translation>Video öffnen</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/controller.py" line="418"/>
+        <location filename="../src/matteloop/ui/controller.py" line="475"/>
         <source>Video files (*.mp4 *.mov *.webm *.mkv)</source>
         <translation>Videodateien (*.mp4 *.mov *.webm *.mkv)</translation>
     </message>
     <message>
-        <location filename="../src/matteloop/ui/controller.py" line="572"/>
+        <location filename="../src/matteloop/ui/controller.py" line="629"/>
         <source>Choose output directory</source>
         <translation>Ausgabeordner auswählen</translation>
     </message>
@@ -2161,6 +2196,19 @@ Freed %s.</source>
         <location filename="../src/matteloop/ui/copy.py" line="600"/>
         <source>This video could not be read. Open another video.</source>
         <translation>Dieses Video konnte nicht gelesen werden. Öffnen Sie ein anderes Video.</translation>
+    </message>
+</context>
+<context>
+    <name>SourcePlaybackController</name>
+    <message>
+        <location filename="../src/matteloop/ui/playback_controller.py" line="425"/>
+        <source>Playback stopped — the video file changed on disk</source>
+        <translation>Wiedergabe gestoppt — die Videodatei hat sich auf der Festplatte geändert</translation>
+    </message>
+    <message>
+        <location filename="../src/matteloop/ui/playback_controller.py" line="430"/>
+        <source>Playback stopped — the video could not be decoded further</source>
+        <translation>Wiedergabe gestoppt — das Video konnte nicht weiter dekodiert werden</translation>
     </message>
 </context>
 <context>
@@ -2541,8 +2589,8 @@ Freed %s.</source>
 <context>
     <name>UpdateBanner</name>
     <message>
-        <location filename="../src/matteloop/ui/action_shelf.py" line="70"/>
-        <location filename="../src/matteloop/ui/action_shelf.py" line="73"/>
+        <location filename="../src/matteloop/ui/action_shelf.py" line="87"/>
+        <location filename="../src/matteloop/ui/action_shelf.py" line="90"/>
         <location filename="../src/matteloop/ui/update_dialog.py" line="23"/>
         <location filename="../src/matteloop/ui/update_dialog.py" line="26"/>
         <location filename="../src/matteloop/ui/update_dialog.py" line="41"/>

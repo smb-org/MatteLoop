@@ -5,8 +5,9 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from PySide6.QtCore import QByteArray, QSettings, Qt, QTimer
-from PySide6.QtGui import QFontMetrics
+from PySide6.QtGui import QFontMetrics, QKeyEvent
 from PySide6.QtWidgets import (
+    QApplication,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -20,10 +21,12 @@ from PySide6.QtWidgets import (
 from matteloop import application_title
 from matteloop.core.execution_providers import ProviderOption
 from matteloop.core.state import AppState, FocusTarget
+from matteloop.core.timeline import SetEndToPlayhead, SetStartToPlayhead
 from matteloop.ui.action_shelf import ActionShelf
 from matteloop.ui.copy import main_window_copy, runtime_banner_copy
 from matteloop.ui.inspector import Inspector
 from matteloop.ui.main_window_render import render_source_error, render_window
+from matteloop.ui.playback_controls import PlaybackTimeline
 from matteloop.ui.ports import (
     ChooseVideoRequested,
     CopyRenderSettingsRequested,
@@ -42,7 +45,6 @@ from matteloop.ui.presentation_model import PresentationModel
 from matteloop.ui.presenter import present
 from matteloop.ui.preview_canvas import PreviewStage, StatusLabel
 from matteloop.ui.source_strip import SourceDropSurface, SourceStrip
-from matteloop.ui.timeline import TimelineWidget
 from matteloop.ui.update_dialog import UpdateDialog
 
 
@@ -76,6 +78,7 @@ class MainWindow(QMainWindow):
         self._last_focus: FocusTarget | None = None
         self._success_artifact_path = ""
         self._build()
+        self._connect_playback_controls()
         self._set_tab_order()
         self._restore_geometry()
         self.render_state(store.state)
@@ -105,10 +108,11 @@ class MainWindow(QMainWindow):
         self.replace_video_button = self.source_strip.replace_button
         self.preview_stage = PreviewStage()
         self.original_canvas = self.preview_stage.original_canvas
+        self.playback_controls = self.preview_stage.playback_controls
         self.result_canvas = self.preview_stage.result_canvas
         self.source_drop_target.install_drop_target(self.source_strip)
         self.source_drop_target.install_drop_target(self.preview_stage)
-        self.timeline_widget = TimelineWidget()
+        self.timeline_widget = PlaybackTimeline()
         self.timeline_placeholder = self.timeline_widget
         self.source_error_heading = StatusLabel(
             main_window_copy("Couldn’t read this video")
@@ -260,6 +264,8 @@ class MainWindow(QMainWindow):
             self.choose_video_button,
             self.replace_video_button,
             self.original_canvas,
+            self.playback_controls.play_button,
+            self.playback_controls.selection_only,
             self.result_canvas,
             self.timeline_widget,
         ]
@@ -341,6 +347,44 @@ class MainWindow(QMainWindow):
 
     def requested_focus_name(self) -> str:
         return (self._last_focus or FocusTarget.NONE).value
+
+    def _connect_playback_controls(self) -> None:
+        def toggle(_checked: bool) -> None:
+            handler = getattr(self._services, "toggle_playback", None)
+            if callable(handler):
+                handler()
+            # A focused button would swallow Left/Right and Space, and a focused
+            # model picker would take `I` for itself; the timeline owns the keys.
+            self.timeline_widget.setFocus(Qt.FocusReason.OtherFocusReason)
+
+        self.playback_controls.play_toggled.connect(toggle)
+
+    def keyPressEvent(self, event: QKeyEvent) -> None:
+        """Window-wide I/O and Space, after the focused widget declined the key."""
+        key = event.key()
+        modifiers = event.modifiers()
+        if key in (Qt.Key.Key_I, Qt.Key.Key_O) and not (
+            modifiers & Qt.KeyboardModifier.ControlModifier
+        ):
+            if not event.isAutoRepeat():
+                self._services.dispatch(
+                    SetStartToPlayhead() if key == Qt.Key.Key_I else SetEndToPlayhead()
+                )
+            event.accept()
+            return
+        if (
+            key == Qt.Key.Key_Space
+            and modifiers == Qt.KeyboardModifier.NoModifier
+            and not event.isAutoRepeat()
+            and QApplication.focusWidget() is not self.result_canvas
+        ):
+            # The row is disabled with the editor, so a job running blocks Space too.
+            handler = getattr(self._services, "toggle_playback", None)
+            if self.playback_controls.isEnabled() and callable(handler):
+                handler()
+            event.accept()
+            return
+        super().keyPressEvent(event)
 
     def closeEvent(self, event) -> None:  # type: ignore[no-untyped-def]
         confirm = getattr(self._services, "confirm_discard_unsaved_transform", None)

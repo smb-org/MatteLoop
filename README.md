@@ -21,8 +21,10 @@ You have a clip of a subject — a person, a pet, a product — and you want it
 without its background, as a loop you can drop onto any page or into any
 composite. MatteLoop is the whole path from that clip to that loop:
 
-- **Open a local video** and scrub to the part you want.
-- **Pick the frames** with IN and OUT points on the timeline.
+- **Open a local video**, play it, and scrub to the part you want.
+- **Pick the frames** with IN and OUT points on the timeline, or with `I` and
+  `O` while the video plays. **Selection only** loops playback inside that
+  range, so a cut can be judged in motion before rendering.
 - **Preview a single frame** to judge the cutout before committing to a render.
 - **Trim, crop and resize** the finished cut, and watch it loop on screen until
   it is right.

@@ -48,6 +48,7 @@ def _render_source_and_result(window: MainWindow, model: PresentationModel) -> N
     window.preview_stage.setVisible(model.show_stage)
     window.timeline_widget.setVisible(model.show_timeline)
     window.timeline_widget.apply_presentation(model.timeline, not model.editor_locked)
+    window.playback_controls.apply(model)
     render_source_error(window, model)
     window.source_drop_surface.heading.setText(
         presented_copy(model.source_surface_heading)

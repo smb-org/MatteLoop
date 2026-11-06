@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 )
 
 from matteloop.resources import status_icon_asset
+from matteloop.ui.playback_controls import PlaybackControls
 from matteloop.ui.theme import CHECKERBOARD_DARK, CHECKERBOARD_LIGHT
 
 
@@ -115,6 +116,9 @@ class StatusLabel(QLabel):
         self.setContentsMargins(left, top, right, bottom)
 
 
+_NOTHING_PENDING = object()
+
+
 class PreviewCanvas(QLabel):
     def __init__(
         self,
@@ -128,6 +132,8 @@ class PreviewCanvas(QLabel):
         self._placeholder = title
         self._frame: QImage | None = None
         self._cover_frame = False
+        self._holding_live_frame = False
+        self._pending_still: QImage | None | object = _NOTHING_PENDING
         self.setObjectName(object_name)
         self.setAccessibleName(
             QCoreApplication.translate("PreviewCanvas", "Original video frame")
@@ -161,6 +167,28 @@ class PreviewCanvas(QLabel):
 
     def set_frame(self, image: QImage | None) -> None:
         """Display a GUI-owned pixmap scaled to fit the current canvas."""
+        if self._holding_live_frame:
+            self._pending_still = image
+            return
+        self._show_still(image)
+
+    @property
+    def holding_live_frame(self) -> bool:
+        return self._holding_live_frame
+
+    def hold_live_frame(self, image: QImage) -> None:
+        """Show a playback frame; ``set_frame`` stills wait until the release."""
+        self._holding_live_frame = True
+        self._show_still(image)
+
+    def release_live_frame(self) -> None:
+        """End the hold and apply the still that arrived meanwhile, if any."""
+        self._holding_live_frame = False
+        pending, self._pending_still = self._pending_still, _NOTHING_PENDING
+        if pending is not _NOTHING_PENDING:
+            self._show_still(pending)  # type: ignore[arg-type]
+
+    def _show_still(self, image: QImage | None) -> None:
         if image is None or image.isNull():
             self._frame = None
             self.clear()
@@ -222,9 +250,7 @@ class PreviewCanvas(QLabel):
                     )
         super().paintEvent(event)
 
-    def _update_pixmap(self) -> None:
-        if self._frame is None:
-            return
+    def _content_rect(self) -> tuple[QRect, int]:
         margins = self.layout().contentsMargins()  # type: ignore[union-attr]
         reserved = max(0, round(self._reserved_bottom_space()))
         content = self.contentsRect().adjusted(
@@ -233,7 +259,18 @@ class PreviewCanvas(QLabel):
             -margins.right(),
             -margins.bottom() - reserved,
         )
-        size = QSize(max(1, content.width()), max(1, content.height()))
+        return content, reserved
+
+    def display_size(self) -> tuple[int, int]:
+        """The logical-pixel box ``_update_pixmap`` scales a frame into."""
+        content, _ = self._content_rect()
+        return max(1, content.width()), max(1, content.height())
+
+    def _update_pixmap(self) -> None:
+        if self._frame is None:
+            return
+        content, reserved = self._content_rect()
+        size = QSize(*self.display_size())
         pixmap = QPixmap.fromImage(self._frame).scaled(
             size,
             (
@@ -292,7 +329,14 @@ class PreviewStage(QFrame):
         )
         self.result_canvas.setProperty("status", "none")
         self.result_canvas.setProperty("checkerboard", False)
-        layout.addWidget(self.original_canvas, 1)
+        self.playback_controls = PlaybackControls()
+        self.original_column = QWidget()
+        column = QVBoxLayout(self.original_column)
+        column.setContentsMargins(0, 0, 0, 0)
+        column.setSpacing(8)
+        column.addWidget(self.original_canvas, 1)
+        column.addWidget(self.playback_controls)
+        layout.addWidget(self.original_column, 1)
         divider = QFrame()
         divider.setFrameShape(QFrame.Shape.VLine)
         divider.setObjectName("preview_divider")

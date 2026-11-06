@@ -53,6 +53,11 @@ from matteloop.jobs.source import (
 from matteloop.paths import model_cache_root
 from matteloop.ui.crop_canvas import CropCanvas
 from matteloop.ui.model_manager import ModelManagerController, ModelRemovalService
+from matteloop.ui.playback_controller import (
+    PlaybackDecoderFactory,
+    SourcePlaybackController,
+)
+from matteloop.ui.playback_controls import PlaybackControls, PlaybackTimeline
 from matteloop.ui.ports import (
     ChooseVideoRequested,
     CopyRenderSettingsRequested,
@@ -69,6 +74,7 @@ from matteloop.ui.ports import (
     WindowCommand,
 )
 from matteloop.ui.preferences import persist_parameters
+from matteloop.ui.preview_canvas import PreviewCanvas
 from matteloop.ui.preview_controller import PreviewController, PreviewRuntime
 from matteloop.ui.render_controller import RenderController
 from matteloop.ui.render_settings_export import RenderSettingsExportController
@@ -168,6 +174,7 @@ class SourceController(QObject):
         settings: QSettings | None = None,
         dialog_parent: QWidget | None = None,
         parent: QObject | None = None,
+        playback_decoder_factory: PlaybackDecoderFactory | None = None,
     ) -> None:
         super().__init__(parent)
         self._store = store
@@ -195,6 +202,7 @@ class SourceController(QObject):
         )
         self._model_manager = self._build_model_manager()
         self._transform_stage = TransformStageController(store, parent=self)
+        self._playback = self._build_playback(store, playback_decoder_factory)
         self._render_controller.artifact_ready.connect(
             self._transform_stage.open_artifact
         )
@@ -205,10 +213,7 @@ class SourceController(QObject):
         )
         self._preview_controller.provider_ready.connect(self._provider_ready)
         self._render_controller.provider_ready.connect(self._provider_ready)
-        self._working_provider = store.state.parameters.execution_provider
-        self._failed_provider: str | None = None
-        self._pending_provider: str | None = None
-        self._provider_reconcile_scheduled = False
+        self._init_provider_state(store)
         self._unsubscribe: Callable[[], None] | None = store.subscribe(
             self._state_changed
         )
@@ -224,6 +229,22 @@ class SourceController(QObject):
     ) -> RenderSettingsExportController:
         return RenderSettingsExportController(
             store, dialog_parent=dialog_parent, parent=self
+        )
+
+    def _init_provider_state(self, store: StateStore) -> None:
+        self._working_provider = store.state.parameters.execution_provider
+        self._failed_provider: str | None = None
+        self._pending_provider: str | None = None
+        self._provider_reconcile_scheduled = False
+
+    def _build_playback(
+        self, store: StateStore, decoder_factory: PlaybackDecoderFactory | None
+    ) -> SourcePlaybackController:
+        return SourcePlaybackController(
+            store,
+            commit=self._commit_playhead,
+            decoder_factory=decoder_factory,
+            parent=self,
         )
 
     def _build_frame_timer(self) -> QTimer:
@@ -291,6 +312,27 @@ class SourceController(QObject):
         """Wire the inspector's Transform group (and, later, the result canvas)."""
         self._transform_stage.attach(group, canvas)
 
+    def attach_playback(
+        self,
+        controls: PlaybackControls,
+        canvas: PreviewCanvas,
+        timeline: PlaybackTimeline,
+    ) -> None:
+        """Wire the playback row, the Original canvas and the timeline."""
+        self._playback.attach(controls, canvas, timeline)
+
+    @property
+    def playback(self) -> SourcePlaybackController:
+        """Expose the playback owner for lifecycle and UI integration tests."""
+        return self._playback
+
+    def toggle_playback(self) -> None:
+        if not self._closed:
+            self._playback.toggle()
+
+    def _commit_playhead(self, position: Fraction) -> None:
+        self._dispatch_timeline(PlayheadChanged(position))
+
     @property
     def model_options(self) -> tuple[tuple[str, bool], ...]:
         """Expose runtime model availability for the passive inspector view."""
@@ -309,6 +351,18 @@ class SourceController(QObject):
     def dispatch(self, command: WindowCommand) -> None:
         if self._closed:
             return
+        if isinstance(
+            command,
+            (
+                ChooseVideoRequested,
+                VideoDropped,
+                PreviewFrameRequested,
+                RenderVideoRequested,
+                RebuildEditedCutsRequested,
+                ManageWorkspacesRequested,
+            ),
+        ):
+            self._playback.stop_and_commit()
         if isinstance(command, (ChooseVideoRequested, VideoDropped)):
             if not self.confirm_discard_unsaved_transform(self._dialog_parent):
                 return
@@ -371,6 +425,7 @@ class SourceController(QObject):
                 ):
                     complete = False
             self._model_manager.close()
+            complete = self._playback.shutdown() and complete
             complete = self._transform_stage.shutdown() and complete
             complete = self._render_controller.shutdown() and complete
             complete = self._preview_controller.shutdown() and complete
@@ -492,7 +547,24 @@ class SourceController(QObject):
     def _load_thread_finished(self, request_id: str) -> None:
         self._threads.pop(request_id, None)
 
+    def _while_playing(self, event: object) -> object:
+        """Translate a timeline event for the frame the user is looking at."""
+        playback = self._playback
+        position = playback.visible_position
+        if not playback.playing:
+            return event
+        if isinstance(event, StepFrame):
+            playback.pause()
+        elif position is not None and isinstance(event, SetStartToPlayhead):
+            return StartChanged(position)
+        elif position is not None and isinstance(event, SetEndToPlayhead):
+            return EndChanged(position)
+        return event
+
     def _dispatch_timeline(self, event: object) -> None:
+        if isinstance(event, PlayheadChanged):
+            self._playback.playhead_changed_by_user()
+        event = self._while_playing(event)
         before = self._store.state
         self._store.dispatch(event)  # type: ignore[arg-type]
         after = self._store.state

@@ -68,6 +68,29 @@ def _decode_only(path: Path) -> int:
     return 0
 
 
+def _playback_only(path: Path) -> int:
+    """Drive PlaybackDecoder.convert at a scaled, unpadded size."""
+    from matteloop.jobs.playback import PlaybackDecoder
+    from matteloop.jobs.source import probe_source
+
+    info = probe_source(path)
+    decoder = PlaybackDecoder(
+        path,
+        info.validation_proof,
+        info.revision,
+        (max(1, info.width * 3 // 5), max(1, info.height * 3 // 5)),
+    )
+    decoder.open()
+    try:
+        decoder.seek(Fraction(0))
+        for _, frame in decoder.frames():
+            decoder.convert(frame)
+            break
+    finally:
+        decoder.close()
+    return 0
+
+
 def _invalid_writes(log: str) -> list[str]:
     """Return every Invalid write stanza in a Valgrind log."""
     stanzas: list[str] = []
@@ -100,39 +123,46 @@ def _check(directory: Path) -> int:
     for width, height in _CLIPS:
         clip = directory / f"clip-{width}x{height}.mp4"
         _encode_clip(clip, width, height)
-        log_path = directory / f"valgrind-{width}x{height}.log"
-        completed = subprocess.run(
-            [
-                "valgrind",
-                "--tool=memcheck",
-                "--num-callers=30",
-                f"--log-file={log_path}",
-                sys.executable,
-                str(script),
-                "--mode",
-                "decode-only",
-                str(clip),
-            ],
-            check=False,
-            env={**_child_env()},
-        )
-        log = log_path.read_text(encoding="utf-8", errors="replace")
-        stanzas = _invalid_writes(log)
-        swscale = [stanza for stanza in stanzas if "libswscale" in stanza]
-        if swscale:
-            verdict = "OVERRUN"
-        else:
-            verdict = "other invalid write" if stanzas else "clean"
-        print(
-            f"{width}x{height}: width%16={width % 16:>2} "
-            f"exit={completed.returncode} {verdict}"
-        )
-        # Print every stanza, not only the libswscale ones: a write from
-        # somewhere else would mean the padding itself is wrong.
-        for stanza in stanzas:
-            print(stanza)
-        failures += len(swscale)
+        for mode in ("decode-only", "playback-scaled"):
+            failures += _check_clip(script, clip, mode, width, height, directory)
     return 1 if failures else 0
+
+
+def _check_clip(
+    script: Path, clip: Path, mode: str, width: int, height: int, directory: Path
+) -> int:
+    log_path = directory / f"valgrind-{mode}-{width}x{height}.log"
+    completed = subprocess.run(
+        [
+            "valgrind",
+            "--tool=memcheck",
+            "--num-callers=30",
+            f"--log-file={log_path}",
+            sys.executable,
+            str(script),
+            "--mode",
+            mode,
+            str(clip),
+        ],
+        check=False,
+        env={**_child_env()},
+    )
+    log = log_path.read_text(encoding="utf-8", errors="replace")
+    stanzas = _invalid_writes(log)
+    swscale = [stanza for stanza in stanzas if "libswscale" in stanza]
+    if swscale:
+        verdict = "OVERRUN"
+    else:
+        verdict = "other invalid write" if stanzas else "clean"
+    print(
+        f"{mode} {width}x{height}: width%16={width % 16:>2} "
+        f"exit={completed.returncode} {verdict}"
+    )
+    # Print every stanza, not only the libswscale ones: a write from
+    # somewhere else would mean the padding itself is wrong.
+    for stanza in stanzas:
+        print(stanza)
+    return len(swscale)
 
 
 def _child_env() -> dict[str, str]:
@@ -146,7 +176,9 @@ def _child_env() -> dict[str, str]:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--mode", choices=("check", "decode-only"), default="check")
+    parser.add_argument(
+        "--mode", choices=("check", "decode-only", "playback-scaled"), default="check"
+    )
     parser.add_argument("path", nargs="?", type=Path)
     arguments = parser.parse_args()
 
@@ -154,6 +186,10 @@ def main() -> int:
         if arguments.path is None:
             parser.error("decode-only requires a clip path")
         return _decode_only(arguments.path)
+    if arguments.mode == "playback-scaled":
+        if arguments.path is None:
+            parser.error("playback-scaled requires a clip path")
+        return _playback_only(arguments.path)
 
     with tempfile.TemporaryDirectory(prefix="matteloop-swscale-") as directory:
         return _check(Path(directory))

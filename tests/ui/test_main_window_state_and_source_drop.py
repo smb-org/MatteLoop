@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, replace
+from fractions import Fraction
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from PySide6.QtCore import QByteArray, QMimeData, QSettings, Qt, QUrl
@@ -33,6 +35,7 @@ from matteloop.core.state import (
     SourceLoadRequested,
     reduce,
 )
+from matteloop.core.timeline import timeline_from_metadata
 from matteloop.ui.main_window import MainWindow
 from matteloop.ui.ports import ChooseVideoRequested
 from matteloop.ui.presenter import present
@@ -781,6 +784,38 @@ def test_actual_tab_order_skips_hidden_widgets_and_reaches_success_actions(
         assert expected_widget.accessibleName()
         QTest.keyClick(expected_widget, Qt.Key.Key_Tab)
         QApplication.processEvents()
+
+
+def test_tab_order_runs_through_the_playback_row_once_a_timeline_exists(
+    window, qtbot
+) -> None:
+    # The row is disabled without a timeline (the string metadata the other
+    # fixtures use), so this one needs real metadata to see it in the chain.
+    value, _ = window
+    metadata = SimpleNamespace(
+        path=Path("source.mp4"), width=64, height=48, duration=Fraction(2)
+    )
+    value.render_state(
+        replace(
+            _ready(),
+            source_value=metadata,
+            timeline=timeline_from_metadata(metadata),
+        )
+    )
+    value.show()
+    qtbot.wait(30)
+    row = value.playback_controls
+    assert row.isEnabled()
+    expected = [value.original_canvas, row.play_button, row.selection_only]
+    value.original_canvas.setFocus()
+    QApplication.processEvents()
+    for expected_widget in expected:
+        assert QApplication.focusWidget() is expected_widget
+        assert expected_widget.objectName()
+        assert expected_widget.accessibleName()
+        QTest.keyClick(expected_widget, Qt.Key.Key_Tab)
+        QApplication.processEvents()
+    assert QApplication.focusWidget() is value.result_canvas
 
 
 @pytest.mark.parametrize(
