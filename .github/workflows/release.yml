@@ -78,7 +78,7 @@
         {
           "name": "Install uv and Python",
           "id": "setup-uv",
-          "uses": "astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d",
+          "uses": "astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d",
           "with": {
             "enable-cache": false,
             "python-version": "3.13",
